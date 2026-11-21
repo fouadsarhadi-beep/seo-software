@@ -5,16 +5,22 @@ import argparse
 from dataclasses import asdict
 import json
 import sys
+import sqlite3
+from urllib.parse import urlsplit
 from pathlib import Path
 
 from seo_analysis import __version__
-from seo_analysis.analysis import analyze, fa_text, review, similarity, variants as variants_mod
+from seo_analysis.analysis import similarity
+from seo_analysis.app.operations import AnalysisInput, CalibrationInput, ReviewInput, VariantInput
+from seo_analysis.app.runner import ToolRunner
+from seo_analysis.core.artifacts import publish_files
 from seo_analysis.web import crawl
 from seo_analysis.app.system import doctor
 from seo_analysis.core import tools
 from seo_analysis.core.network import HttpOrigin
 from seo_analysis.core.workspace import Workspace
-from seo_analysis.reporting.report import write_csv
+from seo_analysis.storage.history import History
+
 
 
 def ask(question, default="", input_fn=input):
@@ -24,7 +30,35 @@ def ask(question, default="", input_fn=input):
 
 
 def _interactive(args) -> bool:
-    return sys.stdin.isatty() and not getattr(args, "yes", False)
+    return sys.stdin.isatty() and not getattr(args, "yes", False) and not getattr(args, "json", False)
+
+
+def execute(args, spec, request, prompt=None, export=None, export_names=None):
+    workspace = args.workspace
+    json_mode = getattr(args, "json", False)
+    log = lambda message: print(message, file=sys.stderr)
+    result = ToolRunner(workspace).run(spec, request, log=log, prompt=None if json_mode else prompt,
+                                       project=getattr(args, "project", None),
+                                       saved_target=getattr(args, "target", None))
+    directory = Path(result.out_dir)
+    if export and result.status in {"succeeded", "partial"}:
+        names = result.artifacts if export_names is None else export_names
+        destination = publish_files(directory, export, names, include_observations=spec.uses_network)
+        log(f"Export directory: {destination}")
+    if json_mode:
+        summary = asdict(result)
+        summary["warning_count"] = len(result.warnings)
+        summary["warnings"] = result.warnings[:20]
+        print(json.dumps(summary, ensure_ascii=False))
+    else:
+        print(f"{result.tool_id} {result.status} | {result.run_id}")
+        print(f"Run directory: {directory}")
+        print("Coverage:", json.dumps(result.counts, ensure_ascii=False))
+        for warning in result.warnings[:20]:
+            print(warning)
+        if len(result.warnings) > 20:
+            print("See run.json for all warnings.")
+    return {"succeeded": 0, "partial": 3, "cancelled": 130}.get(result.status, 2)
 
 
 def cmd_crawl(args, input_fn=input):
@@ -49,31 +83,18 @@ def cmd_crawl(args, input_fn=input):
     if inter and ask(f"Crawl {sitemap_url} now (one request at a time, {args.delay}s apart)?", "Y", input_fn).lower().startswith("n"):
         print("Cancelled.")
         return 1
-    cfg = crawl.CrawlConfig(sitemap=sitemap_url, out_dir=args.out_dir or str(args.workspace.create_run_directory()), delay=args.delay, retries=args.retries,
+    cfg = crawl.CrawlConfig(sitemap=sitemap_url, out_dir="", delay=args.delay, retries=args.retries,
                             limit=args.limit, allow_local=args.allow_local, max_redirects=args.max_redirects,
                             robots=robots, content_selector=selector or "", exclude_selectors=args.exclude_selector or [],
                             skip_sitemap=args.skip_sitemap, config_file=args.config or "",
                             variants_file=args.variants or "", page_types=page_types,
                             user_agent=args.user_agent or crawl.CrawlConfig.__dataclass_fields__["user_agent"].default,
                             csv_guard=not args.no_csv_guard)
-    crawl.run_crawl(cfg, input_fn=input_fn if inter else None)
-    print(f"\nNext: seo-analysis variants --in-dir \"{cfg.out_dir}\"   (optional, Persian spelling variants)\n"
-          f"      seo-analysis analyze --in-dir \"{cfg.out_dir}\"")
-    return 0
+    return execute(args, tools.CRAWL, cfg, input_fn if inter else None, args.out_dir)
 
 
 def cmd_variants(args, input_fn=input):
-    recs = analyze.load_snapshot(Path(args.in_dir) / "snapshot.jsonl")
-    toks = [fa_text.tokenize(r["text"]) for r in recs if r["fetch_state"].startswith("ok")]
-    cands = variants_mod.find_candidates(toks, min_split=args.min_count)
-    if not cands:
-        print("No spelling-variant candidates found.")
-        return 0
-    path = Path(args.variants or Path(args.in_dir) / "persian_variants.json")
-    print(f"{len(cands)} candidate(s). You approve each one; nothing is applied without your answer.")
-    ok = variants_mod.review(cands, path, input_fn)
-    print(f"{len(ok)} variant(s) saved in {path}. 'analyze' will use them automatically.")
-    return 0
+    return execute(args, tools.VARIANTS, VariantInput(args.in_dir, args.variants, args.min_count), input_fn)
 
 
 def cmd_analyze(args, input_fn=input):
@@ -86,35 +107,22 @@ def cmd_analyze(args, input_fn=input):
     s = similarity.Settings(shingle=args.shingle, min_words=args.min_words, thr_dup=args.min_dup,
                             thr_contain=args.min_contain, thr_topic=args.min_topic, thr_title=args.min_title,
                             bigrams=not args.no_bigrams, brand_terms=tuple(args.brand or []))
-    analyze.run_analyze(args.in_dir, args.out_dir, pages, qp, s, args.stopwords, args.variants, args.normalizer,
-                        args.stem, args.include_noindex)
-    out = args.out_dir or args.in_dir
-    print(f"\nNext: seo-analysis review --in-dir \"{out}\"    (you decide, pair by pair)")
-    return 0
+    request = AnalysisInput(args.in_dir, s, pages, qp, args.stopwords, args.variants, args.normalizer,
+                            args.stem, args.include_noindex)
+    export = args.out_dir
+    if export is None and not (Path(args.in_dir) / "run.json").exists():
+        export = args.in_dir
+    return execute(args, tools.ANALYZE, request, export=export)
 
 
 def cmd_review(args, input_fn=input):
-    d = Path(args.in_dir)
-    pairs = json.loads((d / "pairs.json").read_text(encoding="utf-8"))
-    dec_path = Path(args.decisions or d / "decisions.jsonl")
-    review.review_loop(pairs, dec_path, args.min_evidence, args.limit, input_fn)
-    decisions = review.load_decisions(dec_path)
-    if decisions:
-        write_csv(
-            d / "decisions.csv",
-            ["URL A", "URL B", "Decision", "Note", "Decided at (UTC)"],
-            ([x["url_a"], x["url_b"], x["decision"], x["note"], x["ts"]] for x in decisions.values()),
-        )
-        print(f"Your decisions are also in {d / 'decisions.csv'}.")
-    return 0
+    request = ReviewInput(args.in_dir, args.decisions, args.min_evidence, args.limit)
+    return execute(args, tools.REVIEW, request, input_fn, args.in_dir, ["decisions.csv"])
 
 
 def cmd_calibrate(args, input_fn=input):
-    d = Path(args.in_dir)
-    pairs = json.loads((d / "pairs.json").read_text(encoding="utf-8"))
-    text = review.calibrate(pairs, Path(args.decisions or d / "decisions.jsonl"))
-    (d / "calibration.txt").write_text(text, encoding="utf-8")
-    return 0
+    return execute(args, tools.CALIBRATE, CalibrationInput(args.in_dir, args.decisions),
+                   export=args.in_dir, export_names=["calibration.txt"])
 
 
 def cmd_doctor(args):
@@ -123,7 +131,7 @@ def cmd_doctor(args):
         print(json.dumps(facts, ensure_ascii=False))
     else:
         print(f"SEO Analysis {facts['app_version']} on Python {facts['python']}")
-        for key in ("interpreter", "config_file", "data_dir", "runs_dir", "export_dir"):
+        for key in ("interpreter", "config_file", "data_dir", "runs_dir", "history_db", "export_dir"):
             print(f"{key}: {facts[key]}")
         print("Configuration:", "loaded" if facts["config_loaded"] else "defaults")
         print("Dependencies:", ", ".join(f"{k} {v}" for k, v in facts["dependencies"].items()))
@@ -140,35 +148,66 @@ def cmd_list_tools(args):
 
 
 def cmd_audit(args, input_fn=input):
-    from seo_analysis.app.audit import run_audit
     from seo_analysis.web.discovery import read_seeds
 
     interactive = _interactive(args) and not args.json
     selected = [item for item in (args.url, args.sitemap, args.urls_file) if item]
-    if not selected and interactive:
-        args.url = ask("Website URL", input_fn=input_fn)
+    if args.target:
+        if selected:
+            raise ValueError("Choose a saved target or an explicit target.")
+        saved = History(args.workspace).selection(args.project, args.target)
+        if saved["kind"] == "website":
+            args.url = saved["url"]
+        else:
+            args.sitemap = saved["url"]
+    if not selected and not args.target and interactive:
+        value = ask("Website URL, sitemap URL, or path to a URL list", input_fn=input_fn)
+        if value.startswith(("https://", "http://")) and urlsplit(value).path.lower().endswith((".xml", ".xml.gz")):
+            args.sitemap = value
+        elif value and not value.startswith(("https://", "http://")) and Path(value).is_file():
+            args.urls_file = value
+        else:
+            args.url = value
     if sum(bool(item) for item in (args.url, args.sitemap, args.urls_file)) != 1:
         raise ValueError("Select one website URL, --sitemap URL, or --urls-file PATH.")
     seeds = read_seeds(args.urls_file) if args.urls_file else []
     first = seeds[0] if seeds else args.url or args.sitemap
+    raw_input = args.urls_file or first
+    if args.url and "://" not in first:
+        hostname = first.split("/", 1)[0]
+        if "." not in hostname or any(c in hostname for c in ":@"):
+            raise ValueError("Provide the complete HTTP(S) website URL.")
+        first = "https://" + first
     HttpOrigin.from_url(first)
-    directory = args.workspace.create_run_directory()
     cfg = crawl.CrawlConfig(
-        first, str(directory), kind="urls_file" if seeds else "website" if args.url else "sitemap",
-        source=args.urls_file or first, seeds=tuple(seeds), allow_local=args.allow_local,
+        first, "", kind="urls_file" if seeds else "website" if args.url else "sitemap",
+        source=raw_input, seeds=tuple(seeds), allow_local=args.allow_local,
         link_crawl=args.link_crawl, limit=args.max_pages, max_depth=args.max_depth,
         max_variants=args.max_variants, max_bytes=args.max_bytes, max_seconds=args.max_seconds,
         max_requests=args.max_requests, delay=args.delay, retries=args.retries,
         sitemap_paths=tuple(args.sitemap_path or ("/sitemap.xml", "/sitemap_index.xml")),
     )
-    result = run_audit(cfg, log=lambda msg: print(msg, file=sys.stderr), prompt=input_fn if interactive else None)
-    if args.json:
-        print(json.dumps(result, ensure_ascii=False))
+    return execute(args, tools.AUDIT, cfg, input_fn if interactive else None)
+
+
+def cmd_history(args):
+    history = History(args.workspace)
+    if args.cmd == "project":
+        if args.operation == "create":
+            history.add_project(args.name)
+        value = history.projects()
+    elif args.cmd == "target":
+        if args.operation == "add":
+            history.add_target(args.project, args.name, args.kind, args.url)
+        value = history.targets(args.project)
+    elif args.operation == "show":
+        value = history.show(args.run_id)
+    elif args.operation == "reindex":
+        value = history.reindex()
     else:
-        print(f"{result['status']}: {result['counts']['observed']} observations in {directory}")
-        for warning in result["warnings"]:
-            print(warning)
-    return {"succeeded": 0, "partial": 3, "cancelled": 130}.get(result["status"], 2)
+        value = history.list_runs(args.project)
+    print(json.dumps(value, ensure_ascii=False, indent=None if args.json else 2))
+    return 2 if isinstance(value, dict) and value.get("errors") else 0
 
 
 def build_parser():
@@ -189,8 +228,32 @@ def build_parser():
     listing.add_argument("--json", action="store_true")
     listing.set_defaults(func=cmd_list_tools)
 
-    audit = sub.add_parser("audit", help="crawl a selected site and report evidence-backed findings")
+    projects = sub.add_parser("project", help="manage optional saved projects").add_subparsers(dest="operation", required=True)
+    create = projects.add_parser("create")
+    create.add_argument("name")
+    project_list = projects.add_parser("list")
+    targets = sub.add_parser("target", help="manage saved website and sitemap inputs").add_subparsers(dest="operation", required=True)
+    add = targets.add_parser("add")
+    add.add_argument("name")
+    add.add_argument("url")
+    add.add_argument("--kind", choices=("website", "sitemap"), default="website")
+    target_list = targets.add_parser("list")
+    for command in (add, target_list):
+        command.add_argument("--project", required=True)
+    history = sub.add_parser("history", help="inspect and rebuild the local run index").add_subparsers(dest="operation", required=True)
+    runs = history.add_parser("list")
+    runs.add_argument("--project")
+    show = history.add_parser("show")
+    show.add_argument("run_id")
+    rebuild = history.add_parser("reindex")
+    for command in (create, project_list, add, target_list, runs, show, rebuild):
+        command.add_argument("--json", action="store_true")
+        command.set_defaults(func=cmd_history)
+
+    audit = sub.add_parser(tools.AUDIT.command, help=tools.AUDIT.summary)
     audit.add_argument("url", nargs="?")
+    audit.add_argument("--target", help="explicitly select a saved target within --project")
+    audit.add_argument("--project")
     audit.add_argument("--sitemap")
     audit.add_argument("--urls-file")
     audit.add_argument("--sitemap-path", action="append", help="candidate sitemap location; repeatable")
@@ -248,6 +311,9 @@ def build_parser():
     k.add_argument("--in-dir", required=True); k.add_argument("--decisions")
     k.set_defaults(func=cmd_calibrate)
 
+    for command in (c, a, k, r, v):
+        command.add_argument("--json", action="store_true")
+        command.add_argument("--project")
     return p
 
 
@@ -260,7 +326,7 @@ def main(argv=None):
     try:
         args.workspace = Workspace.load(args.config_file)
         return args.func(args)
-    except (ValueError, RuntimeError, OSError) as exc:
+    except (ValueError, RuntimeError, OSError, sqlite3.Error) as exc:
         if getattr(args, "json", False):
             print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))
         else:

@@ -55,7 +55,8 @@ def test_default_crawl_isolated_by_run(site, tmp_path):
     for directory in runs:
         assert (directory / "snapshot.jsonl").is_file()
     assert cli.main(["--config-file", str(config), "analyze", "--in-dir", str(runs[0]), "--yes"]) == 0
-    assert (runs[0] / "analysis_manifest.json").exists()
+    replays = set(runs[0].parent.iterdir()) - set(runs)
+    assert len(replays) == 1 and (replays.pop() / "analysis_manifest.json").exists()
     assert not (runs[1] / "analysis_manifest.json").exists()
 
 
@@ -76,7 +77,7 @@ def test_tool_catalogue_describes_runnable_commands(capsys):
     assert cli.main(["tools", "list", "--json"]) == 0
     catalogue = json.loads(capsys.readouterr().out)
     assert len({tool["id"] for tool in catalogue}) == len(catalogue)
-    assert [tool["command"] for tool in catalogue if tool["uses_network"]] == ["crawl"]
+    assert [tool["command"] for tool in catalogue if tool["uses_network"]] == ["crawl", "audit"]
     for tool in catalogue:
         with pytest.raises(SystemExit) as help_exit:
             cli.build_parser().parse_args([*tool["command"].split(), "--help"])

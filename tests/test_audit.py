@@ -118,3 +118,30 @@ def test_no_sitemap_and_invalid_sitemap_are_visible(site, tmp_path, capsys):
 def test_url_and_sitemap_are_mutually_exclusive(site, tmp_path, capsys):
     code, result = run_cli(tmp_path, capsys, site.base, "--sitemap", site.base)
     assert code == 2 and not site.hits
+
+
+def test_exact_canonical_target_and_filtered_bigram():
+    from seo_analysis.analysis import canon, similarity
+    base = "https://example.org"
+    page = {"url": base, "final_url": base, "final_status": 200, "canonicals_html": [base + "/old"]}
+    target = {"url": base + "/old", "final_url": base + "/new", "first_status": 301, "final_status": 200}
+    diagnostic = canon.analyze([page, target])[base]
+    assert diagnostic["target_status"] == "301" and "redirect" in diagnostic["issues"]
+    words = {"url": base, "title": "", "h1": "", "text": "search and visibility"}
+    corpus = similarity.prepare([words], similarity.Settings(), {"and"})
+    assert "search visibility" not in corpus.docs[0].vec
+
+
+def test_duration_budget_during_dns(monkeypatch):
+    from threading import Event
+    from seo_analysis.web import transport
+    gate = Event()
+    def resolve(*args, **kwargs):
+        gate.wait(1)
+        return []
+    monkeypatch.setattr(transport.socket, "getaddrinfo", resolve)
+    try:
+        with pytest.raises(transport.BudgetExceeded, match="DNS"):
+            transport.resolve_endpoints("example.test", 80, transport.CrawlBudget(10, 0.05))
+    finally:
+        gate.set()

@@ -9,7 +9,7 @@ def test_numbers_in_persian_locale():
     assert abs(gsc.to_float("۲٫۸٪") - 0.028) < 1e-9
     assert abs(gsc.to_float("2.8%") - 0.028) < 1e-9
     assert gsc.to_float("1,234") == 1234 and gsc.to_float("12,5") == 12.5
-    assert gsc.to_float("") == 0.0 and gsc.to_float(None) == 0.0 and gsc.to_float(7) == 7.0
+    assert gsc.to_float("") is None and gsc.to_float(None) is None and gsc.to_float(7) == 7.0
 
 
 def test_pages_export_english_headers(tmp_path):
@@ -73,3 +73,10 @@ def test_api_pagination_metadata_and_readonly_scope(tmp_path):
     m = json.loads((tmp_path / "qp.csv.meta.json").read_text(encoding="utf-8"))
     assert any("Pacific" in x for x in m["limitations"]) and any("does NOT prove" in x for x in m["limitations"])
     assert gsc.SCOPE.endswith("webmasters.readonly")
+
+
+def test_missing_csv_metrics_remain_unknown(tmp_path):
+    source = tmp_path / "pages.csv"
+    source.write_text("Page,Impressions,Position\nhttps://example.org/,0,\n")
+    row = gsc.load_pages(source)["https://example.org/"]
+    assert row["impressions"] == 0 and row["clicks"] is None and row["position"] is None

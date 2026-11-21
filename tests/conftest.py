@@ -57,3 +57,14 @@ def site():
     s = Site()
     yield s
     s.close()
+
+
+@pytest.fixture(autouse=True)
+def isolated_default_workspace(tmp_path, monkeypatch):
+    from seo_analysis.core.workspace import Workspace
+    original = Workspace.load
+    def load(config_file=None):
+        if config_file is not None:
+            return original(config_file)
+        return Workspace(tmp_path / "config.toml", tmp_path / "workspace", tmp_path / "exports")
+    monkeypatch.setattr(Workspace, "load", staticmethod(load))

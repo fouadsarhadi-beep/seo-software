@@ -65,7 +65,7 @@ class Discovery:
                 return
             self.variants[parts.path] += 1
         self.seen.add(key)
-        self.queue.append((SitemapEntry(url, entry.lastmod, entry.source), depth))
+        self.queue.append((SitemapEntry(url, entry.lastmod, entry.source, entry.url), depth))
 
     def discover(self, policy, prompt=None):
         cfg = self.cfg

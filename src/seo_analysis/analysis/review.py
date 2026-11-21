@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from seo_analysis import __version__
+from seo_analysis.connectors.gsc import display_metric
 from seo_analysis.core.urls import url_key
 
 CHOICES = {
@@ -57,9 +58,9 @@ def _fmt(p: dict) -> str:
             return "unknown" if g.get(key) is None else f"{g[key]:.0f}"
         lines.append(f"Search Console: clicks A {metric('clicks_a')} / B {metric('clicks_b')}; "
                      f"impressions A {metric('impr_a')} / B {metric('impr_b')}; "
-                     f"shared queries: {g.get('shared_count', 0)}")
+                     f"shared queries: {metric('shared_count')}")
         for q, ia, ib in g.get("shared_top", []):
-            lines.append(f"   query: {q}  (A {ia:.0f} / B {ib:.0f} impressions)")
+            lines.append(f"   query: {q}  (A {display_metric(ia)} / B {display_metric(ib)} impressions)")
         lines.append("   (a missing query row is not proof that a page never appeared for it)")
     return "\n".join(lines)
 

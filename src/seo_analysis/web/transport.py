@@ -2,6 +2,8 @@
 import ipaddress
 import socket
 import time
+from queue import Empty, Queue
+from threading import Thread
 
 from requests.adapters import HTTPAdapter
 from urllib3.connection import HTTPConnection, HTTPSConnection
@@ -50,6 +52,28 @@ def approved_address(address, local):
     return local and any(ip in ipaddress.ip_network(net) for net in private_ranges)
 
 
+def resolve_endpoints(host, port, budget):
+    """System DNS has no portable timeout. Only resolution runs on the helper thread."""
+    result = Queue(maxsize=1)
+
+    def resolve():
+        try:
+            addresses = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+        except OSError as error:
+            result.put((None, error))
+        else:
+            result.put((addresses, None))
+
+    Thread(target=resolve, name="seo-dns", daemon=True).start()
+    try:
+        addresses, error = result.get(timeout=budget.remaining())
+    except Empty as exc:
+        raise BudgetExceeded("Time budget reached during DNS resolution.") from exc
+    if error:
+        raise error
+    return addresses
+
+
 def scoped_adapter(origin, allow_local, budget):
     class ScopedConnection:
         def _new_conn(self):
@@ -57,7 +81,7 @@ def scoped_adapter(origin, allow_local, budget):
                 raise ScopeError("Connection outside the selected origin.")
             if not allow_local and self.port not in (80, 443):
                 raise ScopeError("Public crawl ports are 80 and 443.")
-            endpoints = socket.getaddrinfo(self.host, self.port, type=socket.SOCK_STREAM)
+            endpoints = resolve_endpoints(self.host, self.port, budget)
             if not endpoints or not all(approved_address(item[4][0], allow_local) for item in endpoints):
                 raise ScopeError("Resolved address outside the permitted network scope.")
             last_error = None

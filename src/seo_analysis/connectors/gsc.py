@@ -6,6 +6,7 @@ from __future__ import annotations
 import csv
 import datetime as _dt
 import json
+import math
 import re
 import time
 from pathlib import Path
@@ -16,9 +17,9 @@ _NUM = {**{0x06F0 + i: str(i) for i in range(10)}, **{0x0660 + i: str(i) for i i
         0x066B: ".", 0x066C: ",", 0x066A: "%"}
 
 
-def to_float(value) -> float:
+def to_float(value) -> float | None:
     if value is None:
-        return 0.0
+        return None
     if isinstance(value, (int, float)):
         return float(value)
     t = str(value).translate(_NUM).replace("\u00a0", "").replace(" ", "").strip()
@@ -31,7 +32,9 @@ def to_float(value) -> float:
     try:
         v = float(t)
     except ValueError:
-        return 0.0
+        return None
+    if not math.isfinite(v):
+        return None
     return v / 100 if pct else v
 
 
@@ -56,6 +59,8 @@ def _find(header, *needles):
 def load_pages(path) -> dict:
     """GSC 'Pages' export -> {url_key: {url, clicks, impressions, ctr, position}}."""
     rows = _read(path)
+    if len(rows) < 2:
+        return {}
     header, data = rows[0], rows[1:]
     url_i = _find(header, "page", "url", "صفحه", "صفحات", "نشانی")
     if url_i is None:
@@ -65,15 +70,13 @@ def load_pages(path) -> dict:
     ti = _find(header, "ctr", "نرخ")
     pi = _find(header, "position", "جایگاه", "موقعیت")
     rest = [i for i in range(len(header)) if i != url_i]
-    ci = rest[0] if ci is None and len(rest) > 0 else ci
-    ii = rest[1] if ii is None and len(rest) > 1 else ii
-    ti = rest[2] if ti is None and len(rest) > 2 else ti
-    pi = rest[3] if pi is None and len(rest) > 3 else pi
+    if all(index is None for index in (ci, ii, ti, pi)):
+        ci, ii, ti, pi = (rest + [None] * 4)[:4]
     out = {}
     for r in data:
         if url_i >= len(r) or not r[url_i].strip():
             continue
-        g = lambda i: to_float(r[i]) if i is not None and i < len(r) else 0.0
+        g = lambda i: to_float(r[i]) if i is not None and i < len(r) else None
         out[url_key(r[url_i].strip())] = {"url": r[url_i].strip(), "clicks": g(ci), "impressions": g(ii),
                                           "ctr": g(ti), "position": g(pi)}
     return out
@@ -82,6 +85,8 @@ def load_pages(path) -> dict:
 def load_query_page(path) -> dict:
     """Query x page rows -> {url_key: {query: (impressions, clicks, position)}}."""
     rows = _read(path)
+    if len(rows) < 2:
+        return {}
     header, data = rows[0], rows[1:]
     url_i = _find(header, "page", "url", "صفحه")
     if url_i is None:
@@ -96,15 +101,19 @@ def load_query_page(path) -> dict:
     for r in data:
         if max(url_i, q_i) >= len(r):
             continue
-        g = lambda i: to_float(r[i]) if i is not None and i < len(r) else 0.0
+        g = lambda i: to_float(r[i]) if i is not None and i < len(r) else None
         out.setdefault(url_key(r[url_i].strip()), {})[r[q_i].strip()] = (g(ii), g(ci), g(pi))
     return out
+
+
+def display_metric(value):
+    return "unknown" if value is None else f"{value:.0f}"
 
 
 def shared_queries(qp: dict, url_a: str, url_b: str, top: int = 5):
     a, b = qp.get(url_key(url_a), {}), qp.get(url_key(url_b), {})
     common = [(q, a[q][0], b[q][0]) for q in a.keys() & b.keys()]
-    common.sort(key=lambda x: -(x[1] + x[2]))
+    common.sort(key=lambda x: -((x[1] or 0) + (x[2] or 0)))
     return len(common), common[:top]
 
 

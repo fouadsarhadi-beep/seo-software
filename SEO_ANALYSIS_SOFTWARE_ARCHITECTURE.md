@@ -6,7 +6,7 @@
 **Starting code:** `samatoos-seo-audit.zip`, containing the existing `seo_audit/` Python package and `tests/`; these are functional unreleased tools, not a previously deployed application  
 **Verified starting baseline (2026-11-21):** Six CLI commands (`crawl`, `variants`, `analyze`, `review`, `calibrate`, `gsc-pull`); offline suite: **75 passed, 1 skipped** (optional Hazm). This result applies to the supplied archive, not necessarily a later working checkout  
 **Package and CLI:** `seo_analysis` / `seo-analysis` on CPython 3.12. The maintained source is in `src/seo_analysis/`. The original ZIP records the assessment baseline.
-**Implementation checkpoint:** Stage A now has an installable CLI, a built-in tool catalogue, workspace configuration, diagnostics, and the extracted audit workflows. See [implementation state](docs/IMPLEMENTATION_STATE.md) and [foundation decision](docs/adr/0001-foundation.md).
+**Implementation checkpoint:** Implemented through Stage C step 2. The installed CLI supports bounded audits, offline replay, optional saved targets and SQLite-indexed run history. See [implementation state](docs/IMPLEMENTATION_STATE.md) and [foundation decision](docs/adr/0001-foundation.md).
 
 This document consolidates the complete architecture and tool catalogue with the critical review corrections. **It replaces both the earlier architecture draft and its review addendum for implementation purposes.** No separate addendum or predecessor specification is required. If the repository reveals facts that conflict with this document, verify them and record the decision in the living architecture and implementation record.
 
@@ -282,11 +282,12 @@ src/seo_analysis/
   web/                   # HTTP transport, discovery, robots and page extraction
   analysis/              # technical checks, content similarity and editorial review
   reporting/             # tabular exports and run manifests
+  storage/               # SQLite migrations, history indexing and recovery
   connectors/            # provider formats and acquisition code
 tests/                   # offline unit and end-to-end fixtures
 ```
 
-Introduce run storage during Stage B to preserve interrupted evidence. Add SQLite indexes and saved projects during Stage C. The local UI, research sources, CMS tools and agent adapters will call these same services. Each source retains its own authority, coverage and permissions.
+Stage B stores page observations atomically. Stage C indexes run manifests, artifacts and page evidence in SQLite, with optional saved projects and targets. The local UI, research sources, CMS tools and agent adapters will call these same services. Each source retains its own authority, coverage and permissions.
 
 **Do not put mutable application data inside the Git checkout by default.** On Windows use an appropriate per-user application-data directory (e.g. `%LOCALAPPDATA%\SEOAnalysisSoftware`, resolved with `platformdirs`); use equivalent per-user paths on other operating systems. Store SQLite databases, run artifacts, caches and logs there. User export paths are configurable and distinct from internal application state. Do not place active WAL-mode SQLite databases in synchronized/network folders. Secrets live in the OS credential store, not the database or repository.
 

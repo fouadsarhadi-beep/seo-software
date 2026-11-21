@@ -5,6 +5,7 @@ import pytest
 
 from seo_analysis.analysis import analyze
 from seo_analysis import cli
+from seo_analysis.core.workspace import Workspace
 from seo_analysis.web import crawl
 from seo_analysis.web.crawl import INVENTORY_HEADER
 from seo_analysis.analysis.analyze import PAIR_HEADER
@@ -108,11 +109,13 @@ def test_review_flow_through_the_cli(crawled):
     analyze.run_analyze(out, log=lambda *_: None)
     args = cli.build_parser().parse_args(["review", "--in-dir", str(out), "--limit", "2"])
     answers = iter(["1", "i"])
+    args.workspace = Workspace(out / "settings", out / "workspace", out / "export")
     cli.cmd_review(args, input_fn=lambda prompt="": next(answers))
     lines = (out / "decisions.jsonl").read_text(encoding="utf-8").splitlines()
     assert len(lines) == 2 and json.loads(lines[0])["decision"] == "merge_a_into_b"
     assert (out / "decisions.csv").exists()
     cal = cli.build_parser().parse_args(["calibrate", "--in-dir", str(out)])
+    cal.workspace = Workspace(out / "settings", out / "workspace", out / "export")
     cli.cmd_calibrate(cal)
     assert "PROVISIONAL" in (out / "calibration.txt").read_text(encoding="utf-8")
 
@@ -130,8 +133,8 @@ def test_unreadable_robots_txt_asks_the_human(site, tmp_path):
     b = build(site)
     site.add("/robots.txt", "down", status=503)
     cfg = crawl.CrawlConfig(allow_local=True, sitemap=b + "/sitemap_index.xml", out_dir=str(tmp_path / "a"), delay=0, retries=0, limit=2)
-    with pytest.raises(RuntimeError, match="robots.txt could not be read"):
-        crawl.run_crawl(cfg, log=lambda *_: None)
+    result = crawl.run_crawl(cfg, log=lambda *_: None)
+    assert result["status"] == "failed" and "robots.txt could not be read" in result["warnings"][0]
     asked = []
     crawl.run_crawl(crawl.CrawlConfig(allow_local=True, sitemap=b + "/sitemap_index.xml", out_dir=str(tmp_path / "b"), delay=0, retries=0, limit=2),
                     input_fn=lambda q: asked.append(q) or "y", log=lambda *_: None)
@@ -152,6 +155,7 @@ def test_variants_command_asks_and_analyze_uses_the_answer(site, tmp_path):
     out = tmp_path / "v"
     cli.main(["crawl", "--allow-local", "--sitemap", b + "/sitemap.xml", "--out-dir", str(out), "--delay", "0", "--retries", "0", "--yes"])
     args = cli.build_parser().parse_args(["variants", "--in-dir", str(out), "--min-count", "2"])
+    args.workspace = Workspace(out / "settings", out / "workspace", out / "export")
     cli.cmd_variants(args, input_fn=lambda prompt="": "y")
     saved = json.loads((out / "persian_variants.json").read_text(encoding="utf-8"))
     assert saved.get("نرمافزار") == "نرم افزار"

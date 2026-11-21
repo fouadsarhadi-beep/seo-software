@@ -4,12 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "seo-analysis"
-version = "0.1.0"
+version = "0.2.0"
 description = "Local-first SEO analysis and website research tools"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "beautifulsoup4>=4.12,<5",
+    "filelock>=3.18,<4",
     "idna>=3,<4",
     "urllib3>=2.6,<3",
     "platformdirs>=4,<5",

@@ -19,6 +19,7 @@ def doctor(workspace: Workspace) -> dict:
         "config_loaded": workspace.config_file.is_file(),
         "data_dir": str(workspace.data_dir),
         "runs_dir": str(workspace.runs_dir),
+        "history_db": str(workspace.data_dir / "history.sqlite3"),
         "export_dir": str(workspace.export_dir),
         "dependencies": {name: version(name) for name in ("beautifulsoup4", "requests", "platformdirs")},
     }

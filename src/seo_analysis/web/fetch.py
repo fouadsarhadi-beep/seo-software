@@ -92,6 +92,7 @@ class Fetcher:
         self.robots, self.robots_agent = robots, robots_agent
         self.backoff_base, self.sleep = backoff_base, sleep
         self._last = 0.0
+        self.attempts = []
 
     # -- scope and pacing
     def in_scope(self, url: str) -> bool:
@@ -126,11 +127,15 @@ class Fetcher:
         attempt = 0
         while True:
             attempt += 1
-            self.budget.charge()
             self._pace()
+            self.budget.charge()
+            event = {"method": "GET", "url": url, "attempt": attempt}
+            self.attempts.append(event)
             try:
                 resp = self.session.get(url, timeout=tuple(min(t, self.budget.remaining()) for t in self.timeout), allow_redirects=False, stream=True)
+                event["http_status"] = resp.status_code
             except requests.RequestException as exc:
+                event["error"] = type(exc).__name__
                 if attempt > self.retries:
                     return None, f"{type(exc).__name__}: {exc}", attempt - 1
                 self._wait(self._retry_delay(None, attempt))
@@ -186,8 +191,13 @@ class Fetcher:
                 res.first_status = resp.status_code
             loc = resp.headers.get("Location")
             if resp.status_code in REDIRECTS and loc:
-                nxt = urljoin(current, loc)
                 resp.close()
+                try:
+                    nxt = urljoin(current, loc)
+                except ValueError:
+                    res.redirect_note = "blocked_external:invalid redirect URL"
+                    res.final_status = resp.status_code
+                    return res
                 res.final_status, res.final_url = resp.status_code, nxt
                 if self.in_scope(nxt) and url_key(nxt) in seen:
                     res.redirect_note = "loop"

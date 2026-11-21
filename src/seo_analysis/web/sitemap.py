@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 import zlib
 from dataclasses import dataclass
 
-from seo_analysis.core.urls import is_http, url_key
+from seo_analysis.core.urls import url_key
 
 
 @dataclass
@@ -16,6 +16,7 @@ class SitemapEntry:
     url: str
     lastmod: str
     source: str
+    raw_url: str = ""
 
 
 def _ln(tag) -> str:
@@ -73,14 +74,14 @@ def collect(fetcher, sitemap_url: str, skip_re: str = "", cap: int = 50_000_000,
     stack = deque([(sitemap_url, 0, "")])
     while stack:
         smap, depth, _parent = stack.popleft()
+        if not fetcher.in_scope(smap):
+            warnings.append(f"sitemap outside the allowed hosts, not fetched: {smap}")
+            continue
         key = url_key(smap)
         if key in seen_maps:
             warnings.append(f"sitemap already visited (recursive or repeated reference): {smap}")
             continue
         seen_maps.add(key)
-        if not is_http(smap) or not fetcher.in_scope(smap):
-            warnings.append(f"sitemap outside the allowed hosts, not fetched: {smap}")
-            continue
         res = fetcher.get(smap)
         if res.final_status != 200 or not res.raw:
             warnings.append(f"cannot read sitemap {smap} (status {res.final_status or res.error})")
@@ -105,7 +106,7 @@ def collect(fetcher, sitemap_url: str, skip_re: str = "", cap: int = 50_000_000,
                 stack.append((loc, depth + 1, smap))
         else:
             for loc, lastmod in items:
-                if not is_http(loc) or not fetcher.in_scope(loc):
+                if not fetcher.in_scope(loc):
                     warnings.append(f"page URL outside the allowed hosts, ignored: {loc}")
                     continue
                 k = url_key(loc)

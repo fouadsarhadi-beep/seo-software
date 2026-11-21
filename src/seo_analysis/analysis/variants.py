@@ -3,6 +3,7 @@ Example: «نرمافزار» (joined) vs «نرم افزار» / «نرم‌ا�
 from __future__ import annotations
 
 import json
+from seo_analysis.core.artifacts import write_json
 from collections import Counter
 from pathlib import Path
 
@@ -39,5 +40,5 @@ def review(cands, path, input_fn=input, output_fn=print):
             elif ans != "y":
                 continue
         approved[c["joined"]] = c["split"]
-    path.write_text(json.dumps(approved, ensure_ascii=False, indent=2), encoding="utf-8")
+    write_json(path, approved)
     return approved

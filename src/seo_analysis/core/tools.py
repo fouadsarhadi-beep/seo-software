@@ -11,10 +11,11 @@ class ToolSpec:
 
 
 DOCTOR = ToolSpec("system.doctor", "system doctor", "Inspect runtime, dependencies and workspace paths.")
+AUDIT = ToolSpec("seo.audit", "audit", "Crawl one site and report evidence-backed findings.", uses_network=True)
 CRAWL = ToolSpec("web.crawl", "crawl", "Read a sitemap and inventory its pages.", uses_network=True)
 ANALYZE = ToolSpec("seo.analyze-snapshot", "analyze", "Evaluate canonicals and content overlap in a saved crawl.")
 VARIANTS = ToolSpec("content.spelling-variants", "variants", "Review Persian spelling variants.")
 REVIEW = ToolSpec("content.review-pairs", "review", "Record editorial decisions on flagged pairs.")
 CALIBRATE = ToolSpec("content.calibrate", "calibrate", "Evaluate thresholds on reviewed pairs.")
 
-BUILTIN_TOOLS = (DOCTOR, CRAWL, ANALYZE, VARIANTS, REVIEW, CALIBRATE)
+BUILTIN_TOOLS = (DOCTOR, CRAWL, AUDIT, ANALYZE, VARIANTS, REVIEW, CALIBRATE)

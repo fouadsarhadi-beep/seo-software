@@ -111,7 +111,8 @@ def run_analyze(in_dir, out_dir=None, gsc_pages=None, gsc_queries=None, settings
     rows, pairs_json = [], []
     for p in results:
         ga, gb = pages.get(url_key(p.url_a), {}), pages.get(url_key(p.url_b), {})
-        count, top = gsc.shared_queries(qpairs, p.url_a, p.url_b) if qpairs else (0, [])
+        comparable = url_key(p.url_a) in qpairs and url_key(p.url_b) in qpairs
+        count, top = gsc.shared_queries(qpairs, p.url_a, p.url_b) if comparable else (0, [])
         evidence = p.evidence + (1 if count >= 3 else 0)
         triggers = list(p.triggers) + (["shared GSC queries"] if count >= 3 else [])
         rows.append([p.url_a, p.url_b, p.title_sim, p.dup, p.topic, "YES" if p.same_h1 else "NO",
@@ -119,7 +120,7 @@ def run_analyze(in_dir, out_dir=None, gsc_pages=None, gsc_queries=None, settings
                      p.page_type_a, p.page_type_b, "yes" if p.page_type_a != p.page_type_b else "no",
                      p.words_a, p.words_b, "short page: scores can be noisy" if p.short_page else "",
                      ga.get("clicks", ""), gb.get("clicks", ""), ga.get("impressions", ""), gb.get("impressions", ""),
-                     count if qpairs else "", "; ".join(f"{q} ({a:.0f}/{b:.0f})" for q, a, b in top)])
+                     count if comparable else "", "; ".join(f"{q} ({gsc.display_metric(a)}/{gsc.display_metric(b)})" for q, a, b in top)])
         pairs_json.append({"url_a": p.url_a, "url_b": p.url_b, "title_a": title_of[p.url_a], "title_b": title_of[p.url_b],
                            "title_sim": p.title_sim, "dup": p.dup, "containment": p.containment, "topic": p.topic,
                            "same_h1": p.same_h1, "shared_terms": p.shared_terms, "shared_phrases": p.shared_phrases,
@@ -127,7 +128,7 @@ def run_analyze(in_dir, out_dir=None, gsc_pages=None, gsc_queries=None, settings
                            "page_type_b": p.page_type_b, "words_a": p.words_a, "words_b": p.words_b, "short_page": p.short_page,
                            "gsc": ({"clicks_a": ga.get("clicks"), "clicks_b": gb.get("clicks"),
                                     "impr_a": ga.get("impressions"), "impr_b": gb.get("impressions"),
-                                    "shared_count": count, "shared_top": top} if (pages or qpairs) else None)})
+                                    "shared_count": count if comparable else None, "shared_top": top} if (pages or qpairs) else None)})
     rows_order = sorted(range(len(rows)), key=lambda i: -rows[i][8])
     write_csv(out / "similar_pairs.csv", PAIR_HEADER, [rows[i] for i in rows_order])
     write_json(out / "pairs.json", [pairs_json[i] for i in rows_order])

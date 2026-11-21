@@ -69,19 +69,23 @@ class CrawlConfig:
     csv_guard: bool = True
 
 
+class RobotsUnavailable(RuntimeError):
+    pass
+
+
 def load_robots(fetcher, sitemap_url, cfg, input_fn=None):
     p = urlsplit(sitemap_url)
     res = fetcher.get(f"{p.scheme}://{p.netloc}/robots.txt")
     if res.final_status == 200 and not res.truncated:
         return RobotsPolicy.parse(res.text), "robots.txt read"
-    if 400 <= res.final_status < 500:
+    if 400 <= res.final_status < 500 and res.final_status != 429:
         return RobotsPolicy.allow_all(), f"robots.txt returned HTTP {res.final_status}: treated as 'allow all' (RFC 9309)"
     msg = f"robots.txt could not be read (status {res.final_status or res.error})."
     if cfg.robots == "ignore":
         return RobotsPolicy.allow_all(available=False), msg + " Continuing because --robots ignore was chosen."
     if input_fn and input_fn(msg + " Continue anyway and treat everything as allowed? [y/N] ").strip().lower() == "y":
         return RobotsPolicy.allow_all(available=False), msg + " You chose to continue."
-    raise RuntimeError(msg + " Nothing was crawled. Re-run with --robots ignore to continue.")
+    raise RobotsUnavailable(msg + " Nothing was crawled. Re-run with --robots ignore to continue.")
 
 
 def fetch_state(res, is_html: bool) -> str:
@@ -152,6 +156,9 @@ def run_crawl(cfg: CrawlConfig, input_fn=None, log=print, fetcher=None) -> dict:
     fetcher = fetcher or Fetcher(cfg.user_agent, cfg.delay, cfg.timeout, cfg.retries, cfg.max_redirects, cfg.max_bytes, origin=origin, allow_local=cfg.allow_local, max_requests=cfg.max_requests, max_seconds=cfg.max_seconds)
     if not 1 <= cfg.limit <= 10000 or cfg.max_depth < 0 or cfg.max_variants < 1:
         raise ValueError("Choose 1–10000 pages, a nonnegative depth and a positive variant limit.")
+    log(f"Target {cfg.sitemap} | origin {origin.host}:{origin.port} | robots {cfg.robots} | "
+        f"limits {cfg.limit} pages, depth {cfg.max_depth}, {cfg.max_requests} requests, "
+        f"{cfg.max_seconds}s, {cfg.max_bytes} bytes/response | output {out}")
     discovery = Discovery(cfg, fetcher)
     records = []
     journal = out / "observations"
@@ -172,7 +179,9 @@ def run_crawl(cfg: CrawlConfig, input_fn=None, log=print, fetcher=None) -> dict:
             rec, links = observe(cfg, fetcher, policy, entry, page_types, excludes, variants, discovery.follow_links)
             evidence_id = f"page-{len(records) + 1:06d}"
             rec.update(evidence_id=evidence_id, observed_at=datetime.now(timezone.utc).isoformat(),
-                       depth=depth, discovery_source=entry.source, url_key=url_key(entry.url),
+                       depth=depth, discovery_source=entry.source, raw_url=entry.raw_url,
+                       discovery_method="internal_links" if discovery.follow_links else cfg.kind,
+                       url_key=url_key(entry.url),
                        content_hash=sha256(rec["text"].encode()).hexdigest() if rec["text"] else None)
             write_json(journal / (evidence_id + ".json"), rec)
             records.append(rec)
@@ -181,13 +190,16 @@ def run_crawl(cfg: CrawlConfig, input_fn=None, log=print, fetcher=None) -> dict:
                     discovery.add(SitemapEntry(link, "", rec["final_url"]), depth + 1)
         if not records:
             status = "no_pages_found"
+        elif all(r["fetch_state"] == "fetch_error" for r in records):
+            status = "failed"
         elif (discovery.incomplete_maps or discovery.skipped or
+              all(r["fetch_state"] in ("robots_disallowed", "redirect_blocked_external", "redirect_blocked_robots") for r in records) or
               any(r["fetch_state"] in ("ok_truncated", "fetch_error") for r in records)):
             status = "partial"
     except BudgetExceeded as exc:
         status = "partial"
         notes.append(str(exc))
-    except ScopeError as exc:
+    except (ScopeError, RobotsUnavailable) as exc:
         status = "partial" if records else "failed"
         notes.append(str(exc))
     except KeyboardInterrupt:
@@ -195,6 +207,7 @@ def run_crawl(cfg: CrawlConfig, input_fn=None, log=print, fetcher=None) -> dict:
         notes.append("Cancelled by user.")
     finally:
         fetcher.session.close()
+        write_json(out / "requests.json", {"schema_version": 1, "attempts": fetcher.attempts})
     warnings = notes + discovery.warnings
     if discovery.skipped:
         warnings.append("Discovery limits: " + str(dict(discovery.skipped)))
@@ -218,7 +231,7 @@ def run_crawl(cfg: CrawlConfig, input_fn=None, log=print, fetcher=None) -> dict:
                     "sitemap_files": discovery.files, "delay": cfg.delay, "robots": cfg.robots, "origin": {"scheme": origin.scheme, "host": origin.host, "port": origin.port},
                     "content_selector": cfg.content_selector, "exclude_selectors": excludes,
                     "max_redirects": cfg.max_redirects, "max_bytes": cfg.max_bytes, "variants_file": cfg.variants_file},
-                   counts, ["snapshot.jsonl", "inventory.csv"], warnings,
+                   counts, ["snapshot.jsonl", "inventory.csv", "requests.json"], warnings,
                    ["HTML-source crawl: JavaScript-generated content is not seen.",
                     "robots.txt rules follow RFC 9309; Crawl-delay is not applied.",
                     "Fields are facts from this single crawl; none of them is a verdict."])
@@ -248,6 +261,9 @@ def observe(cfg, fetcher, policy, e, page_types, excludes, variants, follow_link
                     "words": pd.words, "chars": pd.chars, "text": pd.text,
                     "extraction_selector": pd.selector, "extraction_state": "truncated" if res.truncated else pd.state})
         ix = indexability.evaluate(pd.robots_meta, res.x_robots, True, res.final_status, False)
+        if res.truncated and ix.effective == "indexable":
+            ix.effective = "unknown"
+            ix.reason = "Truncated HTML may omit page directives."
         rec.update({"robots_meta_raw": ix.meta_raw, "googlebot_directives": ix.googlebot,
                     "effective_indexability": ix.effective, "indexability_reason": ix.reason})
     else:

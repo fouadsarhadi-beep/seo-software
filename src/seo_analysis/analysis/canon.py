@@ -26,7 +26,7 @@ def analyze(records: list) -> dict:
     index = {}
     for r in records:
         index[url_key(r["url"])] = r
-        if r.get("final_url"):
+        if r.get("final_url") and (not r.get("redirect_note")) and r.get("final_status"):
             index.setdefault(url_key(r["final_url"]), r)
     pointing: dict[str, int] = {}
     prelim = {}
@@ -68,6 +68,7 @@ def analyze(records: list) -> dict:
                 issues.append("canonical differs from the page URL only by " + human.replace("differs only by ", ""))
             else:
                 rel_text = "points to another page"
+            if code in ("variant", "other"):
                 tr = index.get(url_key(tgt))
                 if tr is None:
                     tstatus = "not in crawl"

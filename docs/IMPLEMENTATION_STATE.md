@@ -1,33 +1,24 @@
 # Implementation state
 
-## Stage A · Installable foundation
+## Goal checklist through Stage C step 2
 
-The Git checkout contains the maintained Python source and offline fixtures. The original ZIP and its six-command baseline are recorded at commit `2001b7c`. The current CLI installs as `seo-analysis`. Run `tools list --json` for the implemented tool IDs and their CLI names, and `system doctor --json` for local installation details.
+- [x] Stage A. Installable Python package, workspace configuration, diagnostics and built-in tool catalogue.
+- [x] B1. Accept explicit website, sitemap and URL-list inputs. Validate the selected origin and pin each connection to an approved address.
+- [x] B2. Discover sitemaps and support an opt-in, bounded link crawl. Apply shared request and time budgets, save observations incrementally and record coverage.
+- [x] B3. Produce technical and content findings, evidence references and terminal, JSON and CSV reports. Exercise the installed CLI against offline fixture sites.
+- [x] C1. Route audit, crawl, offline analysis, variants, review and calibration through typed requests and a shared tool runner.
+- [x] C2. Support ad hoc runs, optional projects and saved targets, transactional SQLite migrations, run history, artifact and evidence indexes and interrupted-run recovery.
 
-| Area | Current behavior |
-|---|---|
-| Acquisition | Sitemap-led crawl with explicit target input. The fetcher checks the selected HTTP origin on its first request and redirects. Page exclusions can be configured. |
-| Analysis | Offline replay of saved snapshots, canonical diagnostics, content similarity, Persian spelling variants, editorial decisions and threshold calibration. |
-| Storage | Each default crawl gets a separate workspace directory. TOML can override the data and export paths. The operator can select a crawl output directory explicitly. |
-| Integrations | GSC CSV imports and the acquisition function with its mock tests are retained. Interactive OAuth and the live command are deferred to the Google connector stage with OS-backed credentials. |
-| Verification | On Linux with CPython 3.12.14, 84 tests passed and one optional Hazm test skipped. A built wheel installed in a clean environment outside the checkout, with spaces and Persian characters in its path. CLI help, doctor JSON and the packaged Persian stopword data passed. The Windows and Linux CI workflow includes the suite and isolated wheel installation. Windows execution is pending. |
+## Verification
 
-## Next increment · Bounded website input and durable runs
+The suite covers a Persian WordPress-style sitemap, static HTML without a sitemap, redirects, robots, malformed XML, CSV seeds, parameter limits, interrupted acquisition, exact canonical target status and phrase adjacency. Transport tests use simulated DNS answers and an explicit local fixture. A separate console test launches the installed executable outside the checkout, performs an ad hoc audit, replays its snapshot offline and inspects the indexed evidence.
 
-1. Extend the transport with destination-address enforcement for public websites and explicit approval for a local fixture or staging origin. Share request/time budgets across discovery, retries and redirects.
-2. Accept a website URL or URL list alongside the explicit sitemap. Discover sitemaps using robots declarations and configured conventional paths. Offer a budgeted internal-link crawl when there is no usable sitemap.
-3. Persist each observation during the crawl. Finalize a per-run manifest with status, coverage, timing and evidence references, including cancelled and partial runs.
-4. Compose the installed `audit` command from acquisition and offline analysis. Verify report correctness for reserved URL characters, redirecting canonical targets, incomplete extraction and phrase adjacency. Add the fixture cases in Section 17.
-5. Once both acquisition and offline replay work end to end, validate the runner contract and add optional SQLite history. Link review decisions to content snapshots and preserve missing GSC values during enrichment.
+Persistence tests exercise concurrent first-time schema creation, a future schema version, an active writer, interrupted runs, repeatable recovery and rebuilding project-linked history after losing the index. The clean wheel check includes the bundled Persian resources. The source checkout and an isolated installation of the 0.2.0 wheel each passed 101 tests on Linux with Python 3.12.14. The optional Hazm test skipped in both environments. Windows runs are configured in CI and await execution.
 
-Until Stage B, the sitemap command uses ordinary system DNS and the existing per-request controls. The page limit applies after sitemap discovery. Interrupting a crawl before snapshot writing can lose its observations. Run against selected, trusted sitemap inputs during this foundation stage.
+## Current scope
 
-The [architecture](../SEO_ANALYSIS_SOFTWARE_ARCHITECTURE.md) maintains the full tool roadmap. The [foundation decision](adr/0001-foundation.md) records the initial runtime and storage choices.
+Audit findings describe the HTML and HTTP responses received. The request/time budget covers acquisition. Offline report generation and SQLite finalization can continue afterward. Reports preserve missing measurements and label content overlap for human review. Search Console CSV imports remain available. Authenticated services are deferred. Existing Stage A snapshots can be analyzed; a missing source completion status appears as unknown coverage.
 
-## Active checklist through Stage C step 2
+The implementation stops at C2. C3 begins additional independent offline checks. C4 covers comparisons across runs and reopening reviews after content changes.
 
-- [x] B1. Pin each connection to an approved destination and apply shared crawl budgets.
-- [x] B2. Accept URL, sitemap and seed lists, discover pages, checkpoint evidence and report coverage.
-- [x] B3. Verify the installed audit and correct the verified reporting defects.
-- [ ] C1. Run the audit and offline operations through shared tool contracts.
-- [ ] C2. Add optional projects and saved targets, schema migrations and recoverable SQLite run, artifact and evidence indexes.
+[Architecture](../SEO_ANALYSIS_SOFTWARE_ARCHITECTURE.md) · [Foundation decision](adr/0001-foundation.md)
