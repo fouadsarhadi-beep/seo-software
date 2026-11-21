@@ -50,7 +50,7 @@ def cmd_crawl(args, input_fn=input):
         print("Cancelled.")
         return 1
     cfg = crawl.CrawlConfig(sitemap=sitemap_url, out_dir=args.out_dir or str(args.workspace.create_run_directory()), delay=args.delay, retries=args.retries,
-                            limit=args.limit, max_redirects=args.max_redirects,
+                            limit=args.limit, allow_local=args.allow_local, max_redirects=args.max_redirects,
                             robots=robots, content_selector=selector or "", exclude_selectors=args.exclude_selector or [],
                             skip_sitemap=args.skip_sitemap, config_file=args.config or "",
                             variants_file=args.variants or "", page_types=page_types,
@@ -139,6 +139,38 @@ def cmd_list_tools(args):
     return 0
 
 
+def cmd_audit(args, input_fn=input):
+    from seo_analysis.app.audit import run_audit
+    from seo_analysis.web.discovery import read_seeds
+
+    interactive = _interactive(args) and not args.json
+    selected = [item for item in (args.url, args.sitemap, args.urls_file) if item]
+    if not selected and interactive:
+        args.url = ask("Website URL", input_fn=input_fn)
+    if sum(bool(item) for item in (args.url, args.sitemap, args.urls_file)) != 1:
+        raise ValueError("Select one website URL, --sitemap URL, or --urls-file PATH.")
+    seeds = read_seeds(args.urls_file) if args.urls_file else []
+    first = seeds[0] if seeds else args.url or args.sitemap
+    HttpOrigin.from_url(first)
+    directory = args.workspace.create_run_directory()
+    cfg = crawl.CrawlConfig(
+        first, str(directory), kind="urls_file" if seeds else "website" if args.url else "sitemap",
+        source=args.urls_file or first, seeds=tuple(seeds), allow_local=args.allow_local,
+        link_crawl=args.link_crawl, limit=args.max_pages, max_depth=args.max_depth,
+        max_variants=args.max_variants, max_bytes=args.max_bytes, max_seconds=args.max_seconds,
+        max_requests=args.max_requests, delay=args.delay, retries=args.retries,
+        sitemap_paths=tuple(args.sitemap_path or ("/sitemap.xml", "/sitemap_index.xml")),
+    )
+    result = run_audit(cfg, log=lambda msg: print(msg, file=sys.stderr), prompt=input_fn if interactive else None)
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False))
+    else:
+        print(f"{result['status']}: {result['counts']['observed']} observations in {directory}")
+        for warning in result["warnings"]:
+            print(warning)
+    return {"succeeded": 0, "partial": 3, "cancelled": 130}.get(result["status"], 2)
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="seo-analysis", description="Analytics-only SEO audit tools. You make the decisions.")
     p.add_argument("--version", action="version", version=__version__)
@@ -157,10 +189,30 @@ def build_parser():
     listing.add_argument("--json", action="store_true")
     listing.set_defaults(func=cmd_list_tools)
 
+    audit = sub.add_parser("audit", help="crawl a selected site and report evidence-backed findings")
+    audit.add_argument("url", nargs="?")
+    audit.add_argument("--sitemap")
+    audit.add_argument("--urls-file")
+    audit.add_argument("--sitemap-path", action="append", help="candidate sitemap location; repeatable")
+    audit.add_argument("--link-crawl", action="store_true", help="follow internal links if discovery finds no sitemap")
+    audit.add_argument("--allow-local", action="store_true", help="approve the selected origin for local/staging access")
+    audit.add_argument("--max-pages", type=int, default=100)
+    audit.add_argument("--max-depth", type=int, default=2)
+    audit.add_argument("--max-requests", type=int, default=500)
+    audit.add_argument("--max-seconds", type=float, default=300)
+    audit.add_argument("--max-bytes", type=int, default=5_000_000)
+    audit.add_argument("--max-variants", type=int, default=5)
+    audit.add_argument("--retries", type=int, default=2)
+    audit.add_argument("--delay", type=float, default=0.5)
+    audit.add_argument("--json", action="store_true")
+    audit.add_argument("--non-interactive", dest="yes", action="store_true")
+    audit.set_defaults(func=cmd_audit)
+
     c = sub.add_parser(tools.CRAWL.command, help=tools.CRAWL.summary)
     c.add_argument("--sitemap"); c.add_argument("--out-dir", help="defaults to a new workspace run directory")
     c.add_argument("--delay", type=float, default=0.5); c.add_argument("--retries", type=int, default=2)
-    c.add_argument("--limit", type=int, default=0, help="crawl only the first N URLs (test run)")
+    c.add_argument("--limit", type=int, default=100, help="crawl only the first N URLs (test run)")
+    c.add_argument("--allow-local", action="store_true", help="allow the selected local/staging origin")
     c.add_argument("--robots", choices=["respect", "ignore"], default=None)
     c.add_argument("--max-redirects", type=int, default=5)
     c.add_argument("--content-selector", default=""); c.add_argument("--exclude-selector", action="append")

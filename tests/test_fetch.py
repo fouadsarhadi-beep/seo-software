@@ -8,7 +8,7 @@ from seo_analysis.web.robots import RobotsPolicy
 
 def mk(site, **kw):
     kw.setdefault("origin", HttpOrigin.from_url(site.base))
-    return Fetcher("t", delay=0, retries=kw.pop("retries", 2), backoff_base=0, sleep=lambda s: None, **kw)
+    return Fetcher("t", allow_local=True, delay=0, retries=kw.pop("retries", 2), backoff_base=0, sleep=lambda s: None, **kw)
 
 
 def test_redirect_chain_keeps_first_and_final_status(site):
@@ -58,7 +58,7 @@ def test_permanent_errors_are_not_retried(site):
 def test_temporary_error_is_retried_and_retry_after_respected(site):
     slept = []
     site.routes["/t"] = lambda n: (503, [("Retry-After", "2")], b"busy") if n == 1 else (200, [("Content-Type", "text/html")], b"<p>ok</p>")
-    f = Fetcher("t", delay=0, retries=2, backoff_base=0, sleep=slept.append, origin=HttpOrigin.from_url(site.base))
+    f = Fetcher("t", allow_local=True, delay=0, retries=2, backoff_base=0, sleep=slept.append, origin=HttpOrigin.from_url(site.base))
     r = f.get(site.base + "/t")
     assert r.final_status == 200 and site.hits["/t"] == 2 and r.retries_used == 1 and 2.0 in slept
 
@@ -90,6 +90,6 @@ def test_repeated_headers_are_kept_separate(site):
 
 
 def test_connection_error_is_reported_not_raised():
-    f = Fetcher("t", delay=0, retries=1, backoff_base=0, sleep=lambda s: None, origin=HttpOrigin.from_url("http://127.0.0.1:1"), timeout=(1, 1))
+    f = Fetcher("t", allow_local=True, delay=0, retries=1, backoff_base=0, sleep=lambda s: None, origin=HttpOrigin.from_url("http://127.0.0.1:1"), timeout=(1, 1))
     r = f.get("http://127.0.0.1:1/")
     assert r.error and r.final_status == 0

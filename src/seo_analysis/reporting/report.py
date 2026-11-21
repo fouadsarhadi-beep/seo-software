@@ -8,6 +8,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from seo_analysis.core.artifacts import atomic_text, write_json
 from seo_analysis import SCHEMA_VERSION, __version__
 
 _DANGEROUS = ("=", "+", "-", "@", "\t", "\r", "\n", "\uff1d", "\uff0b", "\uff0d", "\uff20")
@@ -22,7 +23,7 @@ def csv_safe(value, guard: bool = True):
 
 
 def write_csv(path, header, rows, guard: bool = True):
-    with open(path, "w", newline="", encoding="utf-8-sig") as fh:
+    with atomic_text(path, encoding="utf-8-sig") as fh:
         w = csv.writer(fh)
         w.writerow(header)
         for r in rows:
@@ -39,4 +40,4 @@ def write_manifest(path, command: str, config: dict, counts: dict, files: list, 
             "written_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "python": sys.version.split()[0], "platform": platform.platform(), "packages": pkgs,
             "config": config, "counts": counts, "files": files, "warnings": warnings, "limitations": limitations}
-    Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    write_json(path, data)

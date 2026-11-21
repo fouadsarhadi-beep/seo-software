@@ -47,7 +47,7 @@ def test_default_crawl_isolated_by_run(site, tmp_path):
     site.add("/robots.txt", "User-agent: *", ctype="text/plain")
     site.add("/sitemap.xml", f"<urlset><url><loc>{site.base}/page</loc></url></urlset>", ctype="application/xml")
     site.add("/page", "<html><main>محتوای تست</main></html>")
-    args = ["--config-file", str(config), "crawl", "--yes", "--sitemap", site.base + "/sitemap.xml", "--delay", "0"]
+    args = ["--config-file", str(config), "crawl", "--yes", "--allow-local", "--sitemap", site.base + "/sitemap.xml", "--delay", "0"]
     assert cli.main(args) == 0
     assert cli.main(args) == 0
     runs = list((tmp_path / "داده ها" / "runs").iterdir())

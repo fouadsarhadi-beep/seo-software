@@ -7,8 +7,25 @@ so everything goes through url_key().
 """
 from __future__ import annotations
 
+import re
+import string
 import unicodedata
+from urllib.parse import unquote_to_bytes
+
+import idna
 from urllib.parse import unquote, urlsplit
+
+
+def _component(value):
+    def decode_match(match):
+        raw = unquote_to_bytes(match.group())
+        try:
+            chars = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            return match.group().upper()
+        return "".join(c if ord(c) > 127 or c in string.ascii_letters + string.digits + "-._~"
+                       else f"%{ord(c):02X}" for c in chars)
+    return unicodedata.normalize("NFC", re.sub(r"(?:%[0-9a-fA-F]{2})+", decode_match, value))
 
 
 def _parts(url: str):
@@ -16,8 +33,8 @@ def _parts(url: str):
     scheme = s.scheme.lower()
     host = (s.hostname or "").rstrip(".")
     try:
-        host = host.encode("idna").decode("ascii")
-    except UnicodeError:
+        host = idna.encode(host, uts46=True).decode("ascii")
+    except (UnicodeError, idna.IDNAError):
         pass
     host = host.lower()
     try:
@@ -26,8 +43,8 @@ def _parts(url: str):
         port = None
     if port == {"http": 80, "https": 443}.get(scheme):
         port = None
-    path = unicodedata.normalize("NFC", unquote(s.path)) or "/"
-    query = unicodedata.normalize("NFC", unquote(s.query))
+    path = _component(s.path) or "/"
+    query = _component(s.query)
     return scheme, host, port, path, query
 
 
@@ -38,6 +55,8 @@ def url_key(url: str, loose: bool = False) -> str:
         scheme = "*"
         host = host[4:] if host.startswith("www.") else host
         path = path.rstrip("/") or "/"
+    if ":" in host:
+        host = f"[{host}]"
     hostport = host + (f":{port}" if port else "")
     return f"{scheme}://{hostport}{path}" + (f"?{query}" if query else "")
 

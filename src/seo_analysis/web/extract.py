@@ -21,6 +21,7 @@ def _clean(s: str) -> str:
 
 @dataclass
 class PageData:
+    links: list = field(default_factory=list)
     title: str = ""
     h1_list: list = field(default_factory=list)
     h2_count: int = 0
@@ -36,7 +37,7 @@ class PageData:
 
 
 def extract_page(html: str, base_url: str, content_selector: str = "", exclude_selectors=(),
-                 variants=None) -> PageData:
+                 variants=None, collect_links=False) -> PageData:
     soup = BeautifulSoup(html, "html.parser")
     pd = PageData()
     pd.title = _clean(soup.title.get_text(" ")) if soup.title else ""
@@ -50,6 +51,12 @@ def extract_page(html: str, base_url: str, content_selector: str = "", exclude_s
             pd.robots_meta.append((name.lower(), _clean(m["content"])))
     base_tag = soup.find("base", href=True)
     base = urljoin(base_url, base_tag["href"]) if base_tag else base_url
+    if collect_links:
+        for anchor in soup.find_all("a", href=True):
+            try:
+                pd.links.append(urljoin(base, anchor["href"]))
+            except ValueError:
+                continue
     for link in soup.find_all("link"):
         rel = link.get("rel") or []
         rel = rel.split() if isinstance(rel, str) else rel

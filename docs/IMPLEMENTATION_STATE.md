@@ -23,3 +23,11 @@ The Git checkout contains the maintained Python source and offline fixtures. The
 Until Stage B, the sitemap command uses ordinary system DNS and the existing per-request controls. The page limit applies after sitemap discovery. Interrupting a crawl before snapshot writing can lose its observations. Run against selected, trusted sitemap inputs during this foundation stage.
 
 The [architecture](../SEO_ANALYSIS_SOFTWARE_ARCHITECTURE.md) maintains the full tool roadmap. The [foundation decision](adr/0001-foundation.md) records the initial runtime and storage choices.
+
+## Active checklist through Stage C step 2
+
+- [x] B1. Pin each connection to an approved destination and apply shared crawl budgets.
+- [x] B2. Accept URL, sitemap and seed lists, discover pages, checkpoint evidence and report coverage.
+- [x] B3. Verify the installed audit and correct the verified reporting defects.
+- [ ] C1. Run the audit and offline operations through shared tool contracts.
+- [ ] C2. Add optional projects and saved targets, schema migrations and recoverable SQLite run, artifact and evidence indexes.

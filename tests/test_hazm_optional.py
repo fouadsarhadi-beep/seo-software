@@ -10,7 +10,7 @@ hazm = pytest.importorskip("hazm")
 def test_hazm_normalizer_and_stemmer_are_optional_extras(site, tmp_path):
     b = build(site)
     out = tmp_path / "h"
-    crawl.run_crawl(crawl.CrawlConfig(sitemap=b + "/sitemap_index.xml", out_dir=str(out), delay=0, retries=0), log=lambda *_: None)
+    crawl.run_crawl(crawl.CrawlConfig(allow_local=True, sitemap=b + "/sitemap_index.xml", out_dir=str(out), delay=0, retries=0), log=lambda *_: None)
     r = analyze.run_analyze(out, normalizer="hazm", stem=True, log=lambda *_: None)
     assert r["counts"]["pairs_flagged"] >= 1
     import json

@@ -2,6 +2,7 @@
 extension elements (image:loc, video:content_loc, ...) are NOT page URLs."""
 from __future__ import annotations
 
+from collections import deque
 import re
 import xml.etree.ElementTree as ET
 import zlib
@@ -64,14 +65,14 @@ def parse_sitemap(data: bytes, cap: int = 50_000_000):
     raise ValueError(f"unexpected root element <{name}>")
 
 
-def collect(fetcher, sitemap_url: str, skip_re: str = "", cap: int = 50_000_000, max_depth: int = 4):
+def collect(fetcher, sitemap_url: str, skip_re: str = "", cap: int = 50_000_000, max_depth: int = 4, max_entries: int = 10001):
     """-> (entries, warnings, sitemap_files_read)."""
     skip = re.compile(skip_re) if skip_re else None
     entries, warnings, files = [], [], []
     seen_maps, seen_pages = set(), set()
-    stack = [(sitemap_url, 0, "")]
+    stack = deque([(sitemap_url, 0, "")])
     while stack:
-        smap, depth, _parent = stack.pop(0)
+        smap, depth, _parent = stack.popleft()
         key = url_key(smap)
         if key in seen_maps:
             warnings.append(f"sitemap already visited (recursive or repeated reference): {smap}")
@@ -98,6 +99,9 @@ def collect(fetcher, sitemap_url: str, skip_re: str = "", cap: int = 50_000_000,
                 if skip and skip.search(loc):
                     warnings.append(f"sitemap skipped by pattern: {loc}")
                     continue
+                if len(stack) >= fetcher.budget.limit:
+                    warnings.append("sitemap queue reached the request limit")
+                    break
                 stack.append((loc, depth + 1, smap))
         else:
             for loc, lastmod in items:
@@ -110,4 +114,6 @@ def collect(fetcher, sitemap_url: str, skip_re: str = "", cap: int = 50_000_000,
                     continue
                 seen_pages.add(k)
                 entries.append(SitemapEntry(loc, lastmod, smap))
+                if len(entries) >= max_entries:
+                    return entries, warnings, files
     return entries, warnings, files

@@ -73,7 +73,11 @@ def analyze(records: list) -> dict:
                     tstatus = "not in crawl"
                     issues.append("canonical target is not in the crawl (check it manually)")
                 else:
-                    tstatus = str(tr.get("final_status"))
+                    redirected = (url_key(tr["url"]) == url_key(tgt)
+                                  and tr.get("first_status") in (301, 302, 303, 307, 308))
+                    tstatus = str(tr.get("first_status") if redirected else tr.get("final_status"))
+                    if redirected:
+                        issues.append(f"canonical target redirects (HTTP {tstatus})")
                     if tr.get("final_status") != 200:
                         issues.append(f"canonical target returns HTTP {tr.get('final_status')}")
                     if tr.get("effective_indexability") == "noindex":

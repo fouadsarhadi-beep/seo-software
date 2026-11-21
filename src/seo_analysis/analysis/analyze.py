@@ -5,6 +5,7 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
+from seo_analysis.core.artifacts import write_json, write_text
 from seo_analysis.analysis import canon, fa_text, similarity
 from seo_analysis.connectors import gsc
 from seo_analysis.reporting.report import write_csv, write_manifest
@@ -27,9 +28,7 @@ def load_snapshot(path):
 
 
 def canonical_info(records):
-    return canon.analyze([{"url": r["url"], "final_url": r["final_url"], "final_status": r["final_status"],
-                           "canonicals_html": r["canonicals_html"], "canonicals_header": r["canonicals_header"],
-                           "effective_indexability": r["effective_indexability"]} for r in records])
+    return canon.analyze(records)
 
 
 def summarize(records, info, pairs_count, thin_words=300) -> str:
@@ -98,7 +97,7 @@ def run_analyze(in_dir, out_dir=None, gsc_pages=None, gsc_queries=None, settings
 
     items = []
     for r in records:
-        if not r["fetch_state"].startswith("ok") or r["words"] == 0:
+        if not r["fetch_state"].startswith("ok") or r["words"] == 0 or r["fetch_state"] == "ok_truncated":
             continue
         if r["effective_indexability"] == "noindex" and not include_noindex:
             continue
@@ -126,19 +125,19 @@ def run_analyze(in_dir, out_dir=None, gsc_pages=None, gsc_queries=None, settings
                            "same_h1": p.same_h1, "shared_terms": p.shared_terms, "shared_phrases": p.shared_phrases,
                            "triggers": triggers, "evidence": evidence, "page_type_a": p.page_type_a,
                            "page_type_b": p.page_type_b, "words_a": p.words_a, "words_b": p.words_b, "short_page": p.short_page,
-                           "gsc": ({"clicks_a": ga.get("clicks", 0), "clicks_b": gb.get("clicks", 0),
-                                    "impr_a": ga.get("impressions", 0), "impr_b": gb.get("impressions", 0),
+                           "gsc": ({"clicks_a": ga.get("clicks"), "clicks_b": gb.get("clicks"),
+                                    "impr_a": ga.get("impressions"), "impr_b": gb.get("impressions"),
                                     "shared_count": count, "shared_top": top} if (pages or qpairs) else None)})
     rows_order = sorted(range(len(rows)), key=lambda i: -rows[i][8])
     write_csv(out / "similar_pairs.csv", PAIR_HEADER, [rows[i] for i in rows_order])
-    (out / "pairs.json").write_text(json.dumps([pairs_json[i] for i in rows_order], ensure_ascii=False, indent=1), encoding="utf-8")
+    write_json(out / "pairs.json", [pairs_json[i] for i in rows_order])
     canon_rows = [[r["url"], r["final_status"], r["effective_indexability"], info[r["url"]]["candidates"],
                    info[r["url"]]["relationship"], info[r["url"]]["target_status"], info[r["url"]]["issues"],
                    info[r["url"]]["pointing_here"]] for r in records
                   if info[r["url"]]["issues"] or info[r["url"]]["relationship"] not in ("self", "")]
     write_csv(out / "canonical_report.csv", CANON_HEADER, canon_rows)
     text = summarize(records, info, len(results))
-    (out / "issues.txt").write_text(text, encoding="utf-8")
+    write_text(out / "issues.txt", text)
     counts = {"pages_compared": len(items), "pairs_flagged": len(results), "canonical_rows": len(canon_rows)}
     write_manifest(out / "analysis_manifest.json", "analyze",
                    {"settings": settings.__dict__ | {"brand_terms": list(settings.brand_terms)},

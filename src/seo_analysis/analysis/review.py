@@ -53,8 +53,10 @@ def _fmt(p: dict) -> str:
         lines.append(f"shared phrase: {ph}")
     g = p.get("gsc")
     if g:
-        lines.append(f"Search Console: clicks A {g.get('clicks_a', 0):.0f} / B {g.get('clicks_b', 0):.0f}; "
-                     f"impressions A {g.get('impr_a', 0):.0f} / B {g.get('impr_b', 0):.0f}; "
+        def metric(key):
+            return "unknown" if g.get(key) is None else f"{g[key]:.0f}"
+        lines.append(f"Search Console: clicks A {metric('clicks_a')} / B {metric('clicks_b')}; "
+                     f"impressions A {metric('impr_a')} / B {metric('impr_b')}; "
                      f"shared queries: {g.get('shared_count', 0)}")
         for q, ia, ib in g.get("shared_top", []):
             lines.append(f"   query: {q}  (A {ia:.0f} / B {ib:.0f} impressions)")
@@ -122,7 +124,7 @@ def calibrate(pairs, decisions_path, output_fn=print) -> str:
             prec = tp / len(flagged) if flagged else float("nan")
             rec = tp / total_act if total_act else float("nan")
             lines.append(f"  {t:>8.0%}  {len(flagged):>7}  {tp:>10}  {prec:>9.0%}  {rec:>6.0%}")
-    lines.append("\nChoose thresholds by what you can tolerate: higher = fewer pairs to review but more missed duplicates.")
+    lines.append("\nThese metrics apply only to reviewed candidates. Unflagged pairs were not sampled. Choose thresholds by what you can tolerate: higher = fewer pairs to review but more missed duplicates.")
     text = "\n".join(lines)
     output_fn(text)
     return text

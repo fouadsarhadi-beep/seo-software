@@ -11,7 +11,7 @@ NS = 'xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"'
 
 
 def fetcher(site):
-    return Fetcher("t", delay=0, retries=0, origin=HttpOrigin.from_url(site.base), sleep=lambda s: None)
+    return Fetcher("t", allow_local=True, delay=0, retries=0, origin=HttpOrigin.from_url(site.base), sleep=lambda s: None)
 
 
 def test_image_extension_locs_are_not_pages():

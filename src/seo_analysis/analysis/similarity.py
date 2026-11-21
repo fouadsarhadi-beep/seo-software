@@ -87,10 +87,10 @@ def prepare(items, settings: Settings, stopwords=frozenset(), variants=None, ste
 
     terms_all = []
     for t in toks_all:
-        topic = [(stem_fn(w) if stem_fn else w) for w in t if w not in stopwords and len(w) > 1 and not w.isdigit()]
-        terms = list(topic)
+        topic = [(stem_fn(w) if stem_fn else w) if w not in stopwords and len(w) > 1 and not w.isdigit() else None for w in t]
+        terms = [word for word in topic if word]
         if settings.bigrams:
-            terms += [a + " " + b for a, b in zip(topic, topic[1:])]
+            terms += [a + " " + b for a, b in zip(topic, topic[1:]) if a and b]
         terms_all.append(Counter(terms))
     tdf = Counter(w for c in terms_all for w in c)
     cut = max(3, settings.max_df * n)

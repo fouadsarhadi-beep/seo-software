@@ -52,7 +52,7 @@ def rows(path):
 @pytest.fixture
 def crawled(site, tmp_path):
     b = build(site)
-    cfg = crawl.CrawlConfig(sitemap=b + "/sitemap_index.xml", out_dir=str(tmp_path), delay=0, retries=0, skip_sitemap=r"author")
+    cfg = crawl.CrawlConfig(allow_local=True, sitemap=b + "/sitemap_index.xml", out_dir=str(tmp_path), delay=0, retries=0, skip_sitemap=r"author")
     crawl.run_crawl(cfg, log=lambda *_: None)
     return site, tmp_path
 
@@ -120,7 +120,7 @@ def test_review_flow_through_the_cli(crawled):
 def test_non_interactive_cli_end_to_end(site, tmp_path, capsys):
     b = build(site)
     out = tmp_path / "o"
-    assert cli.main(["crawl", "--sitemap", b + "/sitemap_index.xml", "--out-dir", str(out), "--delay", "0",
+    assert cli.main(["crawl", "--allow-local", "--sitemap", b + "/sitemap_index.xml", "--out-dir", str(out), "--delay", "0",
                      "--retries", "0", "--yes", "--robots", "respect"]) == 0
     assert cli.main(["analyze", "--in-dir", str(out), "--yes"]) == 0
     assert (out / "similar_pairs.csv").exists()
@@ -129,14 +129,14 @@ def test_non_interactive_cli_end_to_end(site, tmp_path, capsys):
 def test_unreadable_robots_txt_asks_the_human(site, tmp_path):
     b = build(site)
     site.add("/robots.txt", "down", status=503)
-    cfg = crawl.CrawlConfig(sitemap=b + "/sitemap_index.xml", out_dir=str(tmp_path / "a"), delay=0, retries=0, limit=2)
+    cfg = crawl.CrawlConfig(allow_local=True, sitemap=b + "/sitemap_index.xml", out_dir=str(tmp_path / "a"), delay=0, retries=0, limit=2)
     with pytest.raises(RuntimeError, match="robots.txt could not be read"):
         crawl.run_crawl(cfg, log=lambda *_: None)
     asked = []
-    crawl.run_crawl(crawl.CrawlConfig(sitemap=b + "/sitemap_index.xml", out_dir=str(tmp_path / "b"), delay=0, retries=0, limit=2),
+    crawl.run_crawl(crawl.CrawlConfig(allow_local=True, sitemap=b + "/sitemap_index.xml", out_dir=str(tmp_path / "b"), delay=0, retries=0, limit=2),
                     input_fn=lambda q: asked.append(q) or "y", log=lambda *_: None)
     assert asked and (tmp_path / "b" / "inventory.csv").exists()
-    crawl.run_crawl(crawl.CrawlConfig(sitemap=b + "/sitemap_index.xml", out_dir=str(tmp_path / "c"), delay=0, retries=0,
+    crawl.run_crawl(crawl.CrawlConfig(allow_local=True, sitemap=b + "/sitemap_index.xml", out_dir=str(tmp_path / "c"), delay=0, retries=0,
                                       limit=2, robots="ignore"), log=lambda *_: None)
     assert (tmp_path / "c" / "inventory.csv").exists()
 
@@ -150,7 +150,7 @@ def test_variants_command_asks_and_analyze_uses_the_answer(site, tmp_path):
     site.add("/a/", page("الف", "الف", text_a))
     site.add("/b/", page("ب", "ب", text_b))
     out = tmp_path / "v"
-    cli.main(["crawl", "--sitemap", b + "/sitemap.xml", "--out-dir", str(out), "--delay", "0", "--retries", "0", "--yes"])
+    cli.main(["crawl", "--allow-local", "--sitemap", b + "/sitemap.xml", "--out-dir", str(out), "--delay", "0", "--retries", "0", "--yes"])
     args = cli.build_parser().parse_args(["variants", "--in-dir", str(out), "--min-count", "2"])
     cli.cmd_variants(args, input_fn=lambda prompt="": "y")
     saved = json.loads((out / "persian_variants.json").read_text(encoding="utf-8"))

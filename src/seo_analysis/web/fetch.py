@@ -3,6 +3,7 @@ failures (429/5xx and connection errors, honouring Retry-After), body-size cap, 
 Persian-aware decoding (UTF-8 first, then the declared charset, then windows-1256)."""
 from __future__ import annotations
 
+import math
 import random
 import re
 import time
@@ -11,8 +12,10 @@ from email.utils import parsedate_to_datetime
 from urllib.parse import urljoin
 
 import requests
+from urllib3.exceptions import HTTPError
 
 from seo_analysis.core.network import HttpOrigin
+from seo_analysis.web.transport import BudgetExceeded, CrawlBudget, scoped_adapter
 from seo_analysis.core.urls import url_key
 
 REDIRECTS = {301, 302, 303, 307, 308}
@@ -73,8 +76,15 @@ class Fetcher:
     def __init__(self, user_agent: str, delay: float = 0.5, timeout=(10, 30), retries: int = 2,
                  max_redirects: int = 5, max_bytes: int = 5_000_000, *, origin: HttpOrigin,
                  robots=None, robots_agent: str = "*", backoff_base: float = 1.0,
-                 sleep=time.sleep, session=None):
-        self.session = session or requests.Session()
+                 sleep=time.sleep, allow_local=False, max_requests=500, max_seconds=300):
+        if not (math.isfinite(delay) and delay >= 0 and 0 < max_seconds <= 86400):
+            raise ValueError("Invalid pacing or time budget.")
+        if min(max_requests, max_bytes) < 1 or min(retries, max_redirects) < 0:
+            raise ValueError("Invalid request, response, retry or redirect budget.")
+        self.budget = CrawlBudget(max_requests, max_seconds)
+        self.session = requests.Session()
+        self.session.trust_env = False
+        self.session.mount(origin.scheme + "://", scoped_adapter(origin, allow_local, self.budget))
         self.session.headers.update({"User-Agent": user_agent})
         self.delay, self.timeout, self.retries = delay, timeout, retries
         self.max_redirects, self.max_bytes = max_redirects, max_bytes
@@ -90,8 +100,13 @@ class Fetcher:
     def _pace(self):
         wait = self.delay - (time.monotonic() - self._last)
         if wait > 0:
-            self.sleep(wait)
+            self._wait(wait)
         self._last = time.monotonic()
+
+    def _wait(self, seconds):
+        if seconds >= self.budget.remaining():
+            raise BudgetExceeded("Time budget insufficient for the next request.")
+        self.sleep(seconds)
 
     def _retry_delay(self, resp, attempt: int) -> float:
         ra = resp.headers.get("Retry-After") if resp is not None else None
@@ -111,18 +126,19 @@ class Fetcher:
         attempt = 0
         while True:
             attempt += 1
+            self.budget.charge()
             self._pace()
             try:
-                resp = self.session.get(url, timeout=self.timeout, allow_redirects=False, stream=True)
+                resp = self.session.get(url, timeout=tuple(min(t, self.budget.remaining()) for t in self.timeout), allow_redirects=False, stream=True)
             except requests.RequestException as exc:
                 if attempt > self.retries:
                     return None, f"{type(exc).__name__}: {exc}", attempt - 1
-                self.sleep(self._retry_delay(None, attempt))
+                self._wait(self._retry_delay(None, attempt))
                 continue
             if resp.status_code in RETRY_STATUSES and attempt <= self.retries:
                 delay = self._retry_delay(resp, attempt)
                 resp.close()
-                self.sleep(delay)
+                self._wait(delay)
                 continue
             return resp, "", attempt - 1
 
@@ -132,9 +148,14 @@ class Fetcher:
         res.x_robots = _getlist(resp, "x-robots-tag")
         res.link_headers = _getlist(resp, "link")
         chunks, total = [], 0
-        for chunk in resp.iter_content(65536):
+        while True:
+            remaining = self.budget.remaining()
+            connection = resp.raw.connection
+            if connection is not None and connection.sock is not None:
+                connection.sock.settimeout(min(self.timeout[1], remaining))
+            chunk = resp.raw.read1(min(65536, self.max_bytes - total + 1), decode_content=True)
             if not chunk:
-                continue
+                break
             if total + len(chunk) > self.max_bytes:
                 chunks.append(chunk[: self.max_bytes - total])
                 res.truncated = True
@@ -173,7 +194,12 @@ class Fetcher:
                     return res
                 current = nxt
                 continue
-            self._read_final(resp, res, current)
+            try:
+                self._read_final(resp, res, current)
+            except (requests.RequestException, HTTPError) as exc:
+                res.error = f"Response interrupted: {type(exc).__name__}"
+            finally:
+                resp.close()
             return res
         res.redirect_note = "too_many"
         return res
