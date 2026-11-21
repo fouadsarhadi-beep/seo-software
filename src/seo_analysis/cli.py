@@ -11,6 +11,7 @@ from pathlib import Path
 
 from seo_analysis import __version__
 from seo_analysis.analysis import similarity
+from seo_analysis.analysis.checks import CHECKS, CompareInput, SnapshotInput
 from seo_analysis.app.operations import AnalysisInput, CalibrationInput, ReviewInput, VariantInput
 from seo_analysis.app.runner import ToolRunner
 from seo_analysis.core.artifacts import publish_files
@@ -210,6 +211,23 @@ def cmd_history(args):
     return 2 if isinstance(value, dict) and value.get("errors") else 0
 
 
+def cmd_agent(args):
+    from seo_analysis.app.agent import run_snapshot_tool
+    result = run_snapshot_tool(args.workspace, args.tool, args.run, previous=args.previous, check=args.check)
+    print(json.dumps({"run_id": result.run_id, "status": result.status, "counts": result.counts,
+                      "artifacts": result.artifacts, "warnings": result.warnings[:10]}, ensure_ascii=False))
+    return {"succeeded": 0, "partial": 3}.get(result.status, 2)
+
+
+def cmd_snapshot(args):
+    history = History(args.workspace)
+    if args.cmd == "check":
+        source = history.show(args.run)["directory"]
+        return execute(args, tools.CHECK, SnapshotInput(source, args.check))
+    before, after = (history.show(r)["directory"] for r in (args.before, args.after))
+    return execute(args, tools.COMPARE, CompareInput(before, after))
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="seo-analysis", description="Analytics-only SEO audit tools. You make the decisions.")
     p.add_argument("--version", action="version", version=__version__)
@@ -224,9 +242,26 @@ def build_parser():
 
     catalogue = sub.add_parser("tools", help="discover installed tools")
     operations = catalogue.add_subparsers(dest="operation", required=True)
+    invoke = operations.add_parser("run", help="execute a permitted offline operation on managed snapshots")
+    invoke.add_argument("tool", choices=(tools.CHECK.id, tools.COMPARE.id, tools.ANALYZE.id))
+    invoke.add_argument("--run", required=True)
+    invoke.add_argument("--previous")
+    invoke.add_argument("--check", choices=(*CHECKS, "all"), default="all")
+    invoke.set_defaults(func=cmd_agent, json=True)
     listing = operations.add_parser("list", help="list tool IDs and commands")
     listing.add_argument("--json", action="store_true")
     listing.set_defaults(func=cmd_list_tools)
+
+    check = sub.add_parser("check", help=tools.CHECK.summary)
+    check.add_argument("--run", required=True)
+    check.add_argument("--check", choices=(*CHECKS, "all"), default="all")
+    compare = sub.add_parser("compare", help=tools.COMPARE.summary)
+    compare.add_argument("--before", required=True)
+    compare.add_argument("--after", required=True)
+    for command in (check, compare):
+        command.add_argument("--json", action="store_true")
+        command.add_argument("--project")
+        command.set_defaults(func=cmd_snapshot)
 
     projects = sub.add_parser("project", help="manage optional saved projects").add_subparsers(dest="operation", required=True)
     create = projects.add_parser("create")

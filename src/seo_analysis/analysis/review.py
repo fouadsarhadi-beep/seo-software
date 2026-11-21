@@ -67,7 +67,10 @@ def _fmt(p: dict) -> str:
 
 def review_loop(pairs, decisions_path, min_evidence: int = 1, limit: int = 0, input_fn=input, output_fn=print):
     done = load_decisions(decisions_path)
-    todo = [p for p in pairs if p["evidence"] >= min_evidence and pair_key(p["url_a"], p["url_b"]) not in done]
+    def needs_review(pair):
+        decision = done.get(pair_key(pair["url_a"], pair["url_b"]))
+        return decision is None or decision.get("content_revisions") != pair.get("content_revisions")
+    todo = [p for p in pairs if p["evidence"] >= min_evidence and needs_review(p)]
     if limit:
         todo = todo[:limit]
     output_fn(f"{len(todo)} pairs to review ({len(done)} already decided). Nothing is changed on your site.")
@@ -90,6 +93,7 @@ def review_loop(pairs, decisions_path, min_evidence: int = 1, limit: int = 0, in
             if ans in CHOICES:
                 rec = {"ts": datetime.now(timezone.utc).isoformat(timespec="seconds"), "tool_version": __version__,
                        "url_a": p["url_a"], "url_b": p["url_b"], "decision": CHOICES[ans], "note": note,
+                       "content_revisions": p.get("content_revisions"), "source_snapshot": p.get("source_snapshot"),
                        "scores": {k: p[k] for k in ("dup", "containment", "topic", "title_sim")},
                        "same_h1": p["same_h1"], "triggers": p["triggers"]}
                 with open(decisions_path, "a", encoding="utf-8") as fh:
@@ -107,7 +111,7 @@ def calibrate(pairs, decisions_path, output_fn=print) -> str:
     rows = []
     for p in pairs:
         d = dec.get(pair_key(p["url_a"], p["url_b"]))
-        if d:
+        if d and d.get("content_revisions") == p.get("content_revisions"):
             rows.append((p, d["decision"] != "ignore"))
     lines = [f"Calibration from {len(rows)} decisions you made "
              f"({sum(1 for _, a in rows if a)} actionable, {sum(1 for _, a in rows if not a)} ignored)."]

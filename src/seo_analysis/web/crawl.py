@@ -255,7 +255,7 @@ def observe(cfg, fetcher, policy, e, page_types, excludes, variants, follow_link
     if state.startswith("ok"):
         pd = extract_page(res.text, res.final_url, cfg.content_selector, excludes, variants, collect_links=follow_links)
         links = pd.links
-        rec.update({"title": pd.title, "h1": pd.h1_list[0] if pd.h1_list else "", "h1_count": len(pd.h1_list),
+        rec.update({"markup": pd.markup, "title": pd.title, "h1": pd.h1_list[0] if pd.h1_list else "", "h1_count": len(pd.h1_list),
                     "meta": pd.meta_description, "lang": pd.lang, "canonicals_html": pd.canonicals,
                     "canonicals_header": canon.header_canonicals(res.link_headers, res.final_url),
                     "words": pd.words, "chars": pd.chars, "text": pd.text,

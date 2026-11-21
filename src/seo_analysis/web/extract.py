@@ -1,6 +1,7 @@
 """Parse each page once: head data, headings, robots meta, canonical candidates, main text."""
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 from urllib.parse import urljoin
@@ -21,6 +22,7 @@ def _clean(s: str) -> str:
 
 @dataclass
 class PageData:
+    markup: dict = field(default_factory=dict)
     links: list = field(default_factory=list)
     title: str = ""
     h1_list: list = field(default_factory=list)
@@ -51,12 +53,9 @@ def extract_page(html: str, base_url: str, content_selector: str = "", exclude_s
             pd.robots_meta.append((name.lower(), _clean(m["content"])))
     base_tag = soup.find("base", href=True)
     base = urljoin(base_url, base_tag["href"]) if base_tag else base_url
+    pd.markup = capture_markup(soup, base)
     if collect_links:
-        for anchor in soup.find_all("a", href=True):
-            try:
-                pd.links.append(urljoin(base, anchor["href"]))
-            except ValueError:
-                continue
+        pd.links = pd.markup["links"]
     for link in soup.find_all("link"):
         rel = link.get("rel") or []
         rel = rel.split() if isinstance(rel, str) else rel
@@ -97,3 +96,54 @@ def extract_page(html: str, base_url: str, content_selector: str = "", exclude_s
     else:
         pd.state = "success"
     return pd
+
+def capture_markup(soup, base):
+    facts = {"links": [], "alternates": [], "assets": [], "schema": [], "limited": False}
+    limit = 2048
+    def resolved(raw):
+        try:
+            url = urljoin(base, raw.strip())
+            return url if url.startswith(("https://", "http://")) else ""
+        except ValueError:
+            return ""
+    seen = set()
+    for tag in soup.find_all(["a", "img", "link", "script"]):
+        if tag.name == "script" and str(tag.get("type", "")).lower() == "application/ld+json":
+            field = "schema"
+            try:
+                data = json.loads(tag.get_text())
+                nodes = data if isinstance(data, list) else [data]
+                types = set()
+                while nodes:
+                    node = nodes.pop()
+                    if not isinstance(node, dict):
+                        continue
+                    if isinstance(node.get("@graph"), list):
+                        nodes.extend(node["@graph"])
+                    value = node.get("@type", [])
+                    types.update(t for t in (value if isinstance(value, list) else [value]) if isinstance(t, str))
+                item = {"state": "types observed" if types else "no typed entity", "types": sorted(types)}
+            except (ValueError, RecursionError):
+                item = {"state": "invalid JSON-LD", "types": []}
+        else:
+            url = resolved(tag.get("href") or tag.get("src") or "") if tag.get("href") or tag.get("src") else ""
+            if not url:
+                continue
+            if tag.name == "a":
+                if url in seen:
+                    continue
+                if len(seen) < limit:
+                    seen.add(url)
+                field, item = "links", url
+            elif tag.name == "link" and "alternate" in tag.get("rel", []) and tag.has_attr("hreflang"):
+                field, item = "alternates", [tag["hreflang"], url]
+            elif tag.name in ("img", "script") or "stylesheet" in tag.get("rel", []):
+                alt = ("absent" if "alt" not in tag.attrs else "empty" if not tag["alt"].strip() else "present")
+                field, item = "assets", {"kind": tag.name, "url": url, "alt_state": alt if tag.name == "img" else ""}
+            else:
+                continue
+        if len(facts[field]) < limit:
+            facts[field].append(item)
+        else:
+            facts["limited"] = True
+    return facts

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from filelock import FileLock
 
+from seo_analysis.analysis.checks import CompareInput, SnapshotInput, check_snapshot, compare_snapshots
 from seo_analysis.analysis import analyze, fa_text, review, similarity, variants
 from seo_analysis.app.audit import run_audit
 from seo_analysis.core import tools
@@ -111,6 +112,8 @@ def calibrate(ctx, request):
 
 
 OPERATIONS = {
+    tools.CHECK: (SnapshotInput, check_snapshot),
+    tools.COMPARE: (CompareInput, compare_snapshots),
     tools.AUDIT: (CrawlConfig, audit),
     tools.CRAWL: (CrawlConfig, crawl),
     tools.ANALYZE: (AnalysisInput, analyze_snapshot),

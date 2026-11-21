@@ -18,4 +18,7 @@ VARIANTS = ToolSpec("content.spelling-variants", "variants", "Review Persian spe
 REVIEW = ToolSpec("content.review-pairs", "review", "Record editorial decisions on flagged pairs.")
 CALIBRATE = ToolSpec("content.calibrate", "calibrate", "Evaluate thresholds on reviewed pairs.")
 
-BUILTIN_TOOLS = (DOCTOR, CRAWL, AUDIT, ANALYZE, VARIANTS, REVIEW, CALIBRATE)
+CHECK = ToolSpec("seo.check", "check", "Inspect observed links, metadata, markup and assets in a crawl.")
+COMPARE = ToolSpec("seo.compare", "compare", "Compare two snapshots for the same origin.")
+
+BUILTIN_TOOLS = (CHECK, COMPARE, DOCTOR, CRAWL, AUDIT, ANALYZE, VARIANTS, REVIEW, CALIBRATE)

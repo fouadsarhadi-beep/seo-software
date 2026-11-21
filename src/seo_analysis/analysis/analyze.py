@@ -1,6 +1,7 @@
 """Analysis of a saved crawl. Re-runnable with different settings without touching the website again."""
 from __future__ import annotations
 
+from hashlib import sha256
 import json
 from collections import defaultdict
 from pathlib import Path
@@ -106,6 +107,7 @@ def run_analyze(in_dir, out_dir=None, gsc_pages=None, gsc_queries=None, settings
     log(f"Comparing {len(items)} pages ({len(items) * (len(items) - 1) // 2} pairs)...")
     corpus = similarity.prepare(items, settings, stop, variants, stem_fn)
     results = similarity.compare(corpus)
+    revisions = {r["url"]: sha256(json.dumps([r.get(k) for k in ("text", "title", "h1", "effective_indexability")], ensure_ascii=False).encode()).hexdigest() for r in records}
     title_of = {i["url"]: i["title"] for i in items}
 
     rows, pairs_json = [], []
@@ -121,7 +123,8 @@ def run_analyze(in_dir, out_dir=None, gsc_pages=None, gsc_queries=None, settings
                      p.words_a, p.words_b, "short page: scores can be noisy" if p.short_page else "",
                      ga.get("clicks", ""), gb.get("clicks", ""), ga.get("impressions", ""), gb.get("impressions", ""),
                      count if comparable else "", "; ".join(f"{q} ({gsc.display_metric(a)}/{gsc.display_metric(b)})" for q, a, b in top)])
-        pairs_json.append({"url_a": p.url_a, "url_b": p.url_b, "title_a": title_of[p.url_a], "title_b": title_of[p.url_b],
+        pairs_json.append({"content_revisions": {p.url_a: revisions[p.url_a], p.url_b: revisions[p.url_b]},
+                           "source_snapshot": str(in_dir.resolve()), "url_a": p.url_a, "url_b": p.url_b, "title_a": title_of[p.url_a], "title_b": title_of[p.url_b],
                            "title_sim": p.title_sim, "dup": p.dup, "containment": p.containment, "topic": p.topic,
                            "same_h1": p.same_h1, "shared_terms": p.shared_terms, "shared_phrases": p.shared_phrases,
                            "triggers": triggers, "evidence": evidence, "page_type_a": p.page_type_a,
