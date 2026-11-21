@@ -1,0 +1,34 @@
+name: Foundation checks
+on: [push, pull_request]
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.13.9'
+      - run: uv sync --locked
+      - run: uv run --locked pytest -q
+      - run: uv build --wheel
+      - name: Smoke-test installed wheel outside the checkout
+        shell: python
+        run: |
+          import os, pathlib, subprocess, sys, tempfile, venv
+          wheel = next(pathlib.Path("dist").resolve().glob("*.whl"))
+          with tempfile.TemporaryDirectory() as scratch:
+              env = pathlib.Path(scratch) / "SEO محیط"
+              venv.create(env, with_pip=True)
+              bin_dir = env / ("Scripts" if os.name == "nt" else "bin")
+              python = bin_dir / ("python.exe" if os.name == "nt" else "python")
+              cli = bin_dir / ("seo-analysis.exe" if os.name == "nt" else "seo-analysis")
+              for args in ([python, "-m", "pip", "install", wheel], [cli, "--help"],
+                           [cli, "system", "doctor", "--json"],
+                           [python, "-c", "from seo_analysis.analysis.fa_text import load_stopwords; assert load_stopwords()"]):
+                  subprocess.run(args, cwd=scratch, check=True)

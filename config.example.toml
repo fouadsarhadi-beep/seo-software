@@ -1,0 +1,4 @@
+# Optional overrides. Relative paths are resolved beside this file.
+[paths]
+# data_dir = 'D:\SEO Analysis\data'
+# export_dir = 'D:\SEO Analysis\exports'

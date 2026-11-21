@@ -5,7 +5,8 @@
 **Date:** 2026-11-21  
 **Starting code:** `samatoos-seo-audit.zip`, containing the existing `seo_audit/` Python package and `tests/`; these are functional unreleased tools, not a previously deployed application  
 **Verified starting baseline (2026-11-21):** Six CLI commands (`crawl`, `variants`, `analyze`, `review`, `calibrate`, `gsc-pull`); offline suite: **75 passed, 1 skipped** (optional Hazm). This result applies to the supplied archive, not necessarily a later working checkout  
-**Proposed package and CLI:** `seo_analysis` / `seo-analysis` (subject to the initial repository assessment)  
+**Package and CLI:** `seo_analysis` / `seo-analysis` on CPython 3.12. The maintained source is in `src/seo_analysis/`. The original ZIP records the assessment baseline.
+**Implementation checkpoint:** Stage A now has an installable CLI, a built-in tool catalogue, workspace configuration, diagnostics, and the extracted audit workflows. See [implementation state](docs/IMPLEMENTATION_STATE.md) and [foundation decision](docs/adr/0001-foundation.md).
 
 This document consolidates the complete architecture and tool catalogue with the critical review corrections. **It replaces both the earlier architecture draft and its review addendum for implementation purposes.** No separate addendum or predecessor specification is required. If the repository reveals facts that conflict with this document, verify them and record the decision in the living architecture and implementation record.
 
@@ -261,59 +262,31 @@ Use a **local-first modular monolith**. Run one application process at first. Ke
 - Connectors are data acquisition mechanisms; a tool is the user-facing operation that applies useful logic to the data.
 - No tool may bypass the shared DataPolicy or secret access layer.
 
-## 3.1 Proposed repository structure
+## 3.1 Repository structure
 
-Create a coherent repository skeleton early. Not every planned directory needs a full implementation immediately, but real modules should have one clear location. Reuse and move starting Python code when justified; there are no previously released CLI/package compatibility obligations.
+The current foundation uses these boundaries. Keep the root architecture document authoritative. Add directories for later capabilities when a working feature needs them.
 
 ```text
-repo/
-├── README.md
-├── pyproject.toml
-├── config.example.toml
-├── docs/
-│   ├── ARCHITECTURE.md           # this maintained specification, once checked in
-│   ├── IMPLEMENTATION_STATE.md  # work completed, tested behavior, next action
-│   ├── adr/                     # consequential decisions
-│   ├── tools/
-│   ├── connectors/
-│   └── security/
-├── src/
-│   └── seo_analysis/
-│       ├── __main__.py
-│       ├── cli/
-│       ├── app/                 # shared services and run lifecycle
-│       ├── core/                # small tool contracts, registry, errors, policy
-│       ├── domain/              # sites, pages, evidence, findings, snapshots
-│       ├── tools/
-│       │   ├── web/
-│       │   ├── seo/
-│       │   ├── research/
-│       │   ├── analytics/
-│       │   ├── content/
-│       │   ├── cms/
-│       │   └── quality/
-│       ├── connectors/
-│       │   ├── google/
-│       │   ├── looker_studio/
-│       │   ├── search/
-│       │   ├── serp/
-│       │   ├── communities/
-│       │   ├── browser_bridge/
-│       │   ├── cms/
-│       │   └── imports/
-│       ├── storage/
-│       │   ├── sqlite/
-│       │   ├── artifacts/
-│       │   └── cache/
-│       ├── security/
-│       ├── reporting/
-│       └── ui/                  # local templates, CSS and minimal JS when built
-└── tests/
-    ├── unit/
-    ├── integration/
-    ├── contract/
-    └── fixtures/
+SEO_ANALYSIS_SOFTWARE_ARCHITECTURE.md
+README.md
+pyproject.toml
+uv.lock
+config.example.toml
+docs/
+  adr/                   # consequential implementation decisions
+  IMPLEMENTATION_STATE.md
+src/seo_analysis/
+  cli.py                 # user input, command dispatch and presentation
+  app/                   # interface-independent application services
+  core/                  # tool metadata, configuration, paths and network scope
+  web/                   # HTTP transport, discovery, robots and page extraction
+  analysis/              # technical checks, content similarity and editorial review
+  reporting/             # tabular exports and run manifests
+  connectors/            # provider formats and acquisition code
+tests/                   # offline unit and end-to-end fixtures
 ```
+
+Introduce run storage during Stage B to preserve interrupted evidence. Add SQLite indexes and saved projects during Stage C. The local UI, research sources, CMS tools and agent adapters will call these same services. Each source retains its own authority, coverage and permissions.
 
 **Do not put mutable application data inside the Git checkout by default.** On Windows use an appropriate per-user application-data directory (e.g. `%LOCALAPPDATA%\SEOAnalysisSoftware`, resolved with `platformdirs`); use equivalent per-user paths on other operating systems. Store SQLite databases, run artifacts, caches and logs there. User export paths are configurable and distinct from internal application state. Do not place active WAL-mode SQLite databases in synchronized/network folders. Secrets live in the OS credential store, not the database or repository.
 
@@ -671,7 +644,7 @@ The starting package runs through `python -m seo_audit <command>`. Its six worki
 | `calibrate` | Compares scoring thresholds against saved human decisions; its sampled-data limitations must be disclosed | Similarity calibration / evaluation tool |
 | `gsc-pull` | Optional read-only GSC Search Analytics `query × page` acquisition using OAuth; API path is mocked in the existing tests, **not verified with a live property** | Google GSC connector and query-map source |
 
-**Source-to-responsibility inventory.** Use the actual working checkout as the final authority; this list reflects the supplied archive:
+**Source-to-responsibility inventory.** These filenames describe the baseline archive. Section 3.1 and the implementation state track the current checkout:
 
 | Existing file(s) | Functionality to reuse or deliberately refactor |
 |---|---|
@@ -688,7 +661,7 @@ The starting package runs through `python -m seo_audit <command>`. Its six worki
 
 The existing workflow produces, among other files, `inventory.csv`, `snapshot.jsonl`, `similar_pairs.csv`, `canonical_report.csv`, `issues.txt`, `pairs.json`, `decisions.jsonl`, `decisions.csv`, `calibration.txt`, `crawl_manifest.json` and `analysis_manifest.json`. The first working application need not preserve the exact old filenames or positional CSV format, because there are no released compatibility obligations; **the underlying capabilities, review decisions and inspectable evidence must not disappear unnoticed**. If an existing feature is deferred, document its status and retain a clear route to reintroduce it through the shared tool interface.
 
-**Confirmed existing limitations to resolve or consciously manage:**
+**Limitations at assessment time.** The implementation state records which items have been addressed:
 
 - `seo_audit/cli.py` has `DEFAULT_SITEMAP = "https://samatoos.ir/sitemap_index.xml"`; `crawl` can silently use it when no target is supplied. Remove this behavior and require explicit input (or an interactive prompt). The GSC prompt and sample/test fixtures also contain site-specific examples; make product-facing examples generic without requiring fixtures to lose all realistic test data.
 - `seo_audit/crawl.py` uses a Samatoos-branded HTTP user-agent token; use an application-appropriate identifier instead. Project identity, configuration and normal runtime defaults must not depend on a particular company or website.
@@ -1739,7 +1712,7 @@ This is **one evolving application**, not a series of separate software products
 1. Remove the old hardcoded website and defaults. Support explicit URL, sitemap, URL-list input and interactive prompting; fail clearly in noninteractive mode when missing.
 2. Validate target mode and exact network scope. Implement secure HTTP fetch for every hop and approved local/staging exceptions.
 3. Add sitemap discovery through robots.txt and known configured paths; when none exists, offer an explicitly bounded internal-link crawl.
-4. Enforce page/depth/time/request/response-size/rate/parameter budgets; handle cancellation and partial reports.
+4. Count discovery, retries and redirects toward the same request and time budgets. Enforce page/depth/response-size/rate/parameter limits. Persist completed observations during the crawl and atomically finalize its manifest with coverage, cancellation or failure status.
 5. Integrate existing `crawl`, `analyze` and reporting functionality into the unified user-run audit, reusing the actual crawler, extractor, canonical/indexability and similarity modules where useful. Fix verified defects with targeted tests. Account explicitly for the already-working `variants`, `review`, `calibrate` and `gsc-pull` workflows even when their full unified interfaces are scheduled after the initial audit.
 6. Produce readable terminal findings plus versioned JSON and CSV artifacts, coverage/source metadata and error/warning/review categorization. Every finding links to its evidence; no similarity score is a cannibalization verdict.
 7. Validate all input types against offline golden fixtures (WordPress-like, static, Persian, no-sitemap, redirects, robots, parameter traps and security scenarios).
@@ -1749,7 +1722,7 @@ This is **one evolving application**, not a series of separate software products
 ## Stage C — Shared tools, persistence and additional offline checks
 
 1. Validate the smallest `ToolSpec`/ToolResult/ToolRunner contract using the already working audit and one other real operation; avoid speculative metadata. Bring the inherited analysis/review/calibration/variant tools under this contract instead of creating duplicate implementations.
-2. Add optional saved targets/projects, SQLite schema migrations, run state, evidence/artifact indexes, atomic file writes and explicit history/coverage.
+2. Index the durable Stage B run artifacts in SQLite. Add optional saved targets/projects, schema migrations and historical queries. Recover interrupted indexing from the run manifest.
 3. Add technical SEO, sitemap reconciliation, internal links, broken links, canonical diagnostics, schema extraction/validation, hreflang and simple asset checks as independently useful tools.
 4. Add historical comparisons, review decisions and content-change awareness, preserving source completeness and snapshot identity.
 5. Support structured CLI output and safe agent invocation over the **same** service interface. No separate agent-side implementation.
@@ -1766,6 +1739,8 @@ This is **one evolving application**, not a series of separate software products
 **Working checkpoint:** The same audit works through CLI and UI, and the UI stays useful without Google connections.
 
 ## Stage E — Owned-site Google data and reporting
+
+The local foundation and first usable audit require no connected service. Keep CSV imports and offline connector fixtures usable independently. Enable live services individually once a concrete workflow needs them.
 
 1. Implement an OS-backed credential store, OAuth property selection and least-privilege scopes before live Google integrations.
 2. GSC Search Analytics (query/page/date/device/country) with API limits, missingness and query attribution; use URL Inspection selectively under quota.
