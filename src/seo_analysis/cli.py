@@ -211,6 +211,15 @@ def cmd_history(args):
     return 2 if isinstance(value, dict) and value.get("errors") else 0
 
 
+def cmd_serve(args):
+    import uvicorn
+    from seo_analysis.ui.server import create_app
+    if not 1 <= args.port <= 65535:
+        raise ValueError("Select a port between 1 and 65535.")
+    uvicorn.run(create_app(args.workspace, args.port), host="127.0.0.1", port=args.port)
+    return 0
+
+
 def cmd_agent(args):
     from seo_analysis.app.agent import run_snapshot_tool
     result = run_snapshot_tool(args.workspace, args.tool, args.run, previous=args.previous, check=args.check)
@@ -233,6 +242,10 @@ def build_parser():
     p.add_argument("--version", action="version", version=__version__)
     p.add_argument("--config-file", type=Path, help="application workspace settings (TOML)")
     sub = p.add_subparsers(dest="cmd", required=True)
+
+    serve = sub.add_parser("serve", help="open the loopback audit workbench")
+    serve.add_argument("--port", type=int, default=8765)
+    serve.set_defaults(func=cmd_serve)
 
     system = sub.add_parser("system", help="inspect the local installation")
     commands = system.add_subparsers(dest="operation", required=True)
