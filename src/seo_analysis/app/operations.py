@@ -11,6 +11,7 @@ from seo_analysis.research.sources import BraveSearchInput, FeedInput, brave_sea
 from seo_analysis.research.imports import ExportInput, import_export
 from seo_analysis.research.intelligence import ResearchInput, build_research
 from seo_analysis.reporting.workbook import WorkbookInput, build_workbook
+from seo_analysis.analysis.local_lighthouse import LocalLighthouseInput, local_lighthouse
 from seo_analysis.analysis.browserqa import BrowserQAInput, browser_qa
 from seo_analysis.analysis.siteqa import SiteQAInput, inspect_build
 
@@ -127,6 +128,7 @@ def calibrate(ctx, request):
 
 
 OPERATIONS = {
+    tools.LOCAL_LIGHTHOUSE: (LocalLighthouseInput, local_lighthouse),
     tools.BROWSER_QA: (BrowserQAInput, browser_qa),
     tools.WORDPRESS: (InventoryInput, inventory),
     tools.PUBLIC_FEED: (FeedInput, read_feed),

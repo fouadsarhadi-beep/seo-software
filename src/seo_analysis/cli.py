@@ -400,6 +400,13 @@ def cmd_browser_qa(args):
                                                            args.axe_script, args.baseline, args.chromium))
 
 
+def cmd_local_lighthouse(args):
+    from seo_analysis.analysis.local_lighthouse import LocalLighthouseInput
+
+    return execute(args, tools.LOCAL_LIGHTHOUSE,
+                   LocalLighthouseInput(args.directory, args.lighthouse_cli, args.chromium, args.page, args.device))
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="seo-analysis", description="Analytics-only SEO audit tools. You make the decisions.")
     p.add_argument("--version", action="version", version=__version__)
@@ -528,6 +535,16 @@ def build_parser():
     browser_qa.add_argument("--project")
     browser_qa.add_argument("--json", action="store_true")
     browser_qa.set_defaults(func=cmd_browser_qa)
+
+    local_lighthouse = sub.add_parser("lighthouse-run", help=tools.LOCAL_LIGHTHOUSE.summary)
+    local_lighthouse.add_argument("directory", help="trusted local build directory")
+    local_lighthouse.add_argument("--page", default="/")
+    local_lighthouse.add_argument("--device", choices=("desktop", "mobile"), default="mobile")
+    local_lighthouse.add_argument("--lighthouse-cli", required=True, help="installed Lighthouse cli/index.js")
+    local_lighthouse.add_argument("--chromium", required=True, help="installed Chrome or Chromium executable")
+    local_lighthouse.add_argument("--project")
+    local_lighthouse.add_argument("--json", action="store_true")
+    local_lighthouse.set_defaults(func=cmd_local_lighthouse)
 
     mcp = sub.add_parser("mcp", help="serve selected local run evidence over stdio")
     mcp.add_argument("--allow-run", required=True, action="append")

@@ -75,4 +75,6 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 - Stage J, Steps 1–2 — Profiled a 300-page audit fixture and replayed ten saved real pages on 2026-11-22. Consolidated default HTML exclusions into one traversal. The fixture's median audit time moved from 2.10 seconds to 1.77 seconds and real-page extraction results matched exactly.
 - Stage J, Step 4 — Built the 0.4.0 Python wheel and extended the cross-platform CI smoke test to run static site QA outside the checkout on 2026-11-22.
 
+- Stage H, Step 3 follow-up — Added the local Lighthouse runner on 2026-11-22. Lighthouse 13.6 and Chromium 156 produced six lab measurements from a local fixture. The HTTP fixture verified that external requests and paths outside the build are refused.
+
 [Current scope and remaining work](ROADMAP.md)

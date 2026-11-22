@@ -1,6 +1,6 @@
 # SEO Software Roadmap
 
-**Current checkpoint:** Stage F has public feed and Brave Search adapters. Stage G now includes keyword clusters, content planning and saved page comparisons. Stage H now includes read-only WordPress inventory and local Chromium and axe checks. Stage I now exposes scoped offline analysis and reporting links through MCP. **Current release checkpoint:** Stage J profiling and Python wheel distribution. Automatic local Lighthouse collection remains open in Stage H. Live Google verification remains open.
+**Current checkpoint:** Stage F has public feed and Brave Search adapters. Stage G now includes keyword clusters, content planning and saved page comparisons. Stage H now includes read-only WordPress inventory and local Chromium and axe checks. Stage I now exposes scoped offline analysis and reporting links through MCP. **Current release checkpoint:** Stage J profiling and Python wheel distribution. Stage H can also generate local Lighthouse reports. Live Google verification remains open.
 
 ## Foundation and audit workbench
 
@@ -29,7 +29,7 @@ E1–E5 have automated coverage. Live verification still needs authorized Google
 | --- | --- | --- |
 | F — Research sources | Local imports, bounded public RSS and Atom retrieval, and Brave Search samples with source and row references. | Verify a live feed from the deployment environment, benchmark Brave with an eligible key and assess authorized browser exports. |
 | G — Keyword and competitor analysis | Keyword maps, SERP clusters, editorial briefs, Search Console refresh candidates, saved page comparisons, sampled rank history and backlink grouping. | Extend discovery beyond selected datasets as sources become available. |
-| H — CMS and site quality | Read-only WordPress inventory for published posts, pages and registered custom types, plus media metadata, static build checks, local Chromium screenshots and axe checks, baseline comparison, access-log summaries, and Lighthouse and axe report imports. | Verify a live WordPress installation and add automatic local Lighthouse collection. |
+| H — CMS and site quality | Read-only WordPress inventory for published posts, pages and registered custom types, plus media metadata, static build checks, local Chromium screenshots and axe checks, baseline comparison, access-log summaries, and Lighthouse lab runs and axe checks and imports. | Verify a live WordPress installation. |
 | I — Agents and reporting | Scoped MCP analysis, snapshot comparisons, editorial decision reads, and links to selected Looker Studio and Sheets reports. | Consider hosted connectors and scheduling where useful. |
 | J — Performance and distribution | Profiled the 300-page audit fixture, replayed saved real pages, reduced extraction overhead and built the 0.4.0 wheel. Windows and Ubuntu CI verify clean wheel installation. | Measure a larger live owner site. Consider native code or a standalone executable if justified. |
 

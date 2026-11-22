@@ -220,6 +220,14 @@ Choose a trusted build directory and an HTML route. Use a trailing slash for a d
 
 To run accessibility checks, pass the `axe.min.js` file from a trusted axe-core installation. The generated `axe.json` also works with `site-qa --axe`. For visual comparisons, pass an approved PNG at the same viewport size. Changes produce a `changed-pixels.png` mask. Keep browser version and viewport consistent across captures. Browser timings describe this local run. Use the Lighthouse and CrUX commands for their separate performance measurements.
 
+### Generate a local Lighthouse lab report
+
+```sh
+seo-analysis lighthouse-run ./build --page / --device desktop --lighthouse-cli ./node_modules/lighthouse/cli/index.js --chromium /path/to/chromium
+```
+
+Install Lighthouse with npm and use a compatible Node.js version plus an installed Chrome or Chromium executable. The command serves one trusted build on loopback and runs Lighthouse against a fresh browser profile. External resources are blocked, so the lab measurements describe the files in the selected build. The run saves the generated `lighthouse.json` and normalized `performance.json`. Pass the raw report to `site-qa --lighthouse` to include it in a build QA report.
+
 ## Inspect published WordPress metadata
 
 ```sh
