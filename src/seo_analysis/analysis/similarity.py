@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import math
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 
 from seo_analysis.analysis.fa_text import tokenize
@@ -123,15 +123,39 @@ def _explain(corpus: Corpus, a: Doc, b: Doc):
     return terms, [p if len(p) <= 70 else p[:67] + "..." for p in phrases]
 
 
+def candidate_rows(corpus):
+    """With positive thresholds a result must share a feature in at least one signal."""
+    docs, settings = corpus.docs, corpus.settings
+    if len(docs) < 32 or min(settings.thr_dup, settings.thr_contain, settings.thr_topic, settings.thr_title) <= 0:
+        for i in range(len(docs)):
+            yield range(i + 1, len(docs))
+        return
+
+    def features(doc):
+        return (doc.shingles, doc.vec.keys(), doc.title_tokens, (doc.h1_key,) if doc.h1_key else ())
+
+    postings = [defaultdict(list) for _ in range(4)]
+    for index, doc in enumerate(docs):
+        for table, keys in zip(postings, features(doc)):
+            for key in keys:
+                table[key].append(index)
+    for index, doc in enumerate(docs):
+        candidates = set()
+        for table, keys in zip(postings, features(doc)):
+            for key in keys:
+                candidates.update(table[key])
+        yield sorted(other for other in candidates if other > index)
+
+
 def compare(corpus: Corpus, progress=None) -> list[PairResult]:
     s, docs = corpus.settings, corpus.docs
     out = []
     n = len(docs)
-    for i in range(n):
+    for i, candidates in enumerate(candidate_rows(corpus)):
         if progress and i % 50 == 0:
             progress(i, n)
         a = docs[i]
-        for j in range(i + 1, n):
+        for j in candidates:
             b = docs[j]
             inter = len(a.shingles & b.shingles)
             smallest = min(len(a.shingles), len(b.shingles))

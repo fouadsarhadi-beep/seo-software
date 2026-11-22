@@ -211,6 +211,26 @@ def cmd_history(args):
     return 2 if isinstance(value, dict) and value.get("errors") else 0
 
 
+def cmd_local_data(args):
+    from seo_analysis.app.operations import ExportInput, ResearchInput, WorkbookInput, SiteQAInput
+    if args.cmd == "import-data":
+        req = ExportInput(args.file,args.kind,args.provider,args.observed,args.locale,args.device,args.period_start,json.loads(args.columns))
+        return execute(args, tools.IMPORT, req)
+    if args.cmd == "site-qa":
+        return execute(args, tools.SITE_QA, SiteQAInput(args.directory,args.lighthouse,args.axe,args.access_log,args.baseline,args.screenshot))
+    history = History(args.workspace)
+    datasets = tuple(history.show(r)["directory"] for r in dict.fromkeys(args.dataset))
+    if args.cmd == "research":
+        return execute(args, tools.RESEARCH, ResearchInput(datasets,args.owned_host))
+    return execute(args, tools.WORKBOOK, WorkbookInput(history.show(args.crawl)["directory"],datasets,args.report_url))
+
+
+def cmd_mcp(args):
+    from seo_analysis.app.mcp_server import build_server
+    build_server(args.workspace, args.allow_run).run(transport="stdio")
+    return 0
+
+
 def cmd_serve(args):
     import uvicorn
     from seo_analysis.ui.server import create_app
@@ -243,6 +263,9 @@ def build_parser():
     p.add_argument("--config-file", type=Path, help="application workspace settings (TOML)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
+    mcp = sub.add_parser("mcp", help="serve selected local run evidence over stdio")
+    mcp.add_argument("--allow-run", required=True, action="append")
+    mcp.set_defaults(func=cmd_mcp)
     serve = sub.add_parser("serve", help="open the loopback audit workbench")
     serve.add_argument("--port", type=int, default=8765)
     serve.set_defaults(func=cmd_serve)
@@ -275,6 +298,35 @@ def build_parser():
         command.add_argument("--json", action="store_true")
         command.add_argument("--project")
         command.set_defaults(func=cmd_snapshot)
+
+    from seo_analysis.research.imports import REQUIRED
+    imp = sub.add_parser("import-data", help=tools.IMPORT.summary)
+    imp.add_argument("file")
+    imp.add_argument("--kind", choices=tuple(REQUIRED), required=True)
+    imp.add_argument("--provider", required=True)
+    imp.add_argument("--observed", required=True, help="Observation or period end date, YYYY-MM-DD")
+    imp.add_argument("--period-start", default="")
+    imp.add_argument("--locale", default="")
+    imp.add_argument("--device", default="")
+    imp.add_argument("--columns", default="{}", help="JSON object mapping normalized names to source headers")
+    research = sub.add_parser("research", help=tools.RESEARCH.summary)
+    research.add_argument("--dataset", action="append", required=True)
+    research.add_argument("--owned-host", required=True)
+    workbook = sub.add_parser("workbook", help=tools.WORKBOOK.summary)
+    workbook.add_argument("--crawl", required=True)
+    workbook.add_argument("--dataset", action="append", default=[])
+    workbook.add_argument("--report-url", default="")
+    qa = sub.add_parser("site-qa", help=tools.SITE_QA.summary)
+    qa.add_argument("directory")
+    qa.add_argument("--lighthouse", default="")
+    qa.add_argument("--axe", default="")
+    qa.add_argument("--access-log", default="", help="Selected common or combined web access log")
+    qa.add_argument("--baseline", default="", help="Operator-selected approved reference PNG")
+    qa.add_argument("--screenshot", default="", help="Current PNG at the same viewport and scale")
+    for command in (imp, research, workbook, qa):
+        command.add_argument("--json", action="store_true")
+        command.add_argument("--project")
+        command.set_defaults(func=cmd_local_data)
 
     projects = sub.add_parser("project", help="manage optional saved projects").add_subparsers(dest="operation", required=True)
     create = projects.add_parser("create")

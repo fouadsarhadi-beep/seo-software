@@ -7,6 +7,11 @@ from filelock import FileLock
 
 from seo_analysis.analysis.checks import CompareInput, SnapshotInput, check_snapshot, compare_snapshots
 from seo_analysis.analysis import analyze, fa_text, review, similarity, variants
+from seo_analysis.research.imports import ExportInput, import_export
+from seo_analysis.research.intelligence import ResearchInput, build_research
+from seo_analysis.reporting.workbook import WorkbookInput, build_workbook
+from seo_analysis.analysis.siteqa import SiteQAInput, inspect_build
+
 from seo_analysis.app.audit import run_audit
 from seo_analysis.core import tools
 from seo_analysis.core.artifacts import write_json, write_text
@@ -112,6 +117,10 @@ def calibrate(ctx, request):
 
 
 OPERATIONS = {
+    tools.IMPORT: (ExportInput, import_export),
+    tools.RESEARCH: (ResearchInput, build_research),
+    tools.WORKBOOK: (WorkbookInput, build_workbook),
+    tools.SITE_QA: (SiteQAInput, inspect_build),
     tools.CHECK: (SnapshotInput, check_snapshot),
     tools.COMPARE: (CompareInput, compare_snapshots),
     tools.AUDIT: (CrawlConfig, audit),

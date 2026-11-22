@@ -82,13 +82,13 @@ def create_app(workspace, port=8765):
 
     @app.get("/")
     def home():
-        return render("home", runs=history.list_runs()[:12], projects=history.projects())
+        return render("home", runs=history.list_runs(limit=12), projects=history.projects())
 
     @app.get("/history")
     def runs(page: int = 1):
         page = max(1, page)
-        records = history.list_runs()
-        return render("history", runs=records[(page-1)*30:page*30], page=page, more=len(records)>page*30)
+        records = history.list_runs(limit=31, offset=(page - 1) * 30)
+        return render("history", runs=records[:30], page=page, more=len(records) > 30)
 
     @app.get("/projects")
     def projects():

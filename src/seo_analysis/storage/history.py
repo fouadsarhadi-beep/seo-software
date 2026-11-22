@@ -119,10 +119,10 @@ class History:
                 db.execute("INSERT INTO evidence VALUES (?, ?, ?, ?, ?)",
                            (rid, item["evidence_id"], item["url"], item["observed_at"], "observations/" + file.name))
 
-    def list_runs(self, project=None):
+    def list_runs(self, project=None, *, limit=-1, offset=0):
         with self.transaction() as db:
             rows = db.execute("""SELECT id, tool, status, project, target, started, finished, coverage FROM runs WHERE (? IS NULL OR project=?)
-                                 ORDER BY started DESC, id""", (project, project))
+                                 ORDER BY started DESC, id LIMIT ? OFFSET ?""", (project, project, limit, offset))
             return [dict(row) | {"coverage": json.loads(row["coverage"])} for row in rows]
 
     def show(self, run_id):

@@ -21,4 +21,9 @@ CALIBRATE = ToolSpec("content.calibrate", "calibrate", "Evaluate thresholds on r
 CHECK = ToolSpec("seo.check", "check", "Inspect observed links, metadata, markup and assets in a crawl.")
 COMPARE = ToolSpec("seo.compare", "compare", "Compare two snapshots for the same origin.")
 
-BUILTIN_TOOLS = (CHECK, COMPARE, DOCTOR, CRAWL, AUDIT, ANALYZE, VARIANTS, REVIEW, CALIBRATE)
+IMPORT = ToolSpec("research.import", "import-data", "Import a selected research or analytics export.")
+RESEARCH = ToolSpec("research.opportunities", "research", "Compare sourced queries, competitors, questions and backlinks.")
+WORKBOOK = ToolSpec("report.workbook", "workbook", "Export crawl and first-party measurements to Excel.")
+SITE_QA = ToolSpec("quality.build", "site-qa", "Inspect a selected static build and browser QA reports.")
+
+BUILTIN_TOOLS = (IMPORT, RESEARCH, WORKBOOK, SITE_QA, CHECK, COMPARE, DOCTOR, CRAWL, AUDIT, ANALYZE, VARIANTS, REVIEW, CALIBRATE)

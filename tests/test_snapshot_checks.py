@@ -19,7 +19,7 @@ def test_checks_compare_and_old_snapshot_coverage(site, tmp_path):
     first = runner.run(tools.AUDIT, cfg)
     hits = dict(site.hits)
     result = run_snapshot_tool(ws, tools.CHECK.id, first.run_id)
-    rows = json.loads((Path(result.out_dir) / "checks.json").read_text())["observations"]
+    rows = json.loads((Path(result.out_dir) / "checks.json").read_text(encoding="utf-8"))["observations"]
     assert {r["check"] for r in rows} == {"technical", "sitemap", "links", "broken-links", "canonicals", "schema", "hreflang", "assets"}
     assert any(r["value"] == "Article" for r in rows)
     assert site.hits == hits
@@ -27,3 +27,10 @@ def test_checks_compare_and_old_snapshot_coverage(site, tmp_path):
     second = runner.run(tools.AUDIT, cfg)
     diff = run_snapshot_tool(ws, tools.COMPARE.id, second.run_id, previous=first.run_id)
     assert diff.counts["changed"] == 1
+    source = Path(first.out_dir)/"snapshot.jsonl"
+    original = [json.loads(line) for line in source.read_text(encoding="utf-8").splitlines()]
+    for page in original:
+        page.pop("markup",None)
+    source.write_text("\n".join(json.dumps(p) for p in original) + "\n")
+    legacy = run_snapshot_tool(ws, tools.CHECK.id, first.run_id, check="assets")
+    assert legacy.status == "partial" and "markup unavailable" in legacy.warnings[0]

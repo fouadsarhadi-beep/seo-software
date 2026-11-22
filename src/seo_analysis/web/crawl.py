@@ -180,7 +180,7 @@ def run_crawl(cfg: CrawlConfig, input_fn=None, log=print, fetcher=None) -> dict:
             evidence_id = f"page-{len(records) + 1:06d}"
             rec.update(evidence_id=evidence_id, observed_at=datetime.now(timezone.utc).isoformat(),
                        depth=depth, discovery_source=entry.source, raw_url=entry.raw_url,
-                       discovery_method="internal_links" if discovery.follow_links else cfg.kind,
+                       discovery_method="internal_links" if discovery.follow_links else ("sitemap" if cfg.kind == "website" else cfg.kind),
                        url_key=url_key(entry.url),
                        content_hash=sha256(rec["text"].encode()).hexdigest() if rec["text"] else None)
             write_json(journal / (evidence_id + ".json"), rec)

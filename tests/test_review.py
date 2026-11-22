@@ -48,3 +48,13 @@ def test_calibration_is_marked_provisional_with_few_decisions(tmp_path):
     review.review_loop(pairs, path, input_fn=feeder(["1", "i"]), output_fn=lambda *_: None)
     text = review.calibrate(pairs, path, output_fn=lambda *_: None)
     assert "PROVISIONAL" in text and "near-duplicate" in text and "precision" in text
+
+
+def test_reviews_reopen_after_content_changes(tmp_path):
+    path = tmp_path / "decisions.jsonl"
+    current = pair("https://example.org/a", "https://example.org/b", content_revisions={"a":"1", "b":"2"})
+    assert review.review_loop([current], path, input_fn=feeder(["i"])) == 1
+    assert review.review_loop([current], path, input_fn=feeder([])) == 0
+    changed = dict(current, content_revisions={"a":"3", "b":"2"})
+    assert "Calibration from 0 decisions" in review.calibrate([changed],path)
+    assert review.review_loop([changed],path,input_fn=feeder(["d"])) == 1
