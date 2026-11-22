@@ -1,19 +1,32 @@
 # SEO Analysis Software
 
-A local-first workbench for SEO analysis and website research. Run a bounded website audit, inspect its evidence and replay content analysis offline. Projects and saved targets are optional.
+A local SEO workbench. Enter a website URL to crawl its pages and flag issues such as missing titles, broken links to checked pages, and similar content across pages. The app shows which pages it reached, links findings to the pages it checked, and saves reports you can download or revisit in **History**.
 
-## Install on Windows
+You can also compare saved audits, turn Search Console and GA4 exports into an Excel report, or check a local site build before publishing. A basic audit needs access to the site, with no API keys or accounts.
 
-From the checkout, in CMD or PowerShell with Python 3.12 installed:
+## Quick start
+
+Open a terminal in the downloaded repository folder with Python 3.12 installed.
+
+On Windows, use CMD or PowerShell.
 
 ```bat
 py -3.12 -m venv .venv
 .venv\Scripts\python -m pip install -e .
-.venv\Scripts\seo-analysis --help
-.venv\Scripts\seo-analysis system doctor
+.venv\Scripts\seo-analysis serve
 ```
 
-For a reproducible development environment with uv, run `uv sync --locked` then `uv run --locked pytest`. On macOS and Linux the executable in a pip-created environment is `.venv/bin/seo-analysis`.
+On macOS or Linux, use these commands.
+
+```sh
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -e .
+.venv/bin/seo-analysis serve
+```
+
+Open [http://127.0.0.1:8765](http://127.0.0.1:8765), enter your website URL, and click **Run audit**. Under **Crawl options**, enable **Follow internal links if no sitemap is available** if your site has no sitemap. When the audit finishes, check the crawl coverage, open a finding to see its evidence, and download the report. On later visits, run only the `serve` command to reopen the app. Press Ctrl+C in the terminal to stop it.
+
+For a reproducible development environment with uv, run `uv sync --locked` then `uv run --locked pytest`.
 
 To install a built wheel, download the `seo-analysis-wheel` artifact from a successful Foundation checks run and extract it. In the virtual environment, replace the editable install above with `.venv\Scripts\python -m pip install path\to\seo_analysis-0.4.0-py3-none-any.whl`. The Python wheel contains the CLI, workbench templates and Persian stopwords.
 
@@ -46,11 +59,7 @@ Each execution receives its own run directory. Use the analysis directory printe
 
 ## Local workbench and snapshot checks
 
-Start the workbench and open `http://127.0.0.1:8765` in your browser. Enter the website, choose crawl options and run the audit. Findings link to the observed page and the results view offers downloadable files. Use Cancel audit to stop acquisition. Completed observations stay available in the cancelled run. Cancellation interrupts pacing and retry waits. An active network read may take until its timeout to return.
-
-```sh
-seo-analysis serve
-```
+Use **Cancel audit** to stop a crawl in progress. Completed observations stay available in the cancelled run. Cancellation interrupts pacing and retry waits. An active network read may take until its timeout to return.
 
 Use run IDs printed by the CLI or listed under History. The following commands read existing snapshots offline.
 
@@ -103,6 +112,8 @@ seo-analysis history reindex
 History includes ad hoc runs. `history show` resolves artifact paths and page evidence within a run. `history reindex` rebuilds index entries from manifests, skips active writers and recovers completed observations from a process that exited before finalization. The recovered run shows incomplete coverage. Saved targets use website input by default. Specify `--kind sitemap` to save a sitemap URL.
 
 ## Collect live research samples
+
+Brave Search is an optional source for keyword and competitor research. It samples which pages rank for a query in Brave's web results. Saved samples can help compare competing sites, group queries with overlapping results, or track observed ranking changes across comparable dates. The website audit runs independently, and Google rankings require a separate source.
 
 ```sh
 seo-analysis research-feed https://example.com/feed.xml --max-items 25
