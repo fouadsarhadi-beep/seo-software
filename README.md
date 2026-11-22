@@ -141,6 +141,20 @@ The GA4 command uses the selected property and the property's reporting time zon
 
 Landing paths retain their query strings. Supply `--origin` only when the selected data belongs to that web origin. This assigns a hostname and scheme for crawl matching. Use `--stream-id` or an appropriately scoped property when the property covers several sites. With no supplied origin, live GA4 paths appear as **landing origin unknown** in the workbook. The workbook checks requested URLs first, then final URLs, then site-declared canonicals. If several crawl records match at the same tier, it reports **ambiguous** and lists the candidate evidence.
 
+### Measure page performance
+
+```sh
+seo-analysis google pagespeed https://example.com/ --strategy mobile
+seo-analysis lighthouse-report lighthouse.json
+seo-analysis google performance-key set
+seo-analysis google crux https://example.com/ --form-factor PHONE
+seo-analysis google crux https://example.com --scope origin
+```
+
+PageSpeed Insights runs a Lighthouse lab test for a public URL. It sends the URL, including its query string, to Google. To connect a key, enable the PageSpeed Insights API and Chrome UX Report API in Google Cloud, install the Google extra and run `google performance-key set` in an interactive terminal. The key is shared by the two performance commands within the selected workspace and stored in the OS credential manager. CrUX requires the key. Add `--use-key` to PageSpeed Insights to use it. `google performance-key delete` removes the saved key locally.
+
+Generate local Lighthouse JSON with Chrome DevTools or the Lighthouse CLI, then pass it to `lighthouse-report`. Both lab tools produce `performance.json` with Lighthouse scores, timings, device data and warnings. CrUX produces a separate field report with p75 values, histogram data when available, collection period and form factor. Use `--scope origin` for an explicit whole-origin sample. A missing URL record appears as `no_data` and exits with code 3. Field INP and lab Total Blocking Time remain distinct measurements.
+
 ## Workspace
 
 Run `system doctor` to locate the configuration, data, run and export directories. Configuration is optional. To customize paths, copy [config.example.toml](config.example.toml) to the reported config path, or select a file with `seo-analysis --config-file "<path>" system doctor`. Relative directory settings resolve beside the configuration file. When all commands have exited, back up the config file and complete data directory, including history.sqlite3 and runs/. Restore them to the locations reported by doctor. Reindexing recovers run records from manifests. The database backup also preserves projects and targets that have never been used. To start a fresh workspace, select a new data directory.

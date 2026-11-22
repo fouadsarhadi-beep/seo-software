@@ -305,6 +305,32 @@ def cmd_ga4(args):
     return execute(args, tools.GA4_LANDING_PAGES, request)
 
 
+def cmd_performance_key(args):
+    from getpass import getpass
+    from seo_analysis.connectors.performance import performance_key, validate_key
+
+    if args.action == "set":
+        if not sys.stdin.isatty():
+            raise ValueError("Use an interactive terminal to save a performance API key.")
+        value = validate_key(getpass("Google performance API key: ").strip())
+        performance_key(args.workspace, "set", value)
+        print("Google performance API key saved to the OS credential store.")
+    else:
+        performance_key(args.workspace, "delete")
+        print("Google performance API key removed locally.")
+    return 0
+
+
+def cmd_performance(args):
+    from seo_analysis.connectors.performance import CruxInput, LighthouseInput, PageSpeedInput
+
+    if args.cmd == "lighthouse-report":
+        return execute(args, tools.LIGHTHOUSE, LighthouseInput(args.report))
+    if args.operation == "pagespeed":
+        return execute(args, tools.PAGESPEED, PageSpeedInput(args.url, args.strategy, args.use_key))
+    return execute(args, tools.CRUX, CruxInput(args.url, args.scope, args.form_factor))
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="seo-analysis", description="Analytics-only SEO audit tools. You make the decisions.")
     p.add_argument("--version", action="version", version=__version__)
@@ -353,6 +379,26 @@ def build_parser():
     landing.add_argument("--project", help="use this project's GA4 connection")
     landing.add_argument("--json", action="store_true")
     landing.set_defaults(func=cmd_ga4)
+
+    from seo_analysis.connectors.performance import FORM_FACTORS
+
+    performance_key = google_actions.add_parser("performance-key", help="manage the optional performance API key")
+    performance_key.add_argument("action", choices=("set", "delete"))
+    performance_key.set_defaults(func=cmd_performance_key)
+    pagespeed = google_actions.add_parser("pagespeed", help=tools.PAGESPEED.summary)
+    pagespeed.add_argument("url", help="public page URL sent to PageSpeed Insights")
+    pagespeed.add_argument("--strategy", choices=("mobile", "desktop"), default="mobile")
+    pagespeed.add_argument("--use-key", action="store_true", help="use the saved Google performance API key")
+    crux = google_actions.add_parser("crux", help=tools.CRUX.summary)
+    crux.add_argument("url", metavar="target", help="public URL or origin sent to CrUX")
+    crux.add_argument("--scope", choices=("url", "origin"), default="url")
+    crux.add_argument("--form-factor", choices=FORM_FACTORS, default="ALL_FORM_FACTORS")
+    lighthouse = sub.add_parser("lighthouse-report", help=tools.LIGHTHOUSE.summary)
+    lighthouse.add_argument("report", help="path to a locally generated Lighthouse JSON report")
+    for command in (pagespeed, crux, lighthouse):
+        command.add_argument("--project")
+        command.add_argument("--json", action="store_true")
+        command.set_defaults(func=cmd_performance)
 
     mcp = sub.add_parser("mcp", help="serve selected local run evidence over stdio")
     mcp.add_argument("--allow-run", required=True, action="append")
