@@ -26,6 +26,7 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 - Stage D, Step 3 — Reused the CLI tool runner and workspace history in the browser on 2026-11-22.
 - Stage D, Step 4 — Enforced host, origin and form-token checks, and paginated history and findings on 2026-11-22.
 - Stage D, Step 2 follow-up — Made cancellation interrupt retry waits and linked completed observations from cancelled runs on 2026-11-22. The Linux suite passed 109 tests with one optional skip. Chromium passed the audit, evidence and CSV download flow.
+- Stage D, Steps 2–4 follow-up — Added a project list with on-demand forms and reversible run archiving on 2026-11-22. Simplified the audit summary, clarified the private-network option and moved common report downloads near the top of the results.
 
 - Stage B, Steps 5–7 and Stage D, Step 2 follow-up — Fixed main text extraction for pages with empty containers and clarified crawl and comparison coverage on 2026-11-22. On the first ten current post sitemap pages from samatoos.ir, the old extractor returned zero words for all ten. The updated extractor recovered text from all ten, including 43 words from the reported article. A local replay through the full audit compared nine pages and excluded one marked noindex.
 
