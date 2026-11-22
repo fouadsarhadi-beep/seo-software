@@ -849,6 +849,9 @@ google = [
     { name = "google-auth-oauthlib" },
     { name = "keyring" },
 ]
+research = [
+    { name = "keyring" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -866,6 +869,7 @@ requires-dist = [
     { name = "idna", specifier = ">=3,<4" },
     { name = "jinja2", specifier = ">=3.1,<4" },
     { name = "keyring", marker = "extra == 'google'", specifier = ">=25,<26" },
+    { name = "keyring", marker = "extra == 'research'", specifier = ">=25,<26" },
     { name = "mcp", specifier = ">=1.12,<2" },
     { name = "openpyxl", specifier = ">=3.1,<4" },
     { name = "pillow", specifier = ">=11,<14" },
@@ -874,7 +878,7 @@ requires-dist = [
     { name = "urllib3", specifier = ">=2.6,<3" },
     { name = "uvicorn", specifier = ">=0.30,<1" },
 ]
-provides-extras = ["google"]
+provides-extras = ["google", "research"]
 
 [package.metadata.requires-dev]
 dev = [

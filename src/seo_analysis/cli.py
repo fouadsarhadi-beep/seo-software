@@ -346,6 +346,31 @@ def cmd_sheets_publish(args):
     return execute(args, tools.SHEETS_PUBLISH, SheetsPublishInput(args.export, args.confirm))
 
 
+def cmd_live_research(args):
+    from seo_analysis.research.sources import BraveSearchInput, FeedInput, brave_key
+
+    if args.cmd == "research-feed":
+        return execute(args, tools.PUBLIC_FEED, FeedInput(args.url, args.max_items))
+    if args.cmd == "research-search":
+        return execute(args, tools.BRAVE_SEARCH,
+                       BraveSearchInput(args.query, args.country, args.language, args.count, args.allow_storage))
+    if args.action == "delete":
+        brave_key(args.workspace, delete=True)
+        print("Brave Search API key removed locally.")
+    else:
+        from getpass import getpass
+        import re
+
+        if not sys.stdin.isatty():
+            raise ValueError("Use an interactive terminal to save the Brave Search key.")
+        token = getpass("Brave Search API key: ").strip()
+        if not re.fullmatch(r"[A-Za-z0-9_-]{20,256}", token):
+            raise ValueError("Enter a valid Brave Search API key.")
+        brave_key(args.workspace, token)
+        print("Brave Search API key saved to the OS credential store.")
+    return 0
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="seo-analysis", description="Analytics-only SEO audit tools. You make the decisions.")
     p.add_argument("--version", action="version", version=__version__)
@@ -430,6 +455,23 @@ def build_parser():
     for command in (export, sheets):
         command.add_argument("--project")
         command.add_argument("--json", action="store_true")
+
+    feed = sub.add_parser("research-feed", help=tools.PUBLIC_FEED.summary)
+    feed.add_argument("url")
+    feed.add_argument("--max-items", type=int, default=100)
+    search_web = sub.add_parser("research-search", help=tools.BRAVE_SEARCH.summary)
+    search_web.add_argument("query")
+    search_web.add_argument("--country", default="us")
+    search_web.add_argument("--language", default="en")
+    search_web.add_argument("--count", type=int, default=10)
+    search_web.add_argument("--allow-storage", action="store_true", help="confirm your Brave plan permits storage")
+    for command in (feed, search_web):
+        command.add_argument("--project")
+        command.add_argument("--json", action="store_true")
+        command.set_defaults(func=cmd_live_research)
+    research_key = sub.add_parser("research-key", help="manage the Brave Search API key")
+    research_key.add_argument("action", choices=("set", "delete"))
+    research_key.set_defaults(func=cmd_live_research)
 
     mcp = sub.add_parser("mcp", help="serve selected local run evidence over stdio")
     mcp.add_argument("--allow-run", required=True, action="append")

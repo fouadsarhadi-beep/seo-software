@@ -50,4 +50,8 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 
 - Stage E, Step 5 — Added offline CSV and Excel previews and checksum-approved Google Sheets publication on 2026-11-22. Mocked responses verified app-file consent, literal cell writes, upload retry and duplicate avoidance after an uncertain create result. Live publication requires a Sheets connection.
 
-The next integration milestone is Stage F's remaining live research sources. [Current scope and remaining work](IMPLEMENTATION_STATE.md#stage-e-handoff)
+## Live research sources
+
+- Stage F, Steps 2, 3 and 5 — Added one-page Brave Search samples and bounded public RSS and Atom retrieval on 2026-11-22. Both feed the existing research dataset format. Verified feed retrieval with a local HTTP fixture and Brave with mocked responses. Live benchmarking needs a Brave key on a plan permitting storage. The cloud could not establish a direct connection for the W3C feed check.
+
+[Current scope and remaining work](ROADMAP.md)

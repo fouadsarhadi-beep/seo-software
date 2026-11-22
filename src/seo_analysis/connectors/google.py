@@ -32,11 +32,11 @@ NATIVE_KEYRINGS = {
 }
 
 
-def native_keyring():
+def native_keyring(extra="google"):
     try:
         import keyring
     except ImportError:
-        raise RuntimeError("Install the optional Google dependencies with pip install 'seo-analysis[google]'.") from None
+        raise RuntimeError(f"Install the optional dependencies with pip install 'seo-analysis[{extra}]'.") from None
     try:
         backend = keyring.get_keyring()
         backends = backend.backends if type(backend).__module__ == "keyring.backends.chainer" else [backend]
@@ -46,7 +46,7 @@ def native_keyring():
                 return candidate
     except Exception:
         raise RuntimeError("Unable to open the OS credential store.") from None
-    raise RuntimeError("Google connections require an available OS credential store, such as Windows Credential Manager.")
+    raise RuntimeError("This integration requires an available OS credential store, such as Windows Credential Manager.")
 
 
 def authorize(client_file, scope):

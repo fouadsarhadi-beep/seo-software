@@ -44,4 +44,8 @@ DATASET_EXPORT = ToolSpec("report.export-dataset", "export-dataset", "Prepare se
 SHEETS_PUBLISH = ToolSpec("google.publish-sheets", "google publish-sheets",
                           "Publish a reviewed export into a new Google spreadsheet.", uses_network=True)
 
-BUILTIN_TOOLS = (DATASET_EXPORT, SHEETS_PUBLISH, PAGESPEED, CRUX, LIGHTHOUSE, GA4_LANDING_PAGES, SEARCH_ANALYTICS, URL_INSPECTION, IMPORT, RESEARCH, WORKBOOK, SITE_QA, CHECK, COMPARE, DOCTOR, CRAWL, AUDIT, ANALYZE, VARIANTS, REVIEW, CALIBRATE)
+PUBLIC_FEED = ToolSpec("research.feed", "research-feed", "Sample one public RSS or Atom feed.", uses_network=True)
+BRAVE_SEARCH = ToolSpec("research.brave-search", "research-search",
+                       "Capture one page of Brave web search results.", uses_network=True)
+
+BUILTIN_TOOLS = (PUBLIC_FEED, BRAVE_SEARCH, DATASET_EXPORT, SHEETS_PUBLISH, PAGESPEED, CRUX, LIGHTHOUSE, GA4_LANDING_PAGES, SEARCH_ANALYTICS, URL_INSPECTION, IMPORT, RESEARCH, WORKBOOK, SITE_QA, CHECK, COMPARE, DOCTOR, CRAWL, AUDIT, ANALYZE, VARIANTS, REVIEW, CALIBRATE)

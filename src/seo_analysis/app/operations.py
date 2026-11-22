@@ -7,6 +7,7 @@ from filelock import FileLock
 
 from seo_analysis.analysis.checks import CompareInput, SnapshotInput, check_snapshot, compare_snapshots
 from seo_analysis.analysis import analyze, fa_text, review, similarity, variants
+from seo_analysis.research.sources import BraveSearchInput, FeedInput, brave_search, read_feed
 from seo_analysis.research.imports import ExportInput, import_export
 from seo_analysis.research.intelligence import ResearchInput, build_research
 from seo_analysis.reporting.workbook import WorkbookInput, build_workbook
@@ -124,6 +125,8 @@ def calibrate(ctx, request):
 
 
 OPERATIONS = {
+    tools.PUBLIC_FEED: (FeedInput, read_feed),
+    tools.BRAVE_SEARCH: (BraveSearchInput, brave_search),
     tools.DATASET_EXPORT: (DatasetExportInput, prepare_dataset),
     tools.SHEETS_PUBLISH: (SheetsPublishInput, publish_sheets),
     tools.PAGESPEED: (PageSpeedInput, pagespeed),

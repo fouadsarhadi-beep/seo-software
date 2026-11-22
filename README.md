@@ -98,6 +98,20 @@ seo-analysis history reindex
 
 History includes ad hoc runs. `history show` resolves artifact paths and page evidence within a run. `history reindex` rebuilds index entries from manifests, skips active writers and recovers completed observations from a process that exited before finalization. The recovered run shows incomplete coverage. Saved targets use website input by default. Specify `--kind sitemap` to save a sitemap URL.
 
+## Collect live research samples
+
+```sh
+seo-analysis research-feed https://example.com/feed.xml --max-items 25
+python -m pip install -e '.[research]'
+seo-analysis research-key set
+seo-analysis research-search "example topic" --country us --language en --count 10 --allow-storage
+seo-analysis research --dataset <sample-run-id> --owned-host example.com
+```
+
+The feed reader requests the selected public RSS or Atom feed and its robots.txt. It follows redirects within the same origin and saves entry titles, links and available publication dates. Each response is limited to 2 MB.
+
+The search command sends the selected query and locale to the official Brave Search API. Use a plan that permits storing the selected results and pass `--allow-storage` to confirm. The key is stored in the OS credential manager and can be removed with `research-key delete`. Each request samples up to 20 Brave web results. The dataset preserves sample rank, the requested locale, retrieval time and elapsed time. Device class is unavailable. Add multiple research datasets with repeated `--dataset` flags.
+
 ## Connect a Google property
 
 Install the optional dependencies on the computer where you will give consent. On Windows, use the virtual environment's Python. On Linux, an unlocked Secret Service or KWallet must be available in your desktop session.
