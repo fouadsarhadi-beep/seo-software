@@ -155,6 +155,27 @@ PageSpeed Insights runs a Lighthouse lab test for a public URL. It sends the URL
 
 Generate local Lighthouse JSON with Chrome DevTools or the Lighthouse CLI, then pass it to `lighthouse-report`. Both lab tools produce `performance.json` with Lighthouse scores, timings, device data and warnings. CrUX produces a separate field report with p75 values, histogram data when available, collection period and form factor. Use `--scope origin` for an explicit whole-origin sample. A missing URL record appears as `no_data` and exits with code 3. Field INP and lab Total Blocking Time remain distinct measurements.
 
+### Export selected data to Google Sheets
+
+Create a local preview from a normalized dataset run, such as a Search Analytics pull, a GA4 landing-page pull or a file import. Repeat `--column` in the order you want the columns written.
+
+```sh
+seo-analysis export-dataset --dataset <dataset-run-id> --title "Search report" --column query --column url --column clicks
+```
+
+Review `selected.csv` or `selected.xlsx` in the export run directory. `export.json` lists the title, columns, row count, coverage and confirmation SHA-256. Preparing the export works offline. Select fewer rows with `--max-rows` if the upload limit is reached.
+
+Enable the Google Sheets API in the Google Cloud project for your Desktop OAuth client. Connect Sheets separately using the app-file permission, then publish the reviewed export.
+
+```sh
+seo-analysis google connect sheets --client-file path/to/desktop-client.json
+seo-analysis google publish-sheets <export-run-id> --confirm <sha256-from-export.json>
+```
+
+Use the same `--project NAME` for preparing, connecting and publishing when working in a project. Publishing creates a spreadsheet in the connected Google account and writes the selected values into its **Data** tab. Google sharing permissions are managed separately. Open the URL in `publication.json`, or select that spreadsheet and tab through the Google Sheets connector in Looker Studio. Strings are written as literal cell values. Empty measurements appear as blank cells and numeric zeros stay numeric.
+
+If a cell upload fails, rerun publication with the same export and checksum to write to the recorded spreadsheet. A completed publication returns the existing receipt. If Google fails to return the spreadsheet ID during creation, the run reports an unknown outcome. Check Drive for the preview title before preparing a fresh export.
+
 ## Workspace
 
 Run `system doctor` to locate the configuration, data, run and export directories. Configuration is optional. To customize paths, copy [config.example.toml](config.example.toml) to the reported config path, or select a file with `seo-analysis --config-file "<path>" system doctor`. Relative directory settings resolve beside the configuration file. When all commands have exited, back up the config file and complete data directory, including history.sqlite3 and runs/. Restore them to the locations reported by doctor. Reindexing recovers run records from manifests. The database backup also preserves projects and targets that have never been used. To start a fresh workspace, select a new data directory.

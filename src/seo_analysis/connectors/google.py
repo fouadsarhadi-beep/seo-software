@@ -12,7 +12,11 @@ import requests
 from seo_analysis.connectors.gsc import SCOPE as GSC_SCOPE
 from seo_analysis.storage.history import History
 
-SCOPES = {"gsc": GSC_SCOPE, "ga4": "https://www.googleapis.com/auth/analytics.readonly"}
+SCOPES = {
+    "gsc": GSC_SCOPE,
+    "ga4": "https://www.googleapis.com/auth/analytics.readonly",
+    "sheets": "https://www.googleapis.com/auth/drive.file",
+}
 APP_NAME = "SEO Analysis Software Google OAuth"
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -76,7 +80,7 @@ def authorize(client_file, scope):
     finally:
         logger.disabled = previous
     if not creds.refresh_token or (creds.granted_scopes is not None and set(creds.granted_scopes) != {scope}):
-        raise RuntimeError("Google did not issue a refresh token with the requested read-only permission.")
+        raise RuntimeError("Google did not issue a refresh token with the requested permission.")
     return creds
 
 
@@ -150,7 +154,7 @@ class GoogleConnection:
     def session(self):
         """Read the selected property and matching credential under the same lock."""
         if self.selected() is None:
-            raise ValueError(f"Connect a {self.service} property first.")
+            raise ValueError(f"Run google connect {self.service} for this workspace or project first.")
         backend = native_keyring()
         from google.auth.transport.requests import AuthorizedSession
         from google.oauth2.credentials import Credentials
@@ -159,7 +163,7 @@ class GoogleConnection:
             selection = self.selected()
             record = self._credential_call(backend, "get_password") if selection else None
         if not record:
-            raise ValueError(f"Reconnect the selected {self.service} property to restore its credentials.")
+            raise ValueError(f"Reconnect {self.service} to restore its credentials.")
         try:
             saved = json.loads(record)
             required = ("refresh_token", "client_id", "client_secret")
@@ -179,11 +183,15 @@ class GoogleConnection:
         backend = native_keyring()
         self._credential_call(backend, "get_password")
         credentials = authorize(client_file, self.scope)
-        with AuthorizedSession(credentials, refresh_timeout=30) as session:
-            available = properties(self.service, session)
-        property_id = choose(available)
-        if property_id not in available:
-            raise ValueError("Select the ID of a property listed for this account.")
+        if self.service == "sheets":
+            property_id, property_name = "app-created-spreadsheets", "Spreadsheets created by this app"
+        else:
+            with AuthorizedSession(credentials, refresh_timeout=30) as session:
+                available = properties(self.service, session)
+            property_id = choose(available)
+            if property_id not in available:
+                raise ValueError("Select the ID of a property listed for this account.")
+            property_name = available[property_id]
         record = json.dumps({"refresh_token": credentials.refresh_token, "client_id": credentials.client_id,
                              "client_secret": credentials.client_secret})
         self.history.path.parent.mkdir(parents=True, exist_ok=True)
@@ -191,14 +199,14 @@ class GoogleConnection:
             previous = self._credential_call(backend, "get_password")
             self._credential_call(backend, "set_password", record)
             try:
-                self.history.set_google_connection(self.project, self.service, property_id, available[property_id])
+                self.history.set_google_connection(self.project, self.service, property_id, property_name)
             except Exception:
                 if previous is None:
                     self._credential_call(backend, "delete_password")
                 else:
                     self._credential_call(backend, "set_password", previous)
                 raise
-        return {"property_id": property_id, "property_name": available[property_id]}
+        return {"property_id": property_id, "property_name": property_name}
 
     def disconnect(self, *, revoke=False):
         backend = native_keyring()

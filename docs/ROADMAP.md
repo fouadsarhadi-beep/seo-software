@@ -1,6 +1,6 @@
 # SEO Software Roadmap
 
-**Current checkpoint:** Stage E4 is implemented. **Next: Stage E5**, selected exports and Google Sheets publication for Looker Studio.
+**Current checkpoint:** Stage E5 is implemented. **Next: finish Stage F**, starting with a permitted search provider and live research sources. Live Google verification remains open.
 
 ## Foundation and audit workbench
 
@@ -19,9 +19,9 @@
 | E2 | Implemented | Search Console Search Analytics exports and single-URL Inspection. |
 | E3 | Implemented | GA4 landing-page sessions and key events, with explicit URL matching in the workbook. |
 | E4 | Implemented | PageSpeed Insights and local Lighthouse lab reports, plus CrUX field metrics. |
-| E5 | **Next** | Publish selected normalized data to Google Sheets for Looker Studio. Local CSV and Excel exports already work. |
+| E5 | Implemented | Preview selected columns in CSV and Excel, then publish an approved selection to a spreadsheet for Looker Studio. |
 
-E1–E4 have automated coverage. Live verification still needs authorized Google properties and a performance API key. The keyless PageSpeed check returned HTTP 429.
+E1–E5 have automated coverage. Live verification still needs authorized Google properties, a performance API key and a Sheets connection. The keyless PageSpeed check returned HTTP 429.
 
 ## After Stage E
 

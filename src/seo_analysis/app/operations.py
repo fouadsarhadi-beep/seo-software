@@ -14,6 +14,8 @@ from seo_analysis.analysis.siteqa import SiteQAInput, inspect_build
 
 from seo_analysis.app.audit import run_audit
 from seo_analysis.connectors.performance import CruxInput, LighthouseInput, PageSpeedInput, crux, lighthouse, pagespeed
+from seo_analysis.connectors.sheets import SheetsPublishInput, publish_sheets
+from seo_analysis.reporting.dataset_export import DatasetExportInput, prepare_dataset
 from seo_analysis.connectors.ga4 import LandingPagesInput, landing_pages
 from seo_analysis.connectors.search_console import InspectionInput, SearchAnalyticsInput, inspect_url, search_analytics
 from seo_analysis.core import tools
@@ -122,6 +124,8 @@ def calibrate(ctx, request):
 
 
 OPERATIONS = {
+    tools.DATASET_EXPORT: (DatasetExportInput, prepare_dataset),
+    tools.SHEETS_PUBLISH: (SheetsPublishInput, publish_sheets),
     tools.PAGESPEED: (PageSpeedInput, pagespeed),
     tools.CRUX: (CruxInput, crux),
     tools.LIGHTHOUSE: (LighthouseInput, lighthouse),

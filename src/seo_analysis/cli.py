@@ -276,8 +276,10 @@ def cmd_google(args):
             if not answer.isdecimal() or not 1 <= int(answer) <= len(choices):
                 raise ValueError("Choose one of the listed property numbers.")
             return choices[int(answer) - 1]
-        if args.property_id is None and not sys.stdin.isatty():
+        if args.service != "sheets" and args.property_id is None and not sys.stdin.isatty():
             raise ValueError("Pass --property ID when connecting from a noninteractive terminal.")
+        if args.service == "sheets" and args.property_id is not None:
+            raise ValueError("Sheets authorization does not accept a property ID.")
         selected = connection.connect(args.client_file, choose)
     elif args.operation == "disconnect":
         connection.disconnect(revoke=args.revoke)
@@ -331,22 +333,35 @@ def cmd_performance(args):
     return execute(args, tools.CRUX, CruxInput(args.url, args.scope, args.form_factor))
 
 
+def cmd_dataset_export(args):
+    from seo_analysis.reporting.dataset_export import DatasetExportInput
+
+    return execute(args, tools.DATASET_EXPORT,
+                   DatasetExportInput(args.dataset, tuple(args.column), args.title, args.max_rows))
+
+
+def cmd_sheets_publish(args):
+    from seo_analysis.connectors.sheets import SheetsPublishInput
+
+    return execute(args, tools.SHEETS_PUBLISH, SheetsPublishInput(args.export, args.confirm))
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="seo-analysis", description="Analytics-only SEO audit tools. You make the decisions.")
     p.add_argument("--version", action="version", version=__version__)
     p.add_argument("--config-file", type=Path, help="application workspace settings (TOML)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    google = sub.add_parser("google", help="manage read-only Google property connections")
+    google = sub.add_parser("google", help="manage Google connections and run Google integrations")
     google_actions = google.add_subparsers(dest="operation", required=True)
-    connect = google_actions.add_parser("connect", help="authorize and select a property on this computer")
+    connect = google_actions.add_parser("connect", help="authorize a Google service on this computer")
     connect.add_argument("--client-file", type=Path, required=True, help="OAuth client JSON for a Desktop app")
     connect.add_argument("--property", dest="property_id", help="select this property ID without a numbered prompt")
-    status = google_actions.add_parser("status", help="show the locally selected property")
+    status = google_actions.add_parser("status", help="show the local Google connection")
     disconnect = google_actions.add_parser("disconnect", help="remove local Google credentials and property selection")
     disconnect.add_argument("--revoke", action="store_true", help="also revoke the grant with Google")
     for command in (connect, status, disconnect):
-        command.add_argument("service", choices=("gsc", "ga4"))
+        command.add_argument("service", choices=("gsc", "ga4", "sheets"))
         command.add_argument("--project", help="scope the connection to an existing project")
         command.set_defaults(func=cmd_google)
 
@@ -399,6 +414,22 @@ def build_parser():
         command.add_argument("--project")
         command.add_argument("--json", action="store_true")
         command.set_defaults(func=cmd_performance)
+
+    from seo_analysis.reporting.dataset_export import MAX_ROWS as EXPORT_MAX_ROWS
+
+    export = sub.add_parser("export-dataset", help=tools.DATASET_EXPORT.summary)
+    export.add_argument("--dataset", required=True, help="normalized dataset run ID")
+    export.add_argument("--column", action="append", required=True, help="column to include, repeat in output order")
+    export.add_argument("--title", required=True, help="title for the spreadsheet if published")
+    export.add_argument("--max-rows", type=int, default=EXPORT_MAX_ROWS)
+    export.set_defaults(func=cmd_dataset_export)
+    sheets = google_actions.add_parser("publish-sheets", help=tools.SHEETS_PUBLISH.summary)
+    sheets.add_argument("export", help="reviewed export run ID")
+    sheets.add_argument("--confirm", required=True, help="SHA-256 shown in the export.json preview")
+    sheets.set_defaults(func=cmd_sheets_publish)
+    for command in (export, sheets):
+        command.add_argument("--project")
+        command.add_argument("--json", action="store_true")
 
     mcp = sub.add_parser("mcp", help="serve selected local run evidence over stdio")
     mcp.add_argument("--allow-run", required=True, action="append")

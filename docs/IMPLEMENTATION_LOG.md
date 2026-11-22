@@ -48,4 +48,6 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 
 - Stage E, Step 4 — Added standalone Lighthouse report import, PageSpeed Insights lab tests and CrUX field queries on 2026-11-22. Mocked responses verified separation of lab and field metrics, missing measurements, collection periods and unavailable records. The live keyless PageSpeed check returned HTTP 429.
 
-The next integration milestone is Stage E, Step 5. [Current scope and remaining work](IMPLEMENTATION_STATE.md#stage-e-handoff)
+- Stage E, Step 5 — Added offline CSV and Excel previews and checksum-approved Google Sheets publication on 2026-11-22. Mocked responses verified app-file consent, literal cell writes, upload retry and duplicate avoidance after an uncertain create result. Live publication requires a Sheets connection.
+
+The next integration milestone is Stage F's remaining live research sources. [Current scope and remaining work](IMPLEMENTATION_STATE.md#stage-e-handoff)

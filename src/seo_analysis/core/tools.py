@@ -40,4 +40,8 @@ CRUX = ToolSpec("google.crux", "google crux",
                 "Read Chrome UX Report field metrics for a public URL or origin.", uses_network=True)
 LIGHTHOUSE = ToolSpec("performance.lighthouse", "lighthouse-report", "Import a local Lighthouse JSON report.")
 
-BUILTIN_TOOLS = (PAGESPEED, CRUX, LIGHTHOUSE, GA4_LANDING_PAGES, SEARCH_ANALYTICS, URL_INSPECTION, IMPORT, RESEARCH, WORKBOOK, SITE_QA, CHECK, COMPARE, DOCTOR, CRAWL, AUDIT, ANALYZE, VARIANTS, REVIEW, CALIBRATE)
+DATASET_EXPORT = ToolSpec("report.export-dataset", "export-dataset", "Prepare selected dataset columns as CSV and XLSX.")
+SHEETS_PUBLISH = ToolSpec("google.publish-sheets", "google publish-sheets",
+                          "Publish a reviewed export into a new Google spreadsheet.", uses_network=True)
+
+BUILTIN_TOOLS = (DATASET_EXPORT, SHEETS_PUBLISH, PAGESPEED, CRUX, LIGHTHOUSE, GA4_LANDING_PAGES, SEARCH_ANALYTICS, URL_INSPECTION, IMPORT, RESEARCH, WORKBOOK, SITE_QA, CHECK, COMPARE, DOCTOR, CRAWL, AUDIT, ANALYZE, VARIANTS, REVIEW, CALIBRATE)
