@@ -48,4 +48,7 @@ PUBLIC_FEED = ToolSpec("research.feed", "research-feed", "Sample one public RSS 
 BRAVE_SEARCH = ToolSpec("research.brave-search", "research-search",
                        "Capture one page of Brave web search results.", uses_network=True)
 
-BUILTIN_TOOLS = (PUBLIC_FEED, BRAVE_SEARCH, DATASET_EXPORT, SHEETS_PUBLISH, PAGESPEED, CRUX, LIGHTHOUSE, GA4_LANDING_PAGES, SEARCH_ANALYTICS, URL_INSPECTION, IMPORT, RESEARCH, WORKBOOK, SITE_QA, CHECK, COMPARE, DOCTOR, CRAWL, AUDIT, ANALYZE, VARIANTS, REVIEW, CALIBRATE)
+WORDPRESS = ToolSpec("cms.wordpress-inventory", "wordpress inventory",
+                     "Read published WordPress posts or pages over the REST API.", uses_network=True)
+
+BUILTIN_TOOLS = (WORDPRESS, PUBLIC_FEED, BRAVE_SEARCH, DATASET_EXPORT, SHEETS_PUBLISH, PAGESPEED, CRUX, LIGHTHOUSE, GA4_LANDING_PAGES, SEARCH_ANALYTICS, URL_INSPECTION, IMPORT, RESEARCH, WORKBOOK, SITE_QA, CHECK, COMPARE, DOCTOR, CRAWL, AUDIT, ANALYZE, VARIANTS, REVIEW, CALIBRATE)

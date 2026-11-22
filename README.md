@@ -203,6 +203,25 @@ Use the same `--project NAME` for preparing, connecting and publishing when work
 
 If a cell upload fails, rerun publication with the same export and checksum to write to the recorded spreadsheet. A completed publication returns the existing receipt. If Google fails to return the spreadsheet ID during creation, the run reports an unknown outcome. Check Drive for the preview title before preparing a fresh export.
 
+## Inspect published WordPress metadata
+
+```sh
+seo-analysis wordpress inventory https://example.com/blog --resource pages --max-items 50
+```
+
+Pass the installation's exact HTTPS base URL, including its subdirectory if present. Public reads follow the site's robots policy. The run saves `wordpress.json` and `wordpress.csv` with selected metadata from published posts or pages. Yoast canonical and index directives appear when the REST API exposes them. Results reflect the selected item limit and any incomplete pages of API results.
+
+For authorized access, create an Application Password for a dedicated WordPress user with the minimum access the site requires. Install the optional credential support, save the password with the interactive prompt and explicitly select authenticated inventory.
+
+```sh
+python -m pip install -e '.[wordpress]'
+seo-analysis wordpress connect https://example.com/blog
+seo-analysis wordpress inventory https://example.com/blog --resource posts --authenticated
+seo-analysis wordpress forget https://example.com/blog
+```
+
+Credentials are stored in the OS credential manager and scoped to the installation, workspace and optional `--project NAME`. The connector reads the selected REST route over HTTPS and stops at redirects. `forget` removes the saved copy locally. To revoke the Application Password itself, use WordPress's user profile screen.
+
 ## Workspace
 
 Run `system doctor` to locate the configuration, data, run and export directories. Configuration is optional. To customize paths, copy [config.example.toml](config.example.toml) to the reported config path, or select a file with `seo-analysis --config-file "<path>" system doctor`. Relative directory settings resolve beside the configuration file. When all commands have exited, back up the config file and complete data directory, including history.sqlite3 and runs/. Restore them to the locations reported by doctor. Reindexing recovers run records from manifests. The database backup also preserves projects and targets that have never been used. To start a fresh workspace, select a new data directory.

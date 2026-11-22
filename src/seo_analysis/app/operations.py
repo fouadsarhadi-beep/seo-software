@@ -13,6 +13,7 @@ from seo_analysis.research.intelligence import ResearchInput, build_research
 from seo_analysis.reporting.workbook import WorkbookInput, build_workbook
 from seo_analysis.analysis.siteqa import SiteQAInput, inspect_build
 
+from seo_analysis.connectors.wordpress import InventoryInput, inventory
 from seo_analysis.app.audit import run_audit
 from seo_analysis.connectors.performance import CruxInput, LighthouseInput, PageSpeedInput, crux, lighthouse, pagespeed
 from seo_analysis.connectors.sheets import SheetsPublishInput, publish_sheets
@@ -125,6 +126,7 @@ def calibrate(ctx, request):
 
 
 OPERATIONS = {
+    tools.WORDPRESS: (InventoryInput, inventory),
     tools.PUBLIC_FEED: (FeedInput, read_feed),
     tools.BRAVE_SEARCH: (BraveSearchInput, brave_search),
     tools.DATASET_EXPORT: (DatasetExportInput, prepare_dataset),

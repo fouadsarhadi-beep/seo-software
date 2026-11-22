@@ -371,6 +371,28 @@ def cmd_live_research(args):
     return 0
 
 
+def cmd_wordpress(args):
+    from seo_analysis.connectors.wordpress import InventoryInput, credentials, site_root
+
+    if args.operation == "inventory":
+        return execute(args, tools.WORDPRESS, InventoryInput(args.site, args.resource, args.max_items, args.authenticated))
+    if args.operation == "forget":
+        credentials(args.workspace, args.project, args.site, delete=True)
+        print("WordPress Application Password removed locally.")
+        return 0
+
+    from getpass import getpass
+
+    site_root(args.site)
+    if not sys.stdin.isatty():
+        raise ValueError("Use an interactive terminal to save a WordPress Application Password.")
+    account = input("Dedicated WordPress username: ").strip()
+    password = getpass("WordPress Application Password: ").strip()
+    credentials(args.workspace, args.project, args.site, account=account, password=password)
+    print("WordPress credentials saved to the OS credential store.")
+    return 0
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="seo-analysis", description="Analytics-only SEO audit tools. You make the decisions.")
     p.add_argument("--version", action="version", version=__version__)
@@ -472,6 +494,20 @@ def build_parser():
     research_key = sub.add_parser("research-key", help="manage the Brave Search API key")
     research_key.add_argument("action", choices=("set", "delete"))
     research_key.set_defaults(func=cmd_live_research)
+
+    wordpress = sub.add_parser("wordpress", help="inspect a WordPress installation")
+    wp_actions = wordpress.add_subparsers(dest="operation", required=True)
+    wp_inventory = wp_actions.add_parser("inventory", help=tools.WORDPRESS.summary)
+    wp_inventory.add_argument("--resource", choices=("posts", "pages"), default="posts")
+    wp_inventory.add_argument("--max-items", type=int, default=100)
+    wp_inventory.add_argument("--authenticated", action="store_true", help="use the saved Application Password")
+    wp_inventory.add_argument("--json", action="store_true")
+    wp_connect = wp_actions.add_parser("connect", help="save credentials for this installation")
+    wp_forget = wp_actions.add_parser("forget", help="remove local credentials for this installation")
+    for command in (wp_inventory, wp_connect, wp_forget):
+        command.add_argument("site", help="HTTPS installation base URL")
+        command.add_argument("--project")
+        command.set_defaults(func=cmd_wordpress)
 
     mcp = sub.add_parser("mcp", help="serve selected local run evidence over stdio")
     mcp.add_argument("--allow-run", required=True, action="append")

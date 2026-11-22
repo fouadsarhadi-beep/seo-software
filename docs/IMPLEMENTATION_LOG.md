@@ -58,4 +58,8 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 
 - Stage G, Steps 2 and 3 — Added sample-scoped keyword clusters, evidence-linked editorial briefs, Search Console refresh candidates and comparisons from selected owned and competitor crawl runs on 2026-11-22. CLI tests cover Persian queries, missing versus zero values, duplicate source rows and links to both crawl and SERP evidence.
 
+## CMS and site quality
+
+- Stage H, Step 1 — Added a read-only inventory of published WordPress posts and pages and installation-scoped Application Password storage on 2026-11-22. Verified bounded pagination, credential isolation, metadata shaping and redirect refusal with fixtures. Live authorization, media and custom types remain open.
+
 [Current scope and remaining work](ROADMAP.md)
