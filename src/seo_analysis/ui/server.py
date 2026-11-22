@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from secrets import compare_digest, token_urlsafe
 from threading import Event, Lock
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlencode
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
@@ -83,23 +83,41 @@ def create_app(workspace, port=8765):
 
     @app.get("/")
     def home():
-        return render("home", runs=history.list_runs(limit=12), projects=history.projects())
+        return render("home", runs=history.list_runs(limit=12, archived=False), projects=history.projects())
 
     @app.get("/history")
-    def runs(page: int = 1):
+    def runs(page: int = 1, archived: bool = False):
         page = max(1, page)
-        records = history.list_runs(limit=31, offset=(page - 1) * 30)
-        return render("history", runs=records[:30], page=page, more=len(records) > 30)
+        records = history.list_runs(limit=31, offset=(page - 1) * 30, archived=archived)
+        return render("history", runs=records[:30], page=page, more=len(records) > 30, archived=archived)
+
+    @app.post("/runs/{rid}/archive")
+    async def archive_run(rid: str, request: Request):
+        fields = await form(request)
+        archived = fields.get("action")
+        if archived not in ("archive", "restore"):
+            raise HTTPException(400, "Choose archive or restore.")
+        try:
+            history.set_archived(rid, archived == "archive")
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        return RedirectResponse("/history?archived=true" if archived == "restore" else "/history", 303)
 
     @app.get("/projects")
-    def projects():
-        return render("projects", projects=[p | {"targets": history.targets(p["name"])} for p in history.projects()])
+    def projects(project: str | None = None):
+        if project is None:
+            return render("projects", projects=history.projects())
+        try:
+            history.selection(project, None)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        return render("project", project=project, targets=history.targets(project))
 
     @app.post("/projects")
     async def create_project(request: Request):
         f = await form(request)
         try:
-            history.add_project(f.get("name", ""))
+            history.add_project(f.get("name", ""), website=f.get("url", ""))
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
         return RedirectResponse("/projects", 303)
@@ -107,11 +125,12 @@ def create_app(workspace, port=8765):
     @app.post("/targets")
     async def create_target(request: Request):
         f = await form(request)
+        project = f.get("project", "")
         try:
-            history.add_target(f.get("project"), f.get("name", ""), "website", f.get("url", ""))
+            history.add_target(project, f.get("name", ""), "website", f.get("url", ""))
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
-        return RedirectResponse("/projects", 303)
+        return RedirectResponse("/projects?" + urlencode({"project": project}), 303)
 
     def launch(job, cfg, project, saved):
         def progress(message):

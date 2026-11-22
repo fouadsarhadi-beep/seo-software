@@ -59,6 +59,10 @@ Each execution receives its own run directory. Use the analysis directory printe
 
 ## Local workbench and snapshot checks
 
+**Projects** lists saved projects. Open **Create project** to enter a name and optionally save a website. Open a project to view its targets or add another. In **History**, use **Archive** to hide a run from the history and recent-runs lists. You can open or restore it under **View archived runs**. Its evidence and files remain available.
+
+Audit results show the sampled coverage and link to the findings CSV, page inventory CSV and text report under **Downloads**. Expand **Technical files** for the raw data and request log. The local or private-network crawl option applies to one audit of a trusted local site, internal staging site or test server on a nonstandard port.
+
 Use **Cancel audit** to stop a crawl in progress. Completed observations stay available in the cancelled run. Cancellation interrupts pacing and retry waits. An active network read may take until its timeout to return.
 
 Use run IDs printed by the CLI or listed under History. The following commands read existing snapshots offline.

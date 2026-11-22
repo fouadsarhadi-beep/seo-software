@@ -2,20 +2,126 @@
 {% if view=="job" and job.status in ("queued","running") %}<meta http-equiv="refresh" content="2">{% endif %}
 <title>SEO Analysis · Workbench</title><style>
 *{box-sizing:border-box}body{margin:0;background:#f5f5ef;color:#20291f;font:16px/1.5 "Inter",system-ui,sans-serif}header{background:#1c3229;color:#fff;padding:18px max(5vw,20px);display:flex;align-items:center;gap:38px}header strong{letter-spacing:-.04em;font-size:22px}nav{display:flex;gap:22px}header a{color:#f0f4df;text-decoration:none}main{max-width:1060px;margin:44px auto;padding:0 24px 70px}h1,h2{letter-spacing:-.045em;line-height:1.1}h1{font-size:clamp(38px,6vw,64px);margin:0 0 30px}h2{font-size:26px;margin:32px 0 16px}section{padding:24px;background:white;border:1px solid #d8ddd0;border-radius:12px}label{display:block;font-weight:600;margin-bottom:5px}input,select,button{font:inherit;border-radius:5px;padding:10px;border:1px solid #acb7aa}input[type=url]{width:min(100%,570px)}input[type=number]{width:94px}button{background:#285339;color:white;border:0;cursor:pointer;padding:11px 20px;font-weight:650}form>*{margin:4px 0}details{margin:14px 0}summary{cursor:pointer}.line,.links{display:flex;gap:12px;flex-wrap:wrap;align-items:center}.table{overflow:auto}table{border-collapse:collapse;width:100%;font-size:14px}td,th{padding:12px 8px;border-bottom:1px solid #d8ddd0;text-align:left;vertical-align:top}th{font-size:12px;color:#576754}a{color:#215a39;text-underline-offset:3px}small{color:#536553}code,pre{font:13px/1.4 ui-monospace,monospace}pre{white-space:pre-wrap;overflow-wrap:anywhere}.count{font-size:24px}.links{margin-top:16px}p{overflow-wrap:anywhere}@media(max-width:600px){header{gap:14px;flex-wrap:wrap}nav{gap:12px}main{padding:0 14px}section{padding:15px}}
+
+form.compact{margin:0}button.secondary{background:#edf1ea;color:#254832;border:1px solid #acb7aa;padding:5px 10px}.help{display:block;margin:0 0 12px 25px}.metrics{display:flex;gap:10px 24px;flex-wrap:wrap;margin:16px 0}.metrics strong{font-size:20px}.downloads{margin:20px 0 32px}.project-list li{margin:10px 0}
 </style></head><body><header><strong>SEO Analysis</strong><nav><a href="/">Workbench</a><a href="/history">History</a><a href="/projects">Projects</a></nav></header><main>
 {% macro csrf() %}<input type="hidden" name="token" value="{{ token }}">{% endmacro %}
-{% macro pages() %}<div class="links">{% if page>1 %}<a href="?page={{page-1}}">Previous</a>{% endif %}{% if more %}<a href="?page={{page+1}}">Next</a>{% endif %}</div>{% endmacro %}
+{% macro pages() %}
+<div class="links">
+{% if page>1 %}<a href="?page={{page-1}}{% if archived %}&amp;archived=true{% endif %}">Previous</a>{% endif %}
+{% if more %}<a href="?page={{page+1}}{% if archived %}&amp;archived=true{% endif %}">Next</a>{% endif %}
+</div>
+{% endmacro %}
 {% macro observation_pages() %}<div class="links">{% if evidence_page>1 %}<a href="?evidence_page={{evidence_page-1}}&amp;page={{page}}">Previous pages</a>{% endif %}{% if evidence_more %}<a href="?evidence_page={{evidence_page+1}}&amp;page={{page}}">Next pages</a>{% endif %}</div>{% endmacro %}
 {% macro finding_pages() %}<div class="links">{% if page>1 %}<a href="?page={{page-1}}&amp;evidence_page={{evidence_page}}">Previous findings</a>{% endif %}{% if more %}<a href="?page={{page+1}}&amp;evidence_page={{evidence_page}}">Next findings</a>{% endif %}</div>{% endmacro %}
-{% macro table(rows) %}{% if rows %}<div class="table"><table><tr><th>Tool</th><th>Status</th><th>Project</th><th>Started (UTC)</th></tr>{% for r in rows %}<tr><td><a href="/runs/{{r.id}}">{{r.tool}}</a></td><td>{{r.status}}</td><td>{{r.project or 'Ad hoc'}}</td><td>{{r.started[:19]|replace('T',' ')}}</td></tr>{% endfor %}</table></div>{% else %}<p>No runs yet.</p>{% endif %}{% endmacro %}
-{% if view=="home" %}<h1>Website audit</h1><section><form method="post" action="/audit">{{csrf()}}<label for="url">Website URL</label><div class="line"><input id="url" name="url" type="url" required placeholder="https://example.org"><button>Run audit</button></div><details><summary>Crawl options</summary><p><label>Maximum pages <input type="number" name="pages" min="1" max="500" value="100"></label></p><label><input type="checkbox" name="links"> Follow internal links if no sitemap is available</label><label><input type="checkbox" name="local"> Allow this local or staging origin</label><label>Project <select name="project"><option value="">Ad hoc</option>{% for p in projects %}<option>{{p.name}}</option>{% endfor %}</select></label></details></form></section><h2>Recent runs</h2>{{table(runs)}}
-{% elif view=="history" %}<h1>Run history</h1>{{table(runs)}}{{pages()}}
-{% elif view=="projects" %}<h1>Projects</h1><form method="post" action="/projects">{{csrf()}}<label>Project name <input name="name" required></label><button>Create project</button></form>{% for p in projects %}<h2>{{p.name}}</h2><section>{% for t in p.targets %}<form method="post" action="/audit">{{csrf()}}<input type="hidden" name="target" value="{{t.name}}"><input type="hidden" name="project" value="{{p.name}}"><strong>{{t.name}}</strong> {{t.url}} <button>Audit target</button></form>{% endfor %}<form method="post" action="/targets">{{csrf()}}<input type="hidden" name="project" value="{{p.name}}"><label>Target name <input name="name" required></label><label>Website URL <input name="url" type="url" required></label><button>Save target</button></form></section>{% endfor %}
-{% elif view=="job" %}<h1>Audit progress</h1><section><strong>{{job.status}}</strong><p>{{job.detail}}</p>{% if job.status in ("queued","running") %}{% if job.cancel.is_set() %}<p>Cancellation requested.</p>{% else %}<form method="post" action="/jobs/{{jid}}/cancel">{{csrf()}}<button>Cancel audit</button></form>{% endif %}{% endif %}</section>
-{% elif view=="result" %}<h1>Run results</h1><section><strong>{{run.tool_id}} · {{run.status}}</strong><p>{{run.parameters.source or run.parameters.sitemap or ''}}</p><code>{{rid}}</code><div class="line">{% for key, value in run.counts.items() if value is number and not (key == 'ok' and 'html_pages' in run.counts) %}<span><strong>{{value}}</strong> {{ {'ok': 'successful HTML fetches', 'html_pages': 'HTML pages', 'pages_extracted': 'pages with usable text', 'pages_compared': 'eligible for comparison', 'pairs_flagged': 'pairs flagged'}.get(key, key|replace('_',' ')) }}</span>{% endfor %}</div>{% if run.counts.skipped is defined and run.counts.skipped.get('page_limit') and run.parameters.limit is defined %}
-<p>The crawl was limited to {{run.parameters.limit}} pages. Site-wide coverage is unknown.</p>
+{% macro table(rows, actions=false) %}
+{% if rows %}
+<div class="table"><table>
+<tr><th>Tool</th><th>Status</th><th>Project</th><th>Started (UTC)</th>{% if actions %}<th>Action</th>{% endif %}</tr>
+{% for r in rows %}
+<tr>
+<td><a href="/runs/{{r.id}}">{{r.tool}}</a></td>
+<td>{{r.status}}</td><td>{{r.project or 'Ad hoc'}}</td><td>{{r.started[:19]|replace('T',' ')}}</td>
+{% if actions %}
+<td><form class="compact" method="post" action="/runs/{{r.id}}/archive">
+{{csrf()}}<button class="secondary" name="action" value="{{'restore' if archived else 'archive'}}">{{'Restore' if archived else 'Archive'}}</button>
+</form></td>
 {% endif %}
-{% for w in run.warnings %}<p>{{w}}</p>{% endfor %}</section>{% if evidence %}<h2>Crawled pages</h2><ul>{% for item in evidence %}<li><a href="/runs/{{rid}}/evidence/{{item.id}}">{{item.url}}</a></li>{% endfor %}</ul>{{observation_pages()}}{% endif %}{% if findings %}<h2>Findings</h2><div class="table"><table><tr><th>Category</th><th>Rule</th><th>Observation</th><th>Evidence</th></tr>{% for f in findings %}<tr><td>{{f.category}}</td><td>{{ {
+</tr>
+{% endfor %}
+</table></div>
+{% else %}<p>{{'No archived runs.' if archived else 'No runs to show.'}}</p>{% endif %}
+{% endmacro %}
+{% if view=="home" %}
+<h1>Website audit</h1>
+<section><form method="post" action="/audit">
+{{csrf()}}<label for="url">Website URL</label>
+<div class="line"><input id="url" name="url" type="url" required placeholder="https://example.org"><button>Run audit</button></div>
+<details><summary>Crawl options</summary>
+<p><label>Maximum pages <input type="number" name="pages" min="1" max="500" value="100"></label></p>
+<label><input type="checkbox" name="links"> Follow internal links if no sitemap is available</label>
+<label><input type="checkbox" name="local" aria-describedby="local-help"> Allow local or private-network access for this audit</label>
+<small id="local-help" class="help">Use for a trusted site on your computer or private network, or a test server on a nonstandard port. Leave off for public sites on standard ports.</small>
+<label>Project <select name="project"><option value="">Ad hoc</option>{% for p in projects %}<option>{{p.name}}</option>{% endfor %}</select></label>
+</details></form></section>
+<h2>Recent runs</h2>{{table(runs)}}
+{% elif view=="history" %}
+<h1>{{'Archived runs' if archived else 'Run history'}}</h1>
+<p><a href="{{'/history' if archived else '/history?archived=true'}}">{{'Back to run history' if archived else 'View archived runs'}}</a></p>
+{{table(runs, actions=true)}}{{pages()}}
+{% elif view=="projects" %}
+<h1>Projects</h1>
+{% if projects %}
+<ul class="project-list">{% for p in projects %}<li><a href="/projects?project={{p.name|urlencode}}">{{p.name}}</a></li>{% endfor %}</ul>
+{% else %}<p>No projects yet.</p>{% endif %}
+<details><summary>Create project</summary>
+<form method="post" action="/projects">
+{{csrf()}}<label>Project name <input name="name" required></label>
+<label>Website URL (optional) <input name="url" type="url"></label>
+<button>Save project</button>
+</form>
+</details>
+{% elif view=="project" %}
+<h1>{{project}}</h1>
+<p><a href="/projects">All projects</a></p>
+<section>
+<h2>Saved targets</h2>
+{% for t in targets %}
+<form method="post" action="/audit">
+{{csrf()}}<input type="hidden" name="target" value="{{t.name}}"><input type="hidden" name="project" value="{{project}}">
+<strong>{{t.name}}</strong> {{t.url}} <button>Audit target</button>
+</form>
+{% else %}<p>No saved targets.</p>{% endfor %}
+<details><summary>Add target</summary>
+<form method="post" action="/targets">
+{{csrf()}}<input type="hidden" name="project" value="{{project}}">
+<label>Target name <input name="name" required></label>
+<label>Website URL <input name="url" type="url" required></label>
+<button>Save target</button>
+</form>
+</details>
+</section>
+{% elif view=="job" %}<h1>Audit progress</h1><section><strong>{{job.status}}</strong><p>{{job.detail}}</p>{% if job.status in ("queued","running") %}{% if job.cancel.is_set() %}<p>Cancellation requested.</p>{% else %}<form method="post" action="/jobs/{{jid}}/cancel">{{csrf()}}<button>Cancel audit</button></form>{% endif %}{% endif %}</section>
+{% elif view=="result" %}
+<h1>Run results</h1>
+{% set audit = run.tool_id == 'seo.audit' %}
+{% set highlights = {'observed': 'URLs observed', 'findings': 'findings', 'redirecting': 'redirecting URLs', 'errors': 'fetch errors'} %}
+{% set labels = {'ok': 'Successful HTML fetches', 'html_pages': 'HTML pages', 'pages_extracted': 'Pages with usable text', 'pages_compared': 'Pages eligible for comparison', 'pairs_flagged': 'Pairs flagged', 'noindex_excluded': 'Noindex pages excluded'} %}
+{% set page_limited = run.counts.skipped is defined and run.counts.skipped.get('page_limit') and run.parameters.limit is defined %}
+<section>
+<strong>{{'Website audit' if audit else run.tool_id}} · {{run.status|replace('_',' ')}}</strong>
+<p>{{run.parameters.source or run.parameters.sitemap or ''}}</p>
+<div class="metrics">
+{% for key, label in highlights.items() if audit and key in run.counts %}<span><strong>{{run.counts[key]}}</strong> {{label}}</span>{% endfor %}
+</div>
+{% if page_limited %}<p>The crawl was capped at {{run.parameters.limit}} pages. Site-wide coverage is unknown.</p>{% endif %}
+{% for w in run.warnings if w != 'robots.txt read' and not w.startswith('Discovery limits: ') and not (page_limited and w.startswith('Reached the configured limit of ')) %}
+<p>{{w}}</p>
+{% endfor %}
+<details><summary>Run details</summary>
+<p>Run ID <code>{{rid}}</code></p>
+<dl>
+{% for key, value in run.counts.items() if value is number and not (audit and key in highlights) %}
+<dt>{{labels.get(key, key|replace('_',' ')|capitalize)}}</dt><dd>{{value}}</dd>
+{% endfor %}
+</dl>
+{% for w in run.warnings if w == 'robots.txt read' or w.startswith('Discovery limits: ') %}<p>{{w}}</p>{% endfor %}
+</details>
+</section>
+{% if artifacts %}
+{% set reports = {'findings.csv': 'Findings CSV', 'inventory.csv': 'Page inventory CSV', 'issues.txt': 'Text report'} %}
+{% set extra = artifacts|rejectattr('path', 'in', reports)|list %}
+<div class="downloads">
+<h2>Downloads</h2>
+<div class="links">{% for a in artifacts if a.path in reports %}<a href="/runs/{{rid}}/files/{{a.path}}">{{reports[a.path]}}</a>{% endfor %}</div>
+{% if extra %}
+<details><summary>Technical files</summary>
+<div class="links">{% for a in extra %}<a href="/runs/{{rid}}/files/{{a.path}}">{{a.path}}</a>{% endfor %}</div>
+</details>
+{% endif %}
+</div>
+{% endif %}
+{% if evidence %}<h2>Crawled pages</h2><ul>{% for item in evidence %}<li><a href="/runs/{{rid}}/evidence/{{item.id}}">{{item.url}}</a></li>{% endfor %}</ul>{{observation_pages()}}{% endif %}{% if findings %}<h2>Findings</h2><div class="table"><table><tr><th>Category</th><th>Rule</th><th>Observation</th><th>Evidence</th></tr>{% for f in findings %}<tr><td>{{f.category}}</td><td>{{ {
 'content.extraction': 'Text extraction', 'content.overlap': 'Content overlap',
 'seo.redirect': 'URL redirects', 'seo.multiple-h1': 'Multiple H1 headings',
 'seo.noindex': 'Page marked noindex', 'seo.missing-title': 'Missing title',
@@ -23,7 +129,7 @@
 'seo.canonical': 'Canonical URL',
 'crawl.fetch_error': 'Fetch failed', 'crawl.robots_disallowed': 'Blocked by robots.txt',
 'crawl.non_html': 'Response was not HTML', 'crawl.redirect_blocked_external': 'Redirect leaves the selected origin'
-}.get(f.rule, f.rule|replace('.', ' · ')|replace('_', ' ')|capitalize) }}</td><td>{{f.detail}}</td><td>{% for eid in f.evidence_ids %}<a href="/runs/{{rid}}/evidence/{{eid}}">{{evidence_urls.get(eid, eid)}}</a><br> {% endfor %}</td></tr>{% endfor %}</table></div>{{finding_pages()}}{% endif %}<h2>Artifacts</h2><div class="links">{% for a in artifacts %}<a href="/runs/{{rid}}/files/{{a.path}}">{{a.path}}</a>{% endfor %}</div>
+}.get(f.rule, f.rule|replace('.', ' · ')|replace('_', ' ')|capitalize) }}</td><td>{{f.detail}}</td><td>{% for eid in f.evidence_ids %}<a href="/runs/{{rid}}/evidence/{{eid}}">{{evidence_urls.get(eid, eid)}}</a><br> {% endfor %}</td></tr>{% endfor %}</table></div>{{finding_pages()}}{% endif %}
 {% else %}<h1>Page evidence</h1><a href="/runs/{{rid}}">Back to results</a><section><strong>{{observation.url}}</strong>
 <dl>
 <dt>HTTP response</dt><dd>{{observation.final_status or 'Unavailable'}}</dd>

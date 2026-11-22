@@ -38,6 +38,52 @@ def test_ui_end_to_end(site, tmp_path):
         assert "3 words" in page.text
         assert "at least two eligible pages" in reply.text
         assert client.get(dom.select_one('a[href$="inventory.csv"]')["href"]).status_code == 200
+        technical = dom.find("summary", string="Technical files").parent
+        assert not technical.has_attr("open")
+        assert technical.select_one('a[href$="snapshot.jsonl"]')
+
+        run_path = reply.url.path
+        history = BeautifulSoup(client.get("/history").text, "html.parser")
+        archive = history.select_one(f'form[action="{run_path}/archive"]')
+        request = {"token": archive.select_one('input[name="token"]')["value"], "action": "archive"}
+        assert client.post(archive["action"], data=request).status_code == 403
+        headers = {"Origin": origin}
+        assert client.post(archive["action"], headers=headers, data=request).status_code == 200
+        assert History(ws).reindex()["indexed"] == 1
+        assert run_path not in client.get("/").text
+        assert run_path not in client.get("/history").text
+        archived = client.get("/history?archived=true")
+        assert run_path in archived.text and "Restore" in archived.text
+        assert client.get(run_path).status_code == 200
+        assert client.get(dom.select_one('a[href$="inventory.csv"]')["href"]).status_code == 200
+        assert client.post(archive["action"], headers=headers, data=request | {"action": "restore"}).status_code == 200
+        assert run_path in client.get("/history").text
+        assert run_path not in client.get("/history?archived=true").text
+
+
+def test_ui_projects_list_and_explicit_target_forms(tmp_path):
+    origin = "http://127.0.0.1:8972"
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    with TestClient(create_app(ws, 8972), base_url=origin) as client:
+        initial = BeautifulSoup(client.get("/projects").text, "html.parser")
+        token = initial.select_one('input[name="token"]')["value"]
+        assert initial.find("summary", string="Create project").parent.select_one('input[name="url"]')
+        name = "SEO & content + فارسی"
+        headers = {"Origin": origin}
+        created = client.post("/projects", headers=headers,
+                              data={"token": token, "name": name, "url": "https://example.com/"})
+        listing = BeautifulSoup(created.text, "html.parser")
+        assert listing.select_one('form[action="/targets"]') is None
+        project = listing.find("a", string=name)["href"]
+        detail = BeautifulSoup(client.get(project).text, "html.parser")
+        assert detail.find("strong", string="Website")
+        add_target = detail.find("summary", string="Add target").parent
+        assert not add_target.has_attr("open")
+        saved = client.post("/targets", headers=headers,
+                            data={"token": token, "project": name, "name": "Blog", "url": "https://example.com/blog"})
+        assert BeautifulSoup(saved.text, "html.parser").find("strong", string="Blog")
+        assert name in [option.text for option in BeautifulSoup(client.get("/").text, "html.parser")
+                        .select('select[name="project"] option')]
 
 
 def test_ui_cancel_interrupts_retry_and_preserves_observations(site, tmp_path):
@@ -118,6 +164,8 @@ def test_ui_clean_five_page_sample_shows_every_evidence_link(site, tmp_path):
         assert "/runs/" in str(response.url)
         dom = BeautifulSoup(response.text, "html.parser")
         assert "partial" in dom.select_one("section strong").text
+        assert dom.find(string="The crawl was capped at 5 pages. Site-wide coverage is unknown.")
+        assert "Reached the configured limit" not in dom.get_text(" ", strip=True)
         assert "0 findings" in dom.get_text(" ", strip=True)
         heading = dom.find("h2", string="Crawled pages")
         assert heading is not None

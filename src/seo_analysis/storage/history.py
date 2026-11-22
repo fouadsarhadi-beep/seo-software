@@ -30,6 +30,7 @@ MIGRATIONS = [
                project TEXT NOT NULL, service TEXT NOT NULL, property_id TEXT NOT NULL,
                property_name TEXT NOT NULL, PRIMARY KEY(project, service))""",
     ),
+    ("ALTER TABLE runs ADD COLUMN archived INTEGER NOT NULL DEFAULT 0",),
 ]
 
 
@@ -60,11 +61,15 @@ class History:
         finally:
             db.close()
 
-    def add_project(self, name):
+    def add_project(self, name, *, website=""):
         if not name.strip():
             raise ValueError("Project name is empty.")
+        if website:
+            HttpOrigin.from_url(website)
         with self.transaction() as db:
             db.execute("INSERT INTO projects VALUES (?)", (name,))
+            if website:
+                db.execute("INSERT INTO targets VALUES (?, 'Website', 'website', ?)", (name, website))
 
     def add_target(self, project, name, kind, url):
         if not name.strip() or kind not in ("website", "sitemap"):
@@ -124,7 +129,8 @@ class History:
                     inputs = record["parameters"]
                     db.execute("INSERT OR IGNORE INTO targets VALUES (?, ?, ?, ?)",
                                (record["project"], record["saved_target"], inputs["kind"], inputs["sitemap"]))
-            db.execute("""INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            db.execute("""INSERT INTO runs (id, tool, status, project, target, started, finished, coverage, manifest)
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                           ON CONFLICT(id) DO UPDATE SET status=excluded.status,
                           finished=excluded.finished, coverage=excluded.coverage, manifest=excluded.manifest""",
                        (rid, record["tool_id"], record["status"], record["project"], record["saved_target"],
@@ -141,11 +147,17 @@ class History:
                 db.execute("INSERT INTO evidence VALUES (?, ?, ?, ?, ?)",
                            (rid, item["evidence_id"], item["url"], item["observed_at"], "observations/" + file.name))
 
-    def list_runs(self, project=None, *, limit=-1, offset=0):
+    def list_runs(self, project=None, *, limit=-1, offset=0, archived=None):
         with self.transaction() as db:
-            rows = db.execute("""SELECT id, tool, status, project, target, started, finished, coverage FROM runs WHERE (? IS NULL OR project=?)
-                                 ORDER BY started DESC, id LIMIT ? OFFSET ?""", (project, project, limit, offset))
+            rows = db.execute("""SELECT id, tool, status, project, target, started, finished, coverage FROM runs
+                                 WHERE (? IS NULL OR project=?) AND (? IS NULL OR archived=?)
+                                 ORDER BY started DESC, id LIMIT ? OFFSET ?""", (project, project, archived, archived, limit, offset))
             return [dict(row) | {"coverage": json.loads(row["coverage"])} for row in rows]
+
+    def set_archived(self, run_id, archived):
+        with self.transaction() as db:
+            if not db.execute("UPDATE runs SET archived=? WHERE id=?", (archived, run_id)).rowcount:
+                raise ValueError("Unknown run ID.")
 
     def show(self, run_id):
         if UUID(run_id).hex != run_id:
