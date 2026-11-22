@@ -1,6 +1,6 @@
 # Implementation state
 
-## Goal checklist through Stage C step 2
+## Foundation checklist
 
 - [x] Stage A. Installable Python package, workspace configuration, diagnostics and built-in tool catalogue.
 - [x] B1. Accept explicit website, sitemap and URL-list inputs. Validate the selected origin and pin each connection to an approved address.
@@ -9,16 +9,33 @@
 - [x] C1. Route audit, crawl, offline analysis, variants, review and calibration through typed requests and a shared tool runner.
 - [x] C2. Support ad hoc runs, optional projects and saved targets, transactional SQLite migrations, run history, artifact and evidence indexes and interrupted-run recovery.
 
+## Local workbench checklist for 0.3.0
+
+| Stage | Verified workflow | Follow-on work |
+| --- | --- | --- |
+| C3–C5 | Run eight technical checks on captured observations, compare same-origin snapshots, reopen changed review pairs and invoke offline tools by workspace run ID. | JSON-LD covers syntax and observed types. Rich-result eligibility requires additional rules. |
+| D | Run and monitor a website audit through a loopback browser UI, request cancellation, inspect history, drill into evidence, download files and manage projects and targets. | Research, build QA and reporting are launched from the CLI. Their results appear in history. |
+| E | Import Search Console and GA4 exports and produce a local Excel report. Every row carries a match status. Ambiguous URLs, unattributed queries and unmatched rows remain visible. | OS-backed credentials, consent, live property selection, GSC and GA4 validation, URL Inspection, PSI, CrUX and Sheets publication. |
+| F | Normalize local CSV, TSV, XLSX, RSS and Atom. Keep source hash, column mapping, date, locale, device, import limits and row references. | Provider benchmarking, permitted live feed retrieval and the browser account export adapter. |
+| G | Normalize keywords, compare sampled competitor coverage, find shared search results, follow rank across comparable captures, collect community topics and group imported backlinks by referring host. Brief candidates link to the observed pages. | Broader topical clustering, completed editorial briefs, refresh prioritization and selected competitor page analysis. |
+| H | Inspect static HTML and local asset paths, import Lighthouse and axe reports, count status codes by path in common/combined access logs and compare two explicitly selected PNGs. | WordPress REST authorization, automated browser capture and generating fresh Lighthouse/axe measurements. |
+| I | An MCP stdio client can inspect selected run evidence and invoke an offline check. Derived results are readable in the same session. Excel reports may reference an existing Looker Studio URL. | Hosted reporting connectors, scheduled jobs and agent-assisted editorial decisions. |
+| J | Profile and optimize content comparison in Python. Build an installable wheel with bundled UI and language resources. | Windows runtime execution, evaluation on larger owner-provided sites and any standalone executable. |
+
 ## Verification
 
-The suite covers a Persian WordPress-style sitemap, static HTML without a sitemap, redirects, robots, malformed XML, CSV seeds, parameter limits, interrupted acquisition, exact canonical target status and phrase adjacency. Transport tests use simulated DNS answers and an explicit local fixture. A separate console test launches the installed executable outside the checkout, performs an ad hoc audit, replays its snapshot offline and inspects the indexed evidence.
+On Linux with CPython 3.12.14, the checkout and an isolated installation of the 0.3.0 wheel each passed 108 tests. Each run skipped the optional Hazm test and reported a Starlette test-client deprecation warning. The isolated CLI also completed dataset import, keyword research and static build inspection outside the checkout. The Windows CI job awaits execution.
 
-Persistence tests exercise concurrent first-time schema creation, a future schema version, an active writer, interrupted runs, repeatable recovery and rebuilding project-linked history after losing the index. The clean wheel check includes the bundled Persian resources. The source checkout and an isolated installation of the 0.2.0 wheel each passed 101 tests on Linux with Python 3.12.14. The optional Hazm test skipped in both environments. Windows runs are configured in CI and await execution.
+The offline tests use local HTTP fixtures for redirects, robots, sitemap discovery, incomplete crawls and Persian content. They also cover concurrent schema creation, recovery from interrupted runs, snapshot replay, content-aware review and history reconstruction. The workbench tests exercise an actual audit through the HTTP interface, follow a page evidence link and download a CSV. A separate Chromium run exercised the same form and download. An MCP integration test starts the installed package in a subprocess, initializes a stdio session, reads allowed evidence, rejects an unselected run and reads the results of a derived check.
 
-## Current scope
+Reporting tests join local analytics exports to observed pages and retain a query-only row without page attribution. Research tests compare two dated Persian SERP captures and preserve RSS evidence. Build QA tests check missing assets, import a browser report, summarize an access log and locate a changed pixel in a selected screenshot pair.
 
-Audit findings describe the HTML and HTTP responses received. The request/time budget covers acquisition. Offline report generation and SQLite finalization can continue afterward. Reports preserve missing measurements and label content overlap for human review. Search Console CSV imports remain available. Authenticated services are deferred. Existing Stage A snapshots can be analyzed; a missing source completion status appears as unknown coverage.
+On the deterministic 600-page synthetic corpus, three runs of content preparation plus comparison had a median of 2.661 seconds with exhaustive pairing and 0.349 seconds with indexed candidate selection. Both returned 27 pairs. The index uses shared shingles, TF-IDF terms, title tokens and H1s. A regression test compares the scored results with exhaustive pairing and covers zero thresholds. This measures offline analysis on one corpus. Crawl duration and memory use on owner sites remain unmeasured. Reproduce with `python benchmarks/similarity.py` from an installed checkout.
 
-The implementation stops at C2. C3 begins additional independent offline checks. C4 covers comparisons across runs and reopening reviews after content changes.
+## Coverage and inputs
+
+Each audit records the HTTP requests attempted and the pages actually observed. A page seen in only one snapshot can reflect a crawl limit. When older snapshots lack markup, applicable checks report partial coverage. SERP overlap uses observations with the same provider, capture date, locale and device. Rank history uses the best imported position per host and capture date, with changes between observed samples. Aggregated competitor counts describe the combined selected sample. For a single market or device, select the corresponding datasets.
+
+All account connections and publication remain deferred at the owner's request. The verified reporting route uses selected local files. A fresh account connection, permission model and live provider test are required for the connected Stage E milestone.
 
 [Architecture](../SEO_ANALYSIS_SOFTWARE_ARCHITECTURE.md) · [Foundation decision](adr/0001-foundation.md)

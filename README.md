@@ -42,6 +42,49 @@ seo-analysis calibrate --in-dir "<analysis directory>"
 
 Each execution receives its own run directory. Use the analysis directory printed by `analyze` for review and calibration. Decisions are saved alongside the selected pair set. The review and calibration runs retain copies of their outputs. Existing Search Console CSVs can enrich an offline replay. The `crawl --sitemap` command runs acquisition on its own.
 
+## Local workbench and snapshot checks
+
+Start the workbench and open `http://127.0.0.1:8765` in your browser. Enter the website, choose crawl options and run the audit. Findings link to the observed page and the results view offers downloadable files.
+
+```sh
+seo-analysis serve
+```
+
+Use run IDs printed by the CLI or listed under History. The following commands read existing snapshots offline.
+
+```sh
+seo-analysis check --run <crawl-id> --check broken-links --json
+seo-analysis check --run <crawl-id> --check hreflang
+seo-analysis compare --before <older-crawl-id> --after <newer-crawl-id>
+```
+
+Omit `--check` to run all eight checks. A broken-link result requires an observed HTTP error at the target. A link to an uncrawled page has unknown status. Older snapshots can lack the new markup inventory. To continue editorial review across crawls, pass the same `--decisions path/to/decisions.jsonl` to successive review and calibration commands. Changed page content reopens its pair for review.
+
+## Research and reports from local exports
+
+Import an export with its source and observation date. Use `--period-start` for an aggregated measurement and `--locale` and `--device` for search results. Each import prints a dataset run ID. CSV, TSV and the active worksheet in XLSX are supported. Community imports also accept local RSS or Atom feeds. Map custom column headers with `--columns`, a JSON object from normalized field names to original headers.
+
+```sh
+seo-analysis import-data rankings.csv --kind serp --provider "Account export" --observed 2026-11-21 --locale fa-IR --device desktop
+seo-analysis research --dataset <rankings-id> --owned-host example.org
+seo-analysis import-data pages.csv --kind gsc --provider "Search Console" --period-start 2026-11-01 --observed 2026-11-21
+seo-analysis import-data landing-pages.csv --kind ga4 --provider "GA4" --period-start 2026-11-01 --observed 2026-11-21
+seo-analysis workbook --crawl <crawl-id> --dataset <gsc-id> --dataset <ga4-id>
+```
+
+Supply repeated `--dataset` arguments to compare dated SERP samples or include keyword, community and backlink exports. The research output includes a keyword map, competitor gaps, overlapping results, sampled rank history, brief candidates and source-row references. The Excel workbook keeps Search Console and GA4 on separate sheets with row-level match status. Query-only Search Console exports retain their clicks and impressions without page attribution. GA4 paths use the crawl origin, so select an export filtered to that host when the property covers several hosts. An optional `--report-url` records an existing Looker Studio report link in the report metadata.
+
+## Local site QA and agent access
+
+```sh
+seo-analysis site-qa ./build
+seo-analysis site-qa ./build --lighthouse lighthouse.json --axe axe.json --access-log access.log --baseline approved.png --screenshot current.png
+seo-analysis tools run seo.check --run <crawl-id> --check canonicals
+seo-analysis mcp --allow-run <crawl-id>
+```
+
+Each QA input is optional. The PNG comparison requires an explicitly chosen baseline and identical dimensions. The log summary counts paths and HTTP statuses and discards client addresses and query strings. For an MCP client, configure the installed `seo-analysis` executable with arguments `mcp --allow-run <crawl-id>`. Repeat the flag to select additional runs. The stdio server exposes selected summaries, page evidence, paginated findings and offline checks. It exits when the client disconnects.
+
 ## Optional projects and history
 
 ```sh
