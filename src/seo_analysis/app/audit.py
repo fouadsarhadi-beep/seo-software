@@ -15,8 +15,14 @@ def report_findings(directory):
     findings = []
 
     def add(category, rule, detail, *ids):
-        findings.append(dict(category=category, rule=rule, detail=detail, evidence_ids=list(ids)))
+        findings.append(dict(category=category, rule=rule, detail=detail, evidence_ids=list(ids), urls=[by_id[i] for i in ids]))
 
+    by_id = {p["evidence_id"]: p["url"] for p in pages}
+    extraction_messages = {
+        "fallback": "Used an alternative content container. Review the extracted text.",
+        "empty": "The received HTML yielded no usable main text. The browser may display additional content.",
+        "truncated": "The response exceeded the byte limit. Content comparison excluded this page.",
+    }
     evidence = {}
     for page in pages:
         url, eid = page["url"], page["evidence_id"]
@@ -27,7 +33,10 @@ def report_findings(directory):
             add(category, "crawl." + state, f"{url} ({page['final_status'] or state})", eid)
             continue
         if page["extraction_state"] in ("fallback", "empty", "truncated"):
-            add("warning", "content.extraction", page["extraction_state"], eid)
+            message = extraction_messages[page["extraction_state"]]
+            if page["extraction_state"] == "empty" and page.get("extraction", {}).get("javascript_notice"):
+                message += " The HTML includes a notice asking visitors to enable JavaScript."
+            add("coverage", "content.extraction", message, eid)
         if state == "ok_truncated":
             continue
         if page["first_status"] in (301, 302, 303, 307, 308):
@@ -45,8 +54,8 @@ def report_findings(directory):
         add("review", "content.overlap", ", ".join(pair["triggers"]),
             evidence[pair["url_a"]], evidence[pair["url_b"]])
     write_json(directory / "findings.json", {"schema_version": 1, "findings": findings})
-    write_csv(directory / "findings.csv", ["Category", "Rule", "Detail", "Evidence IDs"],
-              ([f["category"], f["rule"], f["detail"], " ".join(f["evidence_ids"])] for f in findings))
+    write_csv(directory / "findings.csv", ["Category", "Rule", "Detail", "Evidence IDs", "URLs"],
+              ([f["category"], f["rule"], f["detail"], " ".join(f["evidence_ids"]), " ".join(f["urls"])] for f in findings))
     return findings
 
 
@@ -59,10 +68,12 @@ def run_audit(cfg, log=print, prompt=None, *, cancel=None):
         log("Preparing audit report…")
         analysis = run_analyze(directory, log=lambda message: None)
         result["counts"].update(analysis["counts"])
+        result["warnings"].extend(analysis["warnings"])
         findings = report_findings(directory)
         result["counts"]["findings"] = len(findings)
         lines = [f"Audit {result['status']} | {result['counts']['observed']} observed pages"]
-        for category in ("error", "warning", "review"):
+        lines.extend(result["warnings"])
+        for category in ("error", "warning", "review", "coverage"):
             group = [f for f in findings if f["category"] == category]
             lines.append(f"{category.upper()} ({len(group)})")
             lines.extend(f"  {f['rule']} [{', '.join(f['evidence_ids'])}] {f['detail']}" for f in group)

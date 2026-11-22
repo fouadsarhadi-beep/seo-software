@@ -73,9 +73,11 @@ def analyze_snapshot(ctx, request):
         source_status = source["config"].get("status", "unknown")
         result["counts"]["source_status"] = source_status
         if source_status != "succeeded":
-            result.update(status="partial", warnings=[f"Source crawl status: {source_status}"])
+            result["status"] = "partial"
+            result["warnings"].append(f"Source crawl status: {source_status}")
     else:
-        result.update(status="partial", warnings=["Source coverage unavailable."])
+        result["status"] = "partial"
+        result["warnings"].append("Source coverage unavailable.")
     return result
 
 

@@ -10,9 +10,11 @@ from bs4 import BeautifulSoup
 
 from seo_analysis.analysis.fa_text import tokenize
 
-DEFAULT_CONTENT_SELECTORS = ["main", "article", "[role=main]", ".entry-content", ".post-content",
-                             ".elementor-widget-theme-post-content", "#content"]
-DEFAULT_EXCLUDE = ["nav", "footer", "header", "aside", "form"]
+DEFAULT_CONTENT_SELECTORS = [".entry-content", ".post-content", ".elementor-widget-theme-post-content",
+                             "article", "main", "[role=main]", "#content"]
+HEADING_TAGS = ("h1", "h2", "h3", "h4", "h5", "h6")
+JS_NOTICE = re.compile(r"javascript|جاوا\s*اسکریپت", re.I)
+DEFAULT_EXCLUDE = ["nav", "footer", "header", "aside", "form", "[hidden]", "[role=navigation]"]
 ROBOTS_NAMES = re.compile(r"^(robots|googlebot|googlebot-news|bingbot|msnbot|slurp|yandex|[\w-]*bot)$", re.I)
 
 
@@ -34,6 +36,7 @@ class PageData:
     text: str = ""
     selector: str = ""
     state: str = ""                                       # success | fallback | empty
+    extraction: dict = field(default_factory=dict)
     words: int = 0
     chars: int = 0
 
@@ -64,37 +67,42 @@ def extract_page(html: str, base_url: str, content_selector: str = "", exclude_s
     html_tag = soup.find("html")
     pd.lang = (html_tag.get("lang") or "") if html_tag else ""
 
-    for t in soup(["script", "style", "noscript", "template", "svg", "iframe"]):
+    js_notice = any(JS_NOTICE.search(tag.get_text(" ", strip=True)) for tag in soup("noscript"))
+    selectors = list(dict.fromkeys(filter(None, [content_selector, *DEFAULT_CONTENT_SELECTORS])))
+    for t in soup(["head", "title", "script", "style", "noscript", "template", "svg", "iframe"]):
         t.decompose()
-    node, used = None, ""
-    if content_selector:
-        node = soup.select_one(content_selector)
-        used = content_selector if node is not None else ""
-    if node is None:
-        for sel in DEFAULT_CONTENT_SELECTORS:
-            node = soup.select_one(sel)
-            if node is not None:
-                used = sel
-                break
-    fallback = False
-    if node is None:
-        node, used, fallback = (soup.body or soup), "body", True
-    for sel in list(DEFAULT_EXCLUDE) + list(exclude_selectors or ()):
+    for selector in [*DEFAULT_EXCLUDE, *(exclude_selectors or ())]:
         try:
-            for t in node.select(sel):
-                t.decompose()
-        except Exception:
+            excluded = soup.select(selector)
+        except (ValueError, SyntaxError):
             continue
-    pd.text = node.get_text(" ", strip=True)
-    pd.selector = used
-    pd.words = len(tokenize(pd.text, variants))
-    pd.chars = len(pd.text)
-    if pd.words == 0:
-        pd.state = "empty"
-    elif fallback or (content_selector and used != content_selector):
-        pd.state = "fallback"
-    else:
-        pd.state = "success"
+        for tag in excluded:
+            if tag.parent is not None:
+                tag.decompose()
+
+    attempts = []
+    pd.extraction = {"attempts": attempts, "javascript_notice": js_notice}
+    pd.state = "empty"
+    for selector in selectors + ["body"]:
+        nodes = [soup.body or soup] if selector == "body" else soup.select(selector)
+        attempts.append({"selector": selector, "matches": len(nodes), "outcome": "no match"})
+        for node in nodes:
+            text = node.get_text(" ", strip=True)
+            words = len(tokenize(text, variants))
+            heading_words = sum(len(tokenize(h.get_text(" ", strip=True), variants))
+                                for h in node.find_all(HEADING_TAGS))
+            if words <= heading_words or node.name in HEADING_TAGS:
+                if attempts[-1]["outcome"] != "headings only":
+                    attempts[-1]["outcome"] = "headings only" if words else "empty"
+                continue
+            pd.text, pd.words, pd.chars = text, words, len(text)
+            pd.selector = selector
+            pd.state = ("fallback" if selector == "body" or (content_selector and selector != content_selector)
+                        or any(a["matches"] for a in attempts[:-1]) else "success")
+            attempts[-1]["outcome"] = "selected"
+            break
+        if pd.words:
+            break
     return pd
 
 def capture_markup(soup, base):

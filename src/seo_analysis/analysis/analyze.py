@@ -32,6 +32,20 @@ def canonical_info(records):
     return canon.analyze(records)
 
 
+def comparison_coverage(counts):
+    compared = counts["pages_compared"]
+    if compared < 2:
+        return f"Content comparison requires at least two eligible pages. This run had {compared}."
+    extracted = counts["pages_extracted"]
+    html = counts["html_pages"]
+    if compared < html:
+        message = f"Content comparison covered {compared} of {html} HTML pages. Usable text was extracted from {extracted}."
+        if counts["noindex_excluded"]:
+            message += f" Pages excluded by noindex: {counts['noindex_excluded']}."
+        return message
+    return ""
+
+
 def summarize(records, info, pairs_count, thin_words=300) -> str:
     ok = [r for r in records if r["fetch_state"].startswith("ok")]
     def lst(title, items, limit=8):
@@ -61,7 +75,7 @@ def summarize(records, info, pairs_count, thin_words=300) -> str:
     L += lst("Missing meta description", [r["url"] for r in ok if not r["meta"]])
     L += lst("No H1", [r["url"] for r in ok if r["h1_count"] == 0])
     L += lst("More than one H1 (not an error by itself)", [r["url"] for r in ok if r["h1_count"] > 1])
-    L += lst(f"Under {thin_words} words (a review trigger, not a Google rule)", [f"{r['url']} ({r['words']})" for r in ok if r["words"] < thin_words])
+    L += lst(f"Under {thin_words} words (a review trigger, not a Google rule)", [f"{r['url']} ({r['words']})" for r in ok if 0 < r["words"] < thin_words and r["fetch_state"] != "ok_truncated"])
     L += lst("Text extraction fell back or found nothing (word counts may be wrong)",
              [f"{r['url']} ({r['extraction_state']}, {r['extraction_selector']})" for r in ok if r["extraction_state"] in ("fallback", "empty")])
     for label, key in (("Duplicate titles", "title"), ("Duplicate H1s", "h1")):
@@ -97,10 +111,13 @@ def run_analyze(in_dir, out_dir=None, gsc_pages=None, gsc_queries=None, settings
     qpairs = gsc.load_query_page(gsc_queries) if gsc_queries else {}
 
     items = []
-    for r in records:
-        if not r["fetch_state"].startswith("ok") or r["words"] == 0 or r["fetch_state"] == "ok_truncated":
-            continue
+    html_pages = [r for r in records if r["fetch_state"].startswith("ok")]
+    extracted = [r for r in html_pages if r["words"] > 0 and r["text"].strip()
+                 and r["fetch_state"] != "ok_truncated"]
+    noindex_excluded = 0
+    for r in extracted:
         if r["effective_indexability"] == "noindex" and not include_noindex:
+            noindex_excluded += 1
             continue
         text = hz.normalize(r["text"]) if (hz and normalizer == "hazm") else r["text"]
         items.append({"url": r["url"], "title": r["title"], "h1": r["h1"], "text": text, "page_type": r["page_type"]})
@@ -140,17 +157,22 @@ def run_analyze(in_dir, out_dir=None, gsc_pages=None, gsc_queries=None, settings
                    info[r["url"]]["pointing_here"]] for r in records
                   if info[r["url"]]["issues"] or info[r["url"]]["relationship"] not in ("self", "")]
     write_csv(out / "canonical_report.csv", CANON_HEADER, canon_rows)
+    counts = {"html_pages": len(html_pages), "pages_extracted": len(extracted),
+              "pages_compared": len(items), "pairs_flagged": len(results), "canonical_rows": len(canon_rows),
+              "noindex_excluded": noindex_excluded}
+    coverage = comparison_coverage(counts)
     text = summarize(records, info, len(results))
+    if coverage:
+        text = coverage + "\n\n" + text
     write_text(out / "issues.txt", text)
-    counts = {"pages_compared": len(items), "pairs_flagged": len(results), "canonical_rows": len(canon_rows)}
     write_manifest(out / "analysis_manifest.json", "analyze",
                    {"settings": settings.__dict__ | {"brand_terms": list(settings.brand_terms)},
                     "normalizer": normalizer if hz else fa_text.NORMALIZER_VERSION, "stem": stem,
                     "stopwords_version": fa_text.STOPWORDS_VERSION, "variants": len(variants),
                     "gsc_pages": bool(pages), "gsc_query_page": bool(qpairs), "include_noindex": include_noindex},
-                   counts, ["similar_pairs.csv", "pairs.json", "canonical_report.csv", "issues.txt"], [],
+                   counts, ["similar_pairs.csv", "pairs.json", "canonical_report.csv", "issues.txt"], [coverage] if coverage else [],
                    ["Thresholds are starting values, provisional until you calibrate them with your own decisions.",
                     "Similarity is not proof of cannibalization.",
                     "Search Console data: a missing query row does not prove a page never appeared for it."])
     log(text)
-    return {"counts": counts, "out_dir": str(out)}
+    return {"counts": counts, "out_dir": str(out), "warnings": [coverage] if coverage else []}

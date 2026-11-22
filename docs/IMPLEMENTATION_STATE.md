@@ -40,6 +40,9 @@ Stages A–D cover the local audit workflow. Stage E starts with E1 in the archi
 
 ## Coverage and inputs
 
+A live sample from samatoos.ir confirmed that a theme can place an empty `main` before the actual article. The extractor now tries usable matches in other containers after removing excluded elements, and records the selector attempts. The reported article recovered 43 words from `.entry-content`. The direct crawler connection failed from the cloud environment. Verification used ten raw HTTP responses retrieved separately and replayed through a local HTTP server. The original run's local artifacts were unavailable.
+
+
 Each audit records the HTTP requests attempted and the pages actually observed. A page seen in only one snapshot can reflect a crawl limit. When older snapshots lack markup, applicable checks report partial coverage. SERP overlap uses observations with the same provider, capture date, locale and device. Rank history uses the best imported position per host and capture date, with changes between observed samples. Aggregated competitor counts describe the combined selected sample. For a single market or device, select the corresponding datasets.
 
 All account connections and publication remain deferred at the owner's request. The verified reporting route uses selected local files. A fresh account connection, permission model and live provider test are required for the connected Stage E milestone.

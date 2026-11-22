@@ -34,6 +34,7 @@ def create_app(workspace, port=8765):
     token = token_urlsafe()
     history = History(workspace)
     templates = Environment(loader=PackageLoader("seo_analysis.ui", "."), autoescape=select_autoescape())
+    templates.policies["json.dumps_kwargs"] = {"sort_keys": True, "ensure_ascii": False}
     pool = ThreadPoolExecutor(max_workers=1)
     jobs = {}
     guard = Lock()
@@ -175,9 +176,10 @@ def create_app(workspace, port=8765):
             findings = json.loads((Path(data["directory"]) / "findings.json").read_text(encoding="utf-8"))["findings"]
         page = max(page, 1)
         start, end = (page - 1) * 30, page * 30
+        evidence_urls = {item["id"]: item["url"] for item in data["evidence"]}
         evidence = data["evidence"] if data["manifest"]["status"] == "cancelled" else []
         return render("result", rid=rid, run=data["manifest"], artifacts=data["artifacts"],
-                      findings=findings[start:end], evidence=evidence[start:end],
+                      findings=findings[start:end], evidence=evidence[start:end], evidence_urls=evidence_urls,
                       page=page, more=max(len(findings), len(evidence)) > end)
 
     @app.get("/runs/{rid}/files/{name}")
