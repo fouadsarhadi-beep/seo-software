@@ -54,4 +54,8 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 
 - Stage F, Steps 2, 3 and 5 — Added one-page Brave Search samples and bounded public RSS and Atom retrieval on 2026-11-22. Both feed the existing research dataset format. Verified feed retrieval with a local HTTP fixture and Brave with mocked responses. Live benchmarking needs a Brave key on a plan permitting storage. The cloud could not establish a direct connection for the W3C feed check.
 
+## Content planning and competitor evidence
+
+- Stage G, Steps 2 and 3 — Added sample-scoped keyword clusters, evidence-linked editorial briefs, Search Console refresh candidates and comparisons from selected owned and competitor crawl runs on 2026-11-22. CLI tests cover Persian queries, missing versus zero values, duplicate source rows and links to both crawl and SERP evidence.
+
 [Current scope and remaining work](ROADMAP.md)

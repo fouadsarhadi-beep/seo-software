@@ -1,6 +1,6 @@
 # SEO Software Roadmap
 
-**Current checkpoint:** Stage F has public feed and Brave Search adapters. **Next:** verify live samples and continue Stage G's keyword and competitor analysis. Live Google verification remains open.
+**Current checkpoint:** Stage F has public feed and Brave Search adapters. Stage G now includes keyword clusters, content planning and saved page comparisons. **Next:** continue with Stage H's CMS and site-quality work. Live Google verification remains open.
 
 ## Foundation and audit workbench
 
@@ -28,7 +28,7 @@ E1–E5 have automated coverage. Live verification still needs authorized Google
 | Stage | Work already available | Remaining work |
 | --- | --- | --- |
 | F — Research sources | Local imports, bounded public RSS and Atom retrieval, and Brave Search samples with source and row references. | Verify a live feed from the deployment environment, benchmark Brave with an eligible key and assess authorized browser exports. |
-| G — Keyword and competitor analysis | Keyword maps, observed SERP overlap, sampled rankings and competitor gaps, and imported backlinks. | Expand clustering, editorial briefs, refresh prioritization and selected competitor page comparisons. |
+| G — Keyword and competitor analysis | Keyword maps, SERP clusters, editorial briefs, Search Console refresh candidates, saved page comparisons, sampled rank history and backlink grouping. | Extend discovery beyond selected datasets as sources become available. |
 | H — CMS and site quality | Static build checks, screenshot comparisons, access-log summaries, and Lighthouse and axe report imports. | Add read-only WordPress access and automated browser measurements. |
 | I — Agents and reporting | Scoped MCP tools and optional Looker Studio report links. | Expand report integrations and add reusable workflows or scheduling where useful. |
 | J — Performance and distribution | Benchmarked Python content matching and a tested Linux wheel. | Measure larger real-site runs and verify Windows distribution. Consider native code only for a measured bottleneck. |

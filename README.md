@@ -112,6 +112,19 @@ The feed reader requests the selected public RSS or Atom feed and its robots.txt
 
 The search command sends the selected query and locale to the official Brave Search API. Use a plan that permits storing the selected results and pass `--allow-storage` to confirm. The key is stored in the OS credential manager and can be removed with `research-key delete`. Each request samples up to 20 Brave web results. The dataset preserves sample rank, the requested locale, retrieval time and elapsed time. Device class is unavailable. Add multiple research datasets with repeated `--dataset` flags.
 
+## Plan content from research evidence
+
+```sh
+seo-analysis research --owned-host example.com --dataset <serp-run> --dataset <older-gsc-run> --dataset <newer-gsc-run>
+seo-analysis research --owned-host example.com --dataset <serp-run> --owned-crawl <owned-run> --competitor-crawl <competitor-run>
+```
+
+Open `content-plan.json` in the research run. It groups related queries when observed search results share at least two URLs and half of the combined result set in the same provider, date, locale and device sample. The editorial briefs link to the observed competitor pages and provide prompts for review.
+
+Refresh candidates flag measured declines across the two latest comparable, equal-length and non-overlapping Search Console periods. Supply query-by-page data for both periods. For local imports, use matching property and filters and record each period with `--period-start` and `--observed`. Missing, duplicated, incomplete and segmented measurements are excluded where a comparable pair cannot be established.
+
+Supply both saved crawl IDs to compare the best-ranked observed page from each site for the same query and sample. The report includes titles, H1s, word counts and links by run and evidence ID. Coverage depends on the selected search observations and saved pages.
+
 ## Connect a Google property
 
 Install the optional dependencies on the computer where you will give consent. On Windows, use the virtual environment's Python. On Linux, an unlocked Secret Service or KWallet must be available in your desktop session.

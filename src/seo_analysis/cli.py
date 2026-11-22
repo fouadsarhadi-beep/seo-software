@@ -221,7 +221,7 @@ def cmd_local_data(args):
     history = History(args.workspace)
     datasets = tuple(history.show(r)["directory"] for r in dict.fromkeys(args.dataset))
     if args.cmd == "research":
-        return execute(args, tools.RESEARCH, ResearchInput(datasets,args.owned_host))
+        return execute(args, tools.RESEARCH, ResearchInput(datasets, args.owned_host, args.owned_crawl, args.competitor_crawl))
     return execute(args, tools.WORKBOOK, WorkbookInput(history.show(args.crawl)["directory"],datasets,args.report_url))
 
 
@@ -522,6 +522,8 @@ def build_parser():
     research = sub.add_parser("research", help=tools.RESEARCH.summary)
     research.add_argument("--dataset", action="append", required=True)
     research.add_argument("--owned-host", required=True)
+    research.add_argument("--owned-crawl", help="owned site crawl run ID for comparing observed pages")
+    research.add_argument("--competitor-crawl", help="competitor crawl run ID for comparing observed pages")
     workbook = sub.add_parser("workbook", help=tools.WORKBOOK.summary)
     workbook.add_argument("--crawl", required=True)
     workbook.add_argument("--dataset", action="append", default=[])
