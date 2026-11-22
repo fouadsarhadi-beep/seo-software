@@ -31,4 +31,7 @@ SEARCH_ANALYTICS = ToolSpec("google.search-analytics", "google search-analytics"
 URL_INSPECTION = ToolSpec("google.inspect-url", "google inspect-url",
                           "Read Google's indexed assessment of one URL.", uses_network=True)
 
-BUILTIN_TOOLS = (SEARCH_ANALYTICS, URL_INSPECTION, IMPORT, RESEARCH, WORKBOOK, SITE_QA, CHECK, COMPARE, DOCTOR, CRAWL, AUDIT, ANALYZE, VARIANTS, REVIEW, CALIBRATE)
+GA4_LANDING_PAGES = ToolSpec("google.landing-pages", "google landing-pages",
+                             "Fetch GA4 web landing-page sessions and key events.", uses_network=True)
+
+BUILTIN_TOOLS = (GA4_LANDING_PAGES, SEARCH_ANALYTICS, URL_INSPECTION, IMPORT, RESEARCH, WORKBOOK, SITE_QA, CHECK, COMPARE, DOCTOR, CRAWL, AUDIT, ANALYZE, VARIANTS, REVIEW, CALIBRATE)

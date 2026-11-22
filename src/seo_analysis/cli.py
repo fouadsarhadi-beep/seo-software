@@ -298,6 +298,13 @@ def cmd_search_console(args):
     return execute(args, tools.SEARCH_ANALYTICS, request)
 
 
+def cmd_ga4(args):
+    from seo_analysis.connectors.ga4 import LandingPagesInput
+
+    request = LandingPagesInput(args.start, args.end, args.origin, args.stream_id, args.channel, args.max_rows)
+    return execute(args, tools.GA4_LANDING_PAGES, request)
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="seo-analysis", description="Analytics-only SEO audit tools. You make the decisions.")
     p.add_argument("--version", action="version", version=__version__)
@@ -333,6 +340,19 @@ def build_parser():
         command.add_argument("--project", help="use this project's Search Console connection")
         command.add_argument("--json", action="store_true")
         command.set_defaults(func=cmd_search_console)
+
+    from seo_analysis.connectors.ga4 import MAX_ROWS as GA4_MAX_ROWS
+
+    landing = google_actions.add_parser("landing-pages", help=tools.GA4_LANDING_PAGES.summary)
+    landing.add_argument("--start", required=True, help="First date, YYYY-MM-DD")
+    landing.add_argument("--end", required=True, help="Last date, YYYY-MM-DD")
+    landing.add_argument("--origin", default="", help="web origin to assign to reported paths for crawl matching")
+    landing.add_argument("--stream-id", default="", help="filter to a numeric GA4 web stream ID")
+    landing.add_argument("--channel", default="", help="session default channel group, such as Organic Search")
+    landing.add_argument("--max-rows", type=int, default=GA4_MAX_ROWS)
+    landing.add_argument("--project", help="use this project's GA4 connection")
+    landing.add_argument("--json", action="store_true")
+    landing.set_defaults(func=cmd_ga4)
 
     mcp = sub.add_parser("mcp", help="serve selected local run evidence over stdio")
     mcp.add_argument("--allow-run", required=True, action="append")

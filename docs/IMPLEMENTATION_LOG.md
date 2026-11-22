@@ -44,4 +44,6 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 
 - Stage E, Step 2 — Added bounded Search Analytics pulls and single-URL Inspection for the selected property on 2026-11-22. Verified pagination, missing measurements, duplicate rows, partial pulls and property boundaries using mocked Google responses.
 
-The next integration milestone is Stage E, Step 3. [Current scope and remaining work](IMPLEMENTATION_STATE.md#stage-e-handoff)
+- Stage E, Step 3 — Added bounded GA4 Data API retrieval for web landing-page sessions and key events on 2026-11-22. Verified pagination, quota errors and missing values with mocked responses. Verified that the workbook keeps unscoped paths unresolved and retains all evidence for an ambiguous canonical match.
+
+The next integration milestone is Stage E, Step 4. [Current scope and remaining work](IMPLEMENTATION_STATE.md#stage-e-handoff)

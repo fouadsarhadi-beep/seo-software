@@ -5,7 +5,7 @@ from hashlib import sha256
 import math
 from urllib.parse import quote, unquote, urlsplit
 
-from seo_analysis.connectors.google import GoogleConnection, SITES_URL, TOKEN_URL, google_json
+from seo_analysis.connectors.google import GoogleConnection, SITES_URL, google_json, note_egress
 from seo_analysis.core.artifacts import write_json
 from seo_analysis.core.network import HttpOrigin
 from seo_analysis.reporting.report import write_csv
@@ -31,13 +31,6 @@ class SearchAnalyticsInput:
 @dataclass
 class InspectionInput:
     url: str
-
-
-def note_egress(ctx, endpoint, purpose):
-    ctx.data_egress.extend([
-        {"method": "POST", "endpoint": TOKEN_URL, "purpose": "Refresh Google access token if needed"},
-        {"method": "POST", "endpoint": endpoint, "purpose": purpose},
-    ])
 
 
 def _numeric(value):

@@ -95,6 +95,13 @@ def google_json(session, method, url, **kwargs):
     return payload
 
 
+def note_egress(ctx, endpoint, purpose):
+    ctx.data_egress.extend([
+        {"method": "POST", "endpoint": TOKEN_URL, "purpose": "Refresh Google access token if needed"},
+        {"method": "POST", "endpoint": endpoint, "purpose": purpose},
+    ])
+
+
 def properties(service, session):
     if service == "gsc":
         sites = google_json(session, "GET", SITES_URL).get("siteEntry", [])

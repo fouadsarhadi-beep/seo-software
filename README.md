@@ -72,7 +72,7 @@ seo-analysis import-data landing-pages.csv --kind ga4 --provider "GA4" --period-
 seo-analysis workbook --crawl <crawl-id> --dataset <gsc-id> --dataset <ga4-id>
 ```
 
-Supply repeated `--dataset` arguments to compare dated SERP samples or include keyword, community and backlink exports. The research output includes a keyword map, competitor gaps, overlapping results, sampled rank history, brief candidates and source-row references. The Excel workbook keeps Search Console and GA4 on separate sheets with row-level match status. Query-only Search Console exports retain their clicks and impressions without page attribution. GA4 paths use the crawl origin, so select an export filtered to that host when the property covers several hosts. An optional `--report-url` records an existing Looker Studio report link in the report metadata.
+Supply repeated `--dataset` arguments to compare dated SERP samples or include keyword, community and backlink exports. The research output includes a keyword map, competitor gaps, overlapping results, sampled rank history, brief candidates and source-row references. The Excel workbook keeps Search Console and GA4 on separate sheets with row-level match status. Query-only Search Console exports retain their clicks and impressions without page attribution. GA4 paths from imported files assume the crawl origin, so select an export filtered to that host when the property covers several hosts. An optional `--report-url` records an existing Looker Studio report link in the report metadata.
 
 ## Local site QA and agent access
 
@@ -106,7 +106,7 @@ Install the optional dependencies on the computer where you will give consent. O
 python -m pip install -e '.[google]'
 ```
 
-In Google Cloud, enable the Search Console API for `gsc` or the Google Analytics Admin API for `ga4`. Configure the OAuth consent screen and create an OAuth client of type **Desktop app**. If the consent screen is in testing mode, add the Google account as a test user. Download the client JSON to a private location outside the repository.
+In Google Cloud, enable the Search Console API for `gsc` or the Google Analytics Admin API and Google Analytics Data API for `ga4`. Configure the OAuth consent screen and create an OAuth client of type **Desktop app**. If the consent screen is in testing mode, add the Google account as a test user. Download the client JSON to a private location outside the repository.
 
 ```sh
 seo-analysis google connect gsc --client-file path/to/desktop-client.json
@@ -129,6 +129,17 @@ seo-analysis workbook --crawl <audit-run-id> --dataset <search-analytics-run-id>
 Both Google commands use the selected Search Console property. Add `--project NAME` to use that project's connection. Search Analytics uses Pacific Time dates and defaults to finalized web results grouped by query and page. Choose at least one of those two dimensions. You can also group by date, device or country. `--data-state all` includes provisional data when available.
 
 Each pull saves `normalized.csv` and `dataset.json` in its run directory. Use its run ID with the workbook command directly. The pull retrieves up to 50,000 rows, which you can reduce with `--max-rows`. Reaching the selected limit or losing a later batch produces a partial run. Explicit zero values remain zero. Google may omit rows, including anonymized queries. URL Inspection saves Google's indexed assessment for one URL within the property each time you run it.
+
+### Retrieve GA4 landing-page data
+
+```sh
+seo-analysis google landing-pages --start 2026-11-01 --end 2026-11-21 --channel "Organic Search" --stream-id 123456789 --origin https://example.com
+seo-analysis workbook --crawl <audit-run-id> --dataset <ga4-run-id> --dataset <search-analytics-run-id>
+```
+
+The GA4 command uses the selected property and the property's reporting time zone. Add `--project NAME` for a project connection. By default it reports all web channels and streams. The example filters to Organic Search and one web stream. The dataset keeps sessions and key events in separate columns and records Google's reported row count, quota information and any sampling or privacy threshold notices.
+
+Landing paths retain their query strings. Supply `--origin` only when the selected data belongs to that web origin. This assigns a hostname and scheme for crawl matching. Use `--stream-id` or an appropriately scoped property when the property covers several sites. With no supplied origin, live GA4 paths appear as **landing origin unknown** in the workbook. The workbook checks requested URLs first, then final URLs, then site-declared canonicals. If several crawl records match at the same tier, it reports **ambiguous** and lists the candidate evidence.
 
 ## Workspace
 

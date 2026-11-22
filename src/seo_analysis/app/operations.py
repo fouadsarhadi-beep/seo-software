@@ -13,6 +13,7 @@ from seo_analysis.reporting.workbook import WorkbookInput, build_workbook
 from seo_analysis.analysis.siteqa import SiteQAInput, inspect_build
 
 from seo_analysis.app.audit import run_audit
+from seo_analysis.connectors.ga4 import LandingPagesInput, landing_pages
 from seo_analysis.connectors.search_console import InspectionInput, SearchAnalyticsInput, inspect_url, search_analytics
 from seo_analysis.core import tools
 from seo_analysis.core.artifacts import write_json, write_text
@@ -120,6 +121,7 @@ def calibrate(ctx, request):
 
 
 OPERATIONS = {
+    tools.GA4_LANDING_PAGES: (LandingPagesInput, landing_pages),
     tools.SEARCH_ANALYTICS: (SearchAnalyticsInput, search_analytics),
     tools.URL_INSPECTION: (InspectionInput, inspect_url),
     tools.IMPORT: (ExportInput, import_export),
