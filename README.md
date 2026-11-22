@@ -83,7 +83,9 @@ seo-analysis tools run seo.check --run <crawl-id> --check canonicals
 seo-analysis mcp --allow-run <crawl-id>
 ```
 
-Each QA input is optional. The PNG comparison requires an explicitly chosen baseline and identical dimensions. The log summary counts paths and HTTP statuses and discards client addresses and query strings. For an MCP client, configure the installed `seo-analysis` executable with arguments `mcp --allow-run <crawl-id>`. Repeat the flag to select additional runs. The stdio server exposes selected summaries, page evidence, paginated findings and offline checks. It exits when the client disconnects.
+Each QA input is optional. The PNG comparison requires an explicitly chosen baseline and identical dimensions. The log summary counts paths and HTTP statuses and discards client addresses and query strings. For an MCP client, configure the installed `seo-analysis` executable with arguments `mcp --allow-run <crawl-id>`. Repeat the flag to select additional runs. The stdio server exposes selected summaries, page evidence, and paginated findings. It exits when the client disconnects.
+
+Select both crawl IDs to compare snapshots, or select one crawl to run offline technical checks and content analysis. Derived runs remain available in the same session. Select a saved review run to read editorial decisions, a workbook run to read its recorded Looker Studio link, or a publication run to read its published Sheets link. The session can create up to 20 offline runs. Reads are limited to 100 rows per page and 32 MB per artifact. Reports returned by these tools are local references and excerpts.
 
 ## Optional projects and history
 

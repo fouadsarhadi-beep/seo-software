@@ -1,6 +1,6 @@
 # SEO Software Roadmap
 
-**Current checkpoint:** Stage F has public feed and Brave Search adapters. Stage G now includes keyword clusters, content planning and saved page comparisons. Stage H now includes read-only WordPress inventory and local Chromium and axe checks. **Next:** Stage I reporting and agent work. Automatic local Lighthouse collection remains open in Stage H. Live Google verification remains open.
+**Current checkpoint:** Stage F has public feed and Brave Search adapters. Stage G now includes keyword clusters, content planning and saved page comparisons. Stage H now includes read-only WordPress inventory and local Chromium and axe checks. Stage I now exposes scoped offline analysis and reporting links through MCP. **Next:** Stage J performance and distribution. Automatic local Lighthouse collection remains open in Stage H. Live Google verification remains open.
 
 ## Foundation and audit workbench
 
@@ -30,7 +30,7 @@ E1–E5 have automated coverage. Live verification still needs authorized Google
 | F — Research sources | Local imports, bounded public RSS and Atom retrieval, and Brave Search samples with source and row references. | Verify a live feed from the deployment environment, benchmark Brave with an eligible key and assess authorized browser exports. |
 | G — Keyword and competitor analysis | Keyword maps, SERP clusters, editorial briefs, Search Console refresh candidates, saved page comparisons, sampled rank history and backlink grouping. | Extend discovery beyond selected datasets as sources become available. |
 | H — CMS and site quality | Read-only WordPress inventory for published posts, pages and registered custom types, plus media metadata, static build checks, local Chromium screenshots and axe checks, baseline comparison, access-log summaries, and Lighthouse and axe report imports. | Verify a live WordPress installation and add automatic local Lighthouse collection. |
-| I — Agents and reporting | Scoped MCP tools and optional Looker Studio report links. | Expand report integrations and add reusable workflows or scheduling where useful. |
+| I — Agents and reporting | Scoped MCP analysis, snapshot comparisons, editorial decision reads, and links to selected Looker Studio and Sheets reports. | Consider hosted connectors and scheduling where useful. |
 | J — Performance and distribution | Benchmarked Python content matching and a tested Linux wheel. | Measure larger real-site runs and verify Windows distribution. Consider native code only for a measured bottleneck. |
 
 [Detailed implementation sequence](../SEO_ANALYSIS_SOFTWARE_ARCHITECTURE.md#14-implementation-sequence--stable-foundation-and-working-vertical-slices) · [Verification and remaining work](IMPLEMENTATION_STATE.md) · [Dated implementation log](IMPLEMENTATION_LOG.md)

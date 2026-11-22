@@ -66,4 +66,8 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 
 - Stage H, Step 1 follow-up — Added WordPress media metadata and registered custom post type inventory on 2026-11-22. Fixtures verify media field selection, catalogue filtering and same-installation route selection.
 
+## Scoped agent workflows
+
+- Stage I, Steps 1–3 — Added MCP crawl comparisons, content analysis, paginated reads of saved decisions and retrieval of existing Sheets and Looker Studio links on 2026-11-22. A stdio client verified the allowlist, derived runs and report evidence.
+
 [Current scope and remaining work](ROADMAP.md)
