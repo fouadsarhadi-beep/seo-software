@@ -15,6 +15,8 @@ py -3.12 -m venv .venv
 
 For a reproducible development environment with uv, run `uv sync --locked` then `uv run --locked pytest`. On macOS and Linux the executable in a pip-created environment is `.venv/bin/seo-analysis`.
 
+To install a built wheel, download the `seo-analysis-wheel` artifact from a successful Foundation checks run and extract it. In the virtual environment, replace the editable install above with `.venv\Scripts\python -m pip install path\to\seo_analysis-0.4.0-py3-none-any.whl`. The Python wheel contains the CLI, workbench templates and Persian stopwords.
+
 ## Run an audit
 
 With the virtual environment active, choose a website, a sitemap or a single-origin list of URLs. A CSV list needs a `URL` column. A text list takes one URL per line.

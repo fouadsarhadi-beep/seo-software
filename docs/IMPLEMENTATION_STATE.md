@@ -22,17 +22,34 @@
 | G | Normalize keywords, compare sampled competitor coverage, find shared search results, follow rank across comparable captures, collect community topics and group imported backlinks by referring host. Content plans include sample-based clusters, editorial briefs, refresh candidates and optional paired crawl evidence. | Discovery beyond selected samples and optional Ads/Trends access. |
 | H | Inspect static HTML and local asset paths, import Lighthouse and axe reports, count status codes by path in common/combined access logs and compare two explicitly selected PNGs. | Read-only WordPress posts, pages, media and registered custom types are fixture-tested. Local Chromium capture, axe checks and visual comparisons are verified. Live WordPress authorization and automatic local Lighthouse collection remain open. |
 | I | An MCP stdio client can analyze or compare selected crawls, inspect derived evidence and read saved editorial decisions and reporting links. | Optional hosted reporting connectors, scheduled jobs and agent-assisted editorial proposals. |
-| J | Profile and optimize content comparison in Python. Build an installable wheel with bundled UI and language resources. | Windows runtime execution, evaluation on larger owner-provided sites and any standalone executable. |
+| J | Profile and optimize content comparison in Python. Build an installable wheel with bundled UI and language resources. | Live audits on larger owner-provided sites and any standalone executable. |
 
 ## Verification
 
-On Linux with CPython 3.12.14, the checkout and an isolated installation of the 0.3.0 wheel each passed 108 tests. Each run skipped the optional Hazm test and reported a Starlette test-client deprecation warning. The isolated CLI also completed dataset import, keyword research and static build inspection outside the checkout. The Stage D cancellation follow-up passed 109 tests on Linux with the same optional skip and deprecation warning. A regression test interrupts a 30-second retry wait and opens the completed observation from the cancelled run. Chromium again passed the normal audit, evidence and export flow. The Windows CI job awaits execution.
+On Linux with CPython 3.12.14, the checkout and an isolated installation of the 0.3.0 wheel each passed 108 tests. Each run skipped the optional Hazm test and reported a Starlette test-client deprecation warning. The isolated CLI also completed dataset import, keyword research and static build inspection outside the checkout. The Stage D cancellation follow-up passed 109 tests on Linux with the same optional skip and deprecation warning. A regression test interrupts a 30-second retry wait and opens the completed observation from the cancelled run. Chromium again passed the normal audit, evidence and export flow. The subsequent Windows and Ubuntu jobs passed installation and CLI execution outside the checkout. [GitHub Actions run](https://github.com/fouadsarhadi-beep/seo-software/actions/runs/45041975051)
 
 The offline tests use local HTTP fixtures for redirects, robots, sitemap discovery, incomplete crawls and Persian content. They also cover concurrent schema creation, recovery from interrupted runs, snapshot replay, content-aware review and history reconstruction. The workbench tests exercise an actual audit through the HTTP interface, follow a page evidence link and download a CSV. A separate Chromium run exercised the same form and download. An MCP integration test starts the installed package in a subprocess, initializes a stdio session, reads allowed evidence, rejects an unselected run and reads the results of a derived check.
 
 Reporting tests join local analytics exports to observed pages and retain a query-only row without page attribution. Research tests compare two dated Persian SERP captures and preserve RSS evidence. Build QA tests check missing assets, import a browser report, summarize an access log and locate a changed pixel in a selected screenshot pair.
 
 On the deterministic 600-page synthetic corpus, three runs of content preparation plus comparison had a median of 2.661 seconds with exhaustive pairing and 0.349 seconds with indexed candidate selection. Both returned 27 pairs. The index uses shared shingles, TF-IDF terms, title tokens and H1s. A regression test compares the scored results with exhaustive pairing and covers zero thresholds. This measures offline analysis on one corpus. Crawl duration and memory use on owner sites remain unmeasured. Reproduce with `python benchmarks/similarity.py` from an installed checkout.
+
+## Stage J audit benchmark
+
+Reproduce the larger audit with `python benchmarks/audit.py --pages 300`. It serves generated HTML over loopback and measures crawl wall time, offline analysis, report generation, SQLite indexing, the results HTTP request, and Linux peak process RSS. Use `--html-dir` to replay saved HTML responses. Results timing measures the HTTP response for the workbench results route.
+
+| Measure | Before | After |
+| --- | ---: | ---: |
+| Audit wall time | 2.10 s | 1.77 s |
+| Crawl wall time | 1.38 s | 1.19 s |
+| Offline analysis | 0.66 s | 0.55 s |
+| SQLite index writes | 19 ms | 17 ms |
+| Results HTTP request | 22 ms | 22 ms |
+| Peak process RSS | 105 MiB | 105 MiB |
+
+Values are medians of three runs per version on this Linux machine. The fixture contains 300 pages and makes 302 requests including sitemap and robots discovery. The profile showed repeated HTML scans for default exclusions. The updated extractor removes those elements with one traversal and retains the existing order for custom exclusions. All ten saved Samatoos HTML responses produced identical extraction results before and after the update. Their loopback audit replay processed nine pages for comparison because one had `noindex`. Live network conditions and larger owner-site workloads remain outside these measurements.
+
+The 0.4.0 Python wheel is the distribution checkpoint. The CI workflow installs it in a clean environment with spaces and Persian characters in its path and runs QA against a local HTML file. Rust and a standalone Windows executable remain optional.
 
 ## Stage E handoff
 

@@ -70,4 +70,9 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 
 - Stage I, Steps 1–3 — Added MCP crawl comparisons, content analysis, paginated reads of saved decisions and retrieval of existing Sheets and Looker Studio links on 2026-11-22. A stdio client verified the allowlist, derived runs and report evidence.
 
+## Performance and distribution checkpoint
+
+- Stage J, Steps 1–2 — Profiled a 300-page audit fixture and replayed ten saved real pages on 2026-11-22. Consolidated default HTML exclusions into one traversal. The fixture's median audit time moved from 2.10 seconds to 1.77 seconds and real-page extraction results matched exactly.
+- Stage J, Step 4 — Built the 0.4.0 Python wheel and extended the cross-platform CI smoke test to run static site QA outside the checkout on 2026-11-22.
+
 [Current scope and remaining work](ROADMAP.md)
