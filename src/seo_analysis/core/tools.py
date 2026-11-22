@@ -49,7 +49,7 @@ BRAVE_SEARCH = ToolSpec("research.brave-search", "research-search",
                        "Capture one page of Brave web search results.", uses_network=True)
 
 WORDPRESS = ToolSpec("cms.wordpress-inventory", "wordpress inventory",
-                     "Read published WordPress posts or pages over the REST API.", uses_network=True)
+                     "Read WordPress post, media and registered type metadata.", uses_network=True)
 
 BROWSER_QA = ToolSpec("quality.browser", "browser-qa", "Capture a Chromium screenshot and optional axe report for a local build.")
 

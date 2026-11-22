@@ -86,3 +86,61 @@ def test_opt_in_header_capture_and_redirect_stop_on_real_fetcher(site):
         assert result.selected_headers == {"X-WP-Total": "1"}
     finally:
         fetcher.session.close()
+
+
+def test_media_and_registered_custom_post_types_use_only_selected_collection(tmp_path, monkeypatch, capsys):
+    _, args = _workspace(tmp_path)
+    root = "https://example.com/blog"
+    calls = []
+
+    class FixtureFetcher:
+        def __init__(self, *args, **kwargs):
+            self.attempts = []
+            self.session = SimpleNamespace(close=lambda: None, auth=None)
+
+        def get(self, url, *, follow_redirects, header_names):
+            assert follow_redirects is False
+            parts = urlsplit(url)
+            route = parts.path.rsplit("/", 1)[-1]
+            params = parse_qs(parts.query)
+            calls.append(route)
+            self.attempts.append({"method": "GET", "url": url, "http_status": 200})
+            assert params["context"] == ["view"]
+            if route == "types":
+                data = {
+                    "book": {"name": "Books", "rest_base": "library-books", "rest_namespace": "wp/v2"},
+                    "unavailable": {"name": "Elsewhere", "rest_base": "external", "rest_namespace": "other/v1"},
+                    "misconfigured": {"name": "Invalid", "rest_base": "../users", "rest_namespace": "wp/v2"},
+                }
+            elif route == "media":
+                assert params["status"] == ["inherit"]
+                data = [{
+                    "id": 12, "status": "inherit", "srcset": "unrequested", "post": 4,
+                    "source_url": "https://cdn.example.com/image.png", "alt_text": "",
+                    "mime_type": "image/png", "media_details": {"width": 600, "height": 400, "sizes": {}},
+                }]
+            else:
+                assert route == "library-books" and params["status"] == ["publish"]
+                data = [{"id": 33, "status": "publish", "title": {"rendered": "A Book"}}]
+            return FetchResult(url, final_status=200, raw=json.dumps(data).encode(),
+                               selected_headers={"X-WP-Total": str(len(data))})
+
+    monkeypatch.setattr(wordpress, "Fetcher", FixtureFetcher)
+    monkeypatch.setattr(wordpress, "load_robots", lambda *_: (None, "fixture"))
+    base = [*args, "wordpress", "inventory", root, "--json", "--resource"]
+    for resource in ("types", "book", "media"):
+        assert main([*base, resource]) == 0
+        run = json.loads(capsys.readouterr().out)
+        report = json.loads((Path(run["out_dir"]) / "wordpress.json").read_text(encoding="utf-8"))
+        row, = report["items"]
+        if resource == "types":
+            assert (row["slug"], row["rest_base"]) == ("book", "library-books")
+        elif resource == "media":
+            assert (row["alt_text"], row["width"], row["height"], row["attached_post"]) == ("", 600, 400, 4)
+            assert row["source_url"] == "https://cdn.example.com/image.png"
+            assert "media_details" not in row and "srcset" not in row
+        else:
+            assert row["title"] == "A Book"
+    assert main([*base, "misconfigured"]) == 2
+    assert "registered custom" in json.loads(capsys.readouterr().out)["warnings"][0]
+    assert calls == ["types", "types", "library-books", "media", "types"]

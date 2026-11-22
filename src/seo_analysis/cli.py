@@ -505,7 +505,8 @@ def build_parser():
     wordpress = sub.add_parser("wordpress", help="inspect a WordPress installation")
     wp_actions = wordpress.add_subparsers(dest="operation", required=True)
     wp_inventory = wp_actions.add_parser("inventory", help=tools.WORDPRESS.summary)
-    wp_inventory.add_argument("--resource", choices=("posts", "pages"), default="posts")
+    wp_inventory.add_argument("--resource", default="posts",
+                              help="posts, pages, media, types, or a registered custom post type slug")
     wp_inventory.add_argument("--max-items", type=int, default=100)
     wp_inventory.add_argument("--authenticated", action="store_true", help="use the saved Application Password")
     wp_inventory.add_argument("--json", action="store_true")

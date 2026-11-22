@@ -224,6 +224,8 @@ seo-analysis wordpress inventory https://example.com/blog --resource pages --max
 
 Pass the installation's exact HTTPS base URL, including its subdirectory if present. Public reads follow the site's robots policy. The run saves `wordpress.json` and `wordpress.csv` with selected metadata from published posts or pages. Yoast canonical and index directives appear when the REST API exposes them. Results reflect the selected item limit and any incomplete pages of API results.
 
+Use `--resource media` for attachment metadata, including source URL, alt text, MIME type, dimensions and attached post ID. Attachment files are not downloaded. Use `--resource types` to list supported REST registrations and then pass a custom type's slug, such as `--resource book`, to inventory its published items. Custom routes must be registered under `wp/v2`.
+
 For authorized access, create an Application Password for a dedicated WordPress user with the minimum access the site requires. Install the optional credential support, save the password with the interactive prompt and explicitly select authenticated inventory.
 
 ```sh

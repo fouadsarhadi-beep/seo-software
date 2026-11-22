@@ -64,4 +64,6 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 
 - Stage H, Step 3 — Added local Chromium screenshots, navigation timings, optional axe checks and approved baseline comparisons on 2026-11-22. Verified the CLI against a local HTML fixture with Chromium and axe-core 4.11.1.
 
+- Stage H, Step 1 follow-up — Added WordPress media metadata and registered custom post type inventory on 2026-11-22. Fixtures verify media field selection, catalogue filtering and same-installation route selection.
+
 [Current scope and remaining work](ROADMAP.md)
