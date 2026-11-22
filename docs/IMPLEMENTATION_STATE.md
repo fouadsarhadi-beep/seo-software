@@ -1,5 +1,7 @@
 # Implementation state
 
+[Dated implementation log](IMPLEMENTATION_LOG.md)
+
 ## Foundation checklist
 
 - [x] Stage A. Installable Python package, workspace configuration, diagnostics and built-in tool catalogue.
