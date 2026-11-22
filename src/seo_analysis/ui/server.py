@@ -169,18 +169,22 @@ def create_app(workspace, port=8765):
         return RedirectResponse("/jobs/" + jid, 303)
 
     @app.get("/runs/{rid}")
-    def result(rid: str, page: int = 1):
+    def result(rid: str, page: int = 1, evidence_page: int = 1):
         data = detail(rid)
         findings = []
         if "findings.json" in data["manifest"]["artifacts"]:
             findings = json.loads((Path(data["directory"]) / "findings.json").read_text(encoding="utf-8"))["findings"]
-        page = max(page, 1)
+        evidence = data["evidence"]
+        # Separate pagination so browsing findings never hides observed pages.
+        page = min(max(page, 1), max(1, (len(findings) + 29) // 30))
+        evidence_page = min(max(evidence_page, 1), max(1, (len(evidence) + 29) // 30))
         start, end = (page - 1) * 30, page * 30
-        evidence_urls = {item["id"]: item["url"] for item in data["evidence"]}
-        evidence = data["evidence"] if data["manifest"]["status"] == "cancelled" else []
+        evidence_start, evidence_end = (evidence_page - 1) * 30, evidence_page * 30
+        evidence_urls = {item["id"]: item["url"] for item in evidence}
         return render("result", rid=rid, run=data["manifest"], artifacts=data["artifacts"],
-                      findings=findings[start:end], evidence=evidence[start:end], evidence_urls=evidence_urls,
-                      page=page, more=max(len(findings), len(evidence)) > end)
+                      findings=findings[start:end], evidence=evidence[evidence_start:evidence_end],
+                      evidence_urls=evidence_urls, page=page, more=len(findings) > end,
+                      evidence_page=evidence_page, evidence_more=len(evidence) > evidence_end)
 
     @app.get("/runs/{rid}/files/{name}")
     def download(rid: str, name: str):
