@@ -50,10 +50,13 @@ def report_findings(directory):
     return findings
 
 
-def run_audit(cfg, log=print, prompt=None):
-    result = run_crawl(cfg, log=log, input_fn=prompt)
+def run_audit(cfg, log=print, prompt=None, *, cancel=None):
+    result = run_crawl(cfg, log=log, input_fn=prompt, cancel=cancel)
     directory = Path(cfg.out_dir)
     if result["status"] != "cancelled":
+        if cancel is not None and cancel.is_set():
+            raise KeyboardInterrupt()
+        log("Preparing audit report…")
         analysis = run_analyze(directory, log=lambda message: None)
         result["counts"].update(analysis["counts"])
         findings = report_findings(directory)

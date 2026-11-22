@@ -44,7 +44,7 @@ Each execution receives its own run directory. Use the analysis directory printe
 
 ## Local workbench and snapshot checks
 
-Start the workbench and open `http://127.0.0.1:8765` in your browser. Enter the website, choose crawl options and run the audit. Findings link to the observed page and the results view offers downloadable files.
+Start the workbench and open `http://127.0.0.1:8765` in your browser. Enter the website, choose crawl options and run the audit. Findings link to the observed page and the results view offers downloadable files. Use Cancel audit to stop acquisition. Completed observations stay available in the cancelled run. Cancellation interrupts pacing and retry waits. An active network read may take until its timeout to return.
 
 ```sh
 seo-analysis serve

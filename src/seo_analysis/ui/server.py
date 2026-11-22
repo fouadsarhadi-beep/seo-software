@@ -114,12 +114,12 @@ def create_app(workspace, port=8765):
 
     def launch(job, cfg, project, saved):
         def progress(message):
-            if job.cancel.is_set():
-                raise KeyboardInterrupt()
             job.detail = str(message)[:500]
         try:
             job.status = "running"
-            result = ToolRunner(workspace).run(tools.AUDIT, cfg, project=project, saved_target=saved, log=progress)
+            result = ToolRunner(workspace).run(
+                tools.AUDIT, cfg, project=project, saved_target=saved, log=progress, cancel=job.cancel
+            )
             job.run_id, job.status = result.run_id, result.status
         except Exception as exc:
             job.status, job.detail = "failed", str(exc)
@@ -174,8 +174,11 @@ def create_app(workspace, port=8765):
         if "findings.json" in data["manifest"]["artifacts"]:
             findings = json.loads((Path(data["directory"]) / "findings.json").read_text(encoding="utf-8"))["findings"]
         page = max(page, 1)
+        start, end = (page - 1) * 30, page * 30
+        evidence = data["evidence"] if data["manifest"]["status"] == "cancelled" else []
         return render("result", rid=rid, run=data["manifest"], artifacts=data["artifacts"],
-                      findings=findings[(page-1)*30:page*30], page=page, more=len(findings)>page*30)
+                      findings=findings[start:end], evidence=evidence[start:end],
+                      page=page, more=max(len(findings), len(evidence)) > end)
 
     @app.get("/runs/{rid}/files/{name}")
     def download(rid: str, name: str):

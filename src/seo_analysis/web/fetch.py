@@ -76,7 +76,7 @@ class Fetcher:
     def __init__(self, user_agent: str, delay: float = 0.5, timeout=(10, 30), retries: int = 2,
                  max_redirects: int = 5, max_bytes: int = 5_000_000, *, origin: HttpOrigin,
                  robots=None, robots_agent: str = "*", backoff_base: float = 1.0,
-                 sleep=time.sleep, allow_local=False, max_requests=500, max_seconds=300):
+                 sleep=time.sleep, allow_local=False, max_requests=500, max_seconds=300, cancel=None):
         if not (math.isfinite(delay) and delay >= 0 and 0 < max_seconds <= 86400):
             raise ValueError("Invalid pacing or time budget.")
         if min(max_requests, max_bytes) < 1 or min(retries, max_redirects) < 0:
@@ -91,6 +91,7 @@ class Fetcher:
         self.origin = origin
         self.robots, self.robots_agent = robots, robots_agent
         self.backoff_base, self.sleep = backoff_base, sleep
+        self.cancel = cancel
         self._last = 0.0
         self.attempts = []
 
@@ -107,7 +108,10 @@ class Fetcher:
     def _wait(self, seconds):
         if seconds >= self.budget.remaining():
             raise BudgetExceeded("Time budget insufficient for the next request.")
-        self.sleep(seconds)
+        if self.cancel is None:
+            self.sleep(seconds)
+        elif self.cancel.wait(seconds):
+            raise KeyboardInterrupt()
 
     def _retry_delay(self, resp, attempt: int) -> float:
         ra = resp.headers.get("Retry-After") if resp is not None else None
@@ -128,6 +132,8 @@ class Fetcher:
         while True:
             attempt += 1
             self._pace()
+            if self.cancel is not None and self.cancel.is_set():
+                raise KeyboardInterrupt()
             self.budget.charge()
             event = {"method": "GET", "url": url, "attempt": attempt}
             self.attempts.append(event)
@@ -154,6 +160,8 @@ class Fetcher:
         res.link_headers = _getlist(resp, "link")
         chunks, total = [], 0
         while True:
+            if self.cancel is not None and self.cancel.is_set():
+                raise KeyboardInterrupt()
             remaining = self.budget.remaining()
             connection = resp.raw.connection
             if connection is not None and connection.sock is not None:

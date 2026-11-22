@@ -142,7 +142,7 @@ def inventory_row(r: dict, c: dict) -> list:
             r["sitemap_source"], r["sitemap_lastmod"], decoded(r["url"]), r["lang"]]
 
 
-def run_crawl(cfg: CrawlConfig, input_fn=None, log=print, fetcher=None) -> dict:
+def run_crawl(cfg: CrawlConfig, input_fn=None, log=print, fetcher=None, *, cancel=None) -> dict:
     out = Path(cfg.out_dir)
     out.mkdir(parents=True, exist_ok=True)
     extra = json.loads(Path(cfg.config_file).read_text(encoding="utf-8")) if cfg.config_file else {}
@@ -153,7 +153,7 @@ def run_crawl(cfg: CrawlConfig, input_fn=None, log=print, fetcher=None) -> dict:
         raise ValueError("Crawls are scoped to the origin of the supplied sitemap.")
     variants = load_variants(cfg.variants_file) if cfg.variants_file else {}
 
-    fetcher = fetcher or Fetcher(cfg.user_agent, cfg.delay, cfg.timeout, cfg.retries, cfg.max_redirects, cfg.max_bytes, origin=origin, allow_local=cfg.allow_local, max_requests=cfg.max_requests, max_seconds=cfg.max_seconds)
+    fetcher = fetcher or Fetcher(cfg.user_agent, cfg.delay, cfg.timeout, cfg.retries, cfg.max_redirects, cfg.max_bytes, origin=origin, allow_local=cfg.allow_local, max_requests=cfg.max_requests, max_seconds=cfg.max_seconds, cancel=cancel)
     if not 1 <= cfg.limit <= 10000 or cfg.max_depth < 0 or cfg.max_variants < 1:
         raise ValueError("Choose 1–10000 pages, a nonnegative depth and a positive variant limit.")
     log(f"Target {cfg.sitemap} | origin {origin.host}:{origin.port} | robots {cfg.robots} | "
@@ -167,12 +167,16 @@ def run_crawl(cfg: CrawlConfig, input_fn=None, log=print, fetcher=None) -> dict:
     started = datetime.now(timezone.utc).isoformat()
     notes = []
     try:
+        if cancel is not None and cancel.is_set():
+            raise KeyboardInterrupt()
         policy, robots_note = load_robots(fetcher, cfg.sitemap, cfg, input_fn)
         notes.append(robots_note)
         if cfg.robots == "respect":
             fetcher.robots, fetcher.robots_agent = policy, TOOL_TOKEN
         discovery.discover(policy, input_fn)
         while discovery.queue:
+            if cancel is not None and cancel.is_set():
+                raise KeyboardInterrupt()
             fetcher.budget.remaining()
             entry, depth = discovery.queue.popleft()
             log(f"[{len(records) + 1}] {entry.url}")
@@ -188,6 +192,8 @@ def run_crawl(cfg: CrawlConfig, input_fn=None, log=print, fetcher=None) -> dict:
             for link in links:
                 if fetcher.in_scope(link):
                     discovery.add(SitemapEntry(link, "", rec["final_url"]), depth + 1)
+        if cancel is not None and cancel.is_set():
+            raise KeyboardInterrupt()
         if not records:
             status = "no_pages_found"
         elif all(r["fetch_state"] == "fetch_error" for r in records):

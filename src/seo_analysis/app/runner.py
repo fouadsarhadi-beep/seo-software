@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+from threading import Event
 
 from filelock import FileLock
 
@@ -26,6 +27,7 @@ class ToolContext:
     directory: Path
     log: Callable
     prompt: Callable | None
+    cancel: Event | None = None
 
     def ask(self, question):
         if self.prompt is None:
@@ -56,7 +58,7 @@ class ToolRunner:
     def __init__(self, workspace: Workspace):
         self.workspace = workspace
 
-    def run(self, spec: ToolSpec, request, *, project=None, saved_target=None, log=print, prompt=None):
+    def run(self, spec: ToolSpec, request, *, project=None, saved_target=None, log=print, prompt=None, cancel=None):
         expected, operation = OPERATIONS[spec]
         if not isinstance(request, expected):
             raise TypeError(f"{spec.id} requires {expected.__name__}")
@@ -75,7 +77,7 @@ class ToolRunner:
                 parameters["seed_count"] = len(seeds)
                 write_json(directory / "seeds.json", seeds)
         result = ToolResult(directory.name, spec.id, str(directory), parameters, project, saved_target)
-        ctx = ToolContext(directory, log, prompt)
+        ctx = ToolContext(directory, log, prompt, cancel)
         manifest = directory / "run.json"
         with FileLock(str(directory / ".active.lock")):
             write_json(manifest, asdict(result))

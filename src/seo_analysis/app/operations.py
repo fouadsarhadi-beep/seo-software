@@ -54,11 +54,11 @@ class CalibrationInput:
 
 
 def crawl(ctx, cfg):
-    return run_crawl(replace(cfg, out_dir=str(ctx.directory)), input_fn=ctx.prompt, log=ctx.log)
+    return run_crawl(replace(cfg, out_dir=str(ctx.directory)), input_fn=ctx.prompt, log=ctx.log, cancel=ctx.cancel)
 
 
 def audit(ctx, cfg):
-    return run_audit(replace(cfg, out_dir=str(ctx.directory)), prompt=ctx.prompt, log=ctx.log)
+    return run_audit(replace(cfg, out_dir=str(ctx.directory)), prompt=ctx.prompt, log=ctx.log, cancel=ctx.cancel)
 
 
 def analyze_snapshot(ctx, request):

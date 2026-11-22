@@ -14,7 +14,7 @@
 | Stage | Verified workflow | Follow-on work |
 | --- | --- | --- |
 | C3–C5 | Run eight technical checks on captured observations, compare same-origin snapshots, reopen changed review pairs and invoke offline tools by workspace run ID. | JSON-LD covers syntax and observed types. Rich-result eligibility requires additional rules. |
-| D | Run and monitor a website audit through a loopback browser UI, request cancellation, inspect history, drill into evidence, download files and manage projects and targets. | Research, build QA and reporting are launched from the CLI. Their results appear in history. |
+| D | Run and monitor a website audit through a loopback browser UI, cancel acquisition and inspect completed observations, review history, drill into evidence, download files and manage projects and targets. | Research, build QA and reporting are launched from the CLI. Their results appear in history. |
 | E | Import Search Console and GA4 exports and produce a local Excel report. Every row carries a match status. Ambiguous URLs, unattributed queries and unmatched rows remain visible. | OS-backed credentials, consent, live property selection, GSC and GA4 validation, URL Inspection, PSI, CrUX and Sheets publication. |
 | F | Normalize local CSV, TSV, XLSX, RSS and Atom. Keep source hash, column mapping, date, locale, device, import limits and row references. | Provider benchmarking, permitted live feed retrieval and the browser account export adapter. |
 | G | Normalize keywords, compare sampled competitor coverage, find shared search results, follow rank across comparable captures, collect community topics and group imported backlinks by referring host. Brief candidates link to the observed pages. | Broader topical clustering, completed editorial briefs, refresh prioritization and selected competitor page analysis. |
@@ -24,13 +24,17 @@
 
 ## Verification
 
-On Linux with CPython 3.12.14, the checkout and an isolated installation of the 0.3.0 wheel each passed 108 tests. Each run skipped the optional Hazm test and reported a Starlette test-client deprecation warning. The isolated CLI also completed dataset import, keyword research and static build inspection outside the checkout. The Windows CI job awaits execution.
+On Linux with CPython 3.12.14, the checkout and an isolated installation of the 0.3.0 wheel each passed 108 tests. Each run skipped the optional Hazm test and reported a Starlette test-client deprecation warning. The isolated CLI also completed dataset import, keyword research and static build inspection outside the checkout. The Stage D cancellation follow-up passed 109 tests on Linux with the same optional skip and deprecation warning. A regression test interrupts a 30-second retry wait and opens the completed observation from the cancelled run. Chromium again passed the normal audit, evidence and export flow. The Windows CI job awaits execution.
 
 The offline tests use local HTTP fixtures for redirects, robots, sitemap discovery, incomplete crawls and Persian content. They also cover concurrent schema creation, recovery from interrupted runs, snapshot replay, content-aware review and history reconstruction. The workbench tests exercise an actual audit through the HTTP interface, follow a page evidence link and download a CSV. A separate Chromium run exercised the same form and download. An MCP integration test starts the installed package in a subprocess, initializes a stdio session, reads allowed evidence, rejects an unselected run and reads the results of a derived check.
 
 Reporting tests join local analytics exports to observed pages and retain a query-only row without page attribution. Research tests compare two dated Persian SERP captures and preserve RSS evidence. Build QA tests check missing assets, import a browser report, summarize an access log and locate a changed pixel in a selected screenshot pair.
 
 On the deterministic 600-page synthetic corpus, three runs of content preparation plus comparison had a median of 2.661 seconds with exhaustive pairing and 0.349 seconds with indexed candidate selection. Both returned 27 pairs. The index uses shared shingles, TF-IDF terms, title tokens and H1s. A regression test compares the scored results with exhaustive pairing and covers zero thresholds. This measures offline analysis on one corpus. Crawl duration and memory use on owner sites remain unmeasured. Reproduce with `python benchmarks/similarity.py` from an installed checkout.
+
+## Stage E handoff
+
+Stages A–D cover the local audit workflow. Stage E starts with E1 in the architecture. It calls for OS-backed credentials, OAuth consent and least-privilege property selection. Existing local imports and joins provide fixtures for later connected reporting.
 
 ## Coverage and inputs
 
