@@ -118,7 +118,7 @@ def test_ui_clean_five_page_sample_shows_every_evidence_link(site, tmp_path):
         assert "/runs/" in str(response.url)
         dom = BeautifulSoup(response.text, "html.parser")
         assert "partial" in dom.select_one("section strong").text
-        assert "0 findings" in dom.get_text(" ")
+        assert "0 findings" in dom.get_text(" ", strip=True)
         heading = dom.find("h2", string="Crawled pages")
         assert heading is not None
         links = heading.find_next("ul").find_all("a")
