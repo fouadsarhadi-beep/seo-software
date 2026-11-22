@@ -28,6 +28,7 @@ dependencies = [
 google = ["google-auth-oauthlib>=1.5,<2", "keyring>=25,<26"]
 research = ["keyring>=25,<26"]
 wordpress = ["keyring>=25,<26"]
+browser = ["playwright>=1.48,<2"]
 
 [project.scripts]
 seo-analysis = "seo_analysis.cli:main"

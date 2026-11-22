@@ -393,6 +393,13 @@ def cmd_wordpress(args):
     return 0
 
 
+def cmd_browser_qa(args):
+    from seo_analysis.analysis.browserqa import BrowserQAInput
+
+    return execute(args, tools.BROWSER_QA, BrowserQAInput(args.directory, args.page, args.width, args.height,
+                                                           args.axe_script, args.baseline, args.chromium))
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="seo-analysis", description="Analytics-only SEO audit tools. You make the decisions.")
     p.add_argument("--version", action="version", version=__version__)
@@ -508,6 +515,18 @@ def build_parser():
         command.add_argument("site", help="HTTPS installation base URL")
         command.add_argument("--project")
         command.set_defaults(func=cmd_wordpress)
+
+    browser_qa = sub.add_parser("browser-qa", help=tools.BROWSER_QA.summary)
+    browser_qa.add_argument("directory", help="trusted local build directory")
+    browser_qa.add_argument("--page", default="/", help="local page path, such as /docs/")
+    browser_qa.add_argument("--width", type=int, default=1365)
+    browser_qa.add_argument("--height", type=int, default=768)
+    browser_qa.add_argument("--axe-script", default="", help="trusted local axe-core JavaScript file")
+    browser_qa.add_argument("--baseline", default="", help="approved PNG baseline with matching dimensions")
+    browser_qa.add_argument("--chromium", default="", help="use an installed Chromium executable")
+    browser_qa.add_argument("--project")
+    browser_qa.add_argument("--json", action="store_true")
+    browser_qa.set_defaults(func=cmd_browser_qa)
 
     mcp = sub.add_parser("mcp", help="serve selected local run evidence over stdio")
     mcp.add_argument("--allow-run", required=True, action="append")

@@ -203,6 +203,19 @@ Use the same `--project NAME` for preparing, connecting and publishing when work
 
 If a cell upload fails, rerun publication with the same export and checksum to write to the recorded spreadsheet. A completed publication returns the existing receipt. If Google fails to return the spreadsheet ID during creation, the run reports an unknown outcome. Check Drive for the preview title before preparing a fresh export.
 
+## Capture browser QA for a local build
+
+```sh
+python -m pip install -e '.[browser]'
+python -m playwright install chromium
+seo-analysis browser-qa ./build --page /docs/ --width 1365 --height 768
+seo-analysis browser-qa ./build --page /docs/ --axe-script ./node_modules/axe-core/axe.min.js --baseline approved.png
+```
+
+Choose a trusted build directory and an HTML route. Use a trailing slash for a directory index such as `/docs/`. The command runs Chromium with a fresh profile, serves files from the selected build and blocks external resources. Use `--chromium` to select an installed Chromium executable. The run saves `screenshot.png` and `browser-qa.json` with browser version, viewport, resource observations and local navigation timings.
+
+To run accessibility checks, pass the `axe.min.js` file from a trusted axe-core installation. The generated `axe.json` also works with `site-qa --axe`. For visual comparisons, pass an approved PNG at the same viewport size. Changes produce a `changed-pixels.png` mask. Keep browser version and viewport consistent across captures. Browser timings describe this local run. Use the Lighthouse and CrUX commands for their separate performance measurements.
+
 ## Inspect published WordPress metadata
 
 ```sh

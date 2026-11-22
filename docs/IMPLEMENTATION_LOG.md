@@ -62,4 +62,6 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 
 - Stage H, Step 1 — Added a read-only inventory of published WordPress posts and pages and installation-scoped Application Password storage on 2026-11-22. Verified bounded pagination, credential isolation, metadata shaping and redirect refusal with fixtures. Live authorization, media and custom types remain open.
 
+- Stage H, Step 3 — Added local Chromium screenshots, navigation timings, optional axe checks and approved baseline comparisons on 2026-11-22. Verified the CLI against a local HTML fixture with Chromium and axe-core 4.11.1.
+
 [Current scope and remaining work](ROADMAP.md)
