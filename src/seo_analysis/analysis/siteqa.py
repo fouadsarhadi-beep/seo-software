@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
+from seo_analysis.analysis.lighthouse import import_lighthouse
 from seo_analysis.core.artifacts import write_json
 from seo_analysis.reporting.report import write_csv
 from seo_analysis.web.extract import extract_page
@@ -119,42 +120,28 @@ def inspect_build(ctx, request):
                 if asset["alt_state"] == "absent":
                     findings.append([relative, "image lacks alt attribute", asset["url"]])
     diagnostics = {}
-    for kind, file in (("lighthouse", request.lighthouse), ("axe", request.axe)):
-        if not file:
-            continue
-        path = Path(file)
+    if request.lighthouse:
+        diagnostics["lighthouse"] = import_lighthouse(request.lighthouse)
+    if request.axe:
+        path = Path(request.axe)
         if path.stat().st_size > 25_000_000:
             raise ValueError("QA report exceeds 25 MB.")
         data = json.loads(path.read_text(encoding="utf-8-sig"))
-        if not isinstance(data, dict):
-            raise ValueError(f"Expected a JSON object for the {kind} report.")
-        if kind == "axe":
-            if not isinstance(data.get("violations"), list) or any(
-                not isinstance(v, dict)
-                or not isinstance(v.get("id"), str)
-                or not isinstance(v.get("nodes", []), list)
+        if not isinstance(data, dict) or not isinstance(data.get("violations"), list) or any(
+            not isinstance(v, dict)
+            or not isinstance(v.get("id"), str)
+            or not isinstance(v.get("nodes", []), list)
+            for v in data["violations"]
+        ):
+            raise ValueError("Expected an axe report with violations.")
+        diagnostics["axe"] = {
+            "url": data.get("url"),
+            "source_file": path.name,
+            "violations": [
+                {"id": v["id"], "impact": v.get("impact"), "nodes": len(v.get("nodes", []))}
                 for v in data["violations"]
-            ):
-                raise ValueError("Expected an axe report with violations.")
-            diagnostics[kind] = {
-                "url": data.get("url"),
-                "violations": [
-                    {"id": v["id"], "impact": v.get("impact"), "nodes": len(v.get("nodes", []))}
-                    for v in data["violations"]
-                ],
-            }
-        else:
-            if not isinstance(data.get("categories"), dict) or any(
-                not isinstance(v, dict) for v in data["categories"].values()
-            ):
-                raise ValueError("Expected Lighthouse JSON with categories.")
-            diagnostics[kind] = {
-                "url": data.get("finalDisplayedUrl", data.get("finalUrl")),
-                "time": data.get("fetchTime"),
-                "version": data.get("lighthouseVersion"),
-                "lab_scores": {k: v.get("score") for k, v in data["categories"].items()},
-            }
-        diagnostics[kind]["source_file"] = path.name
+            ],
+        }
     if request.baseline or request.screenshot:
         diagnostics["visual_comparison"] = compare_screenshots(ctx, request.baseline, request.screenshot)
     if request.access_log:

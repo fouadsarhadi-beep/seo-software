@@ -26,4 +26,18 @@ RESEARCH = ToolSpec("research.opportunities", "research", "Compare sourced queri
 WORKBOOK = ToolSpec("report.workbook", "workbook", "Export crawl and first-party measurements to Excel.")
 SITE_QA = ToolSpec("quality.build", "site-qa", "Inspect a selected static build and browser QA reports.")
 
-BUILTIN_TOOLS = (IMPORT, RESEARCH, WORKBOOK, SITE_QA, CHECK, COMPARE, DOCTOR, CRAWL, AUDIT, ANALYZE, VARIANTS, REVIEW, CALIBRATE)
+SEARCH_ANALYTICS = ToolSpec("google.search-analytics", "google search-analytics",
+                            "Fetch Search Analytics for the selected Search Console property.", uses_network=True)
+URL_INSPECTION = ToolSpec("google.inspect-url", "google inspect-url",
+                          "Read Google's indexed assessment of one URL.", uses_network=True)
+
+GA4_LANDING_PAGES = ToolSpec("google.landing-pages", "google landing-pages",
+                             "Fetch GA4 web landing-page sessions and key events.", uses_network=True)
+
+PAGESPEED = ToolSpec("google.pagespeed", "google pagespeed",
+                     "Run a PageSpeed Insights Lighthouse lab test.", uses_network=True)
+CRUX = ToolSpec("google.crux", "google crux",
+                "Read Chrome UX Report field metrics for a public URL or origin.", uses_network=True)
+LIGHTHOUSE = ToolSpec("performance.lighthouse", "lighthouse-report", "Import a local Lighthouse JSON report.")
+
+BUILTIN_TOOLS = (PAGESPEED, CRUX, LIGHTHOUSE, GA4_LANDING_PAGES, SEARCH_ANALYTICS, URL_INSPECTION, IMPORT, RESEARCH, WORKBOOK, SITE_QA, CHECK, COMPARE, DOCTOR, CRAWL, AUDIT, ANALYZE, VARIANTS, REVIEW, CALIBRATE)

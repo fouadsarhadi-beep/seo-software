@@ -25,6 +25,20 @@ class WorkbookInput:
     report_url: str = ""
 
 
+def landing_identity(raw, source, crawl_base):
+    """Resolve a landing path only with the origin available for its source."""
+    if not raw or raw in ("(not set)", "(other)"):
+        return "", "", "unknown landing page"
+    if not raw.startswith("/") or raw.startswith("//"):
+        return raw, "source URL", "unmatched"
+    if "landing_origin" in source:
+        origin = source["landing_origin"]
+        if not origin:
+            return "", "", "landing origin unknown"
+        return origin + raw, "operator-selected GA4 origin and path", "unmatched"
+    return crawl_base + raw, "crawl origin assumed for imported path", "unmatched"
+
+
 def build_workbook(ctx, request):
     if request.report_url and not re.fullmatch(
         r"https://lookerstudio\.google\.com/(?:u/\d+/)?reporting/[a-zA-Z0-9/_-]+", request.report_url
@@ -78,19 +92,33 @@ def build_workbook(ctx, request):
     for seq, (run_id, dataset) in enumerate(datasets, 1):
         s = dataset["source"]
         sources.append({"run_id": run_id, **s})
+        extra = [field for field in ("date", "device", "country", "ctr") if
+                 field in s.get("dimensions", ()) or (field == "ctr" and s.get("retrieval") == "Search Analytics API")]
         rows = []
         for r in dataset["rows"]:
             raw = r.get("url", "")
-            full = (
-                base + raw if raw.startswith("/") and not raw.startswith("//") and s["kind"] == "ga4" else raw
-            )
-            state, evidence = ("unmatched" if raw else "unattributed query"), []
+            if s["kind"] == "ga4":
+                full, basis, state = landing_identity(raw, s, base)
+            else:
+                full, basis, state = raw, "source URL" if raw else "", "unmatched" if raw else "unattributed query"
+            evidence = []
+            key = match_tier = ""
             if origin.allows(full):
+                key = url_key(full)
                 for kind, index in indexes.items():
-                    ids = index.get(url_key(full), set())
+                    ids = index.get(key, set())
                     if ids:
+                        match_tier = kind
                         state, evidence = kind if len(ids) == 1 else "ambiguous", sorted(ids)
                         break
+            elif full:
+                try:
+                    HttpOrigin.from_url(full)
+                except ValueError:
+                    pass
+                else:
+                    key = url_key(full)
+                    state = "outside crawl origin"
             counts[state] += 1
             rows.append(
                 [
@@ -100,6 +128,8 @@ def build_workbook(ctx, request):
                     ", ".join(evidence),
                     r.get("query"),
                     *[r.get(k) for k in ("clicks", "impressions", "rank", "sessions", "conversions")],
+                    full, key, basis, match_tier,
+                    *[r.get(k) for k in extra],
                 ]
             )
         table(
@@ -115,16 +145,21 @@ def build_workbook(ctx, request):
                 "Average position",
                 "Sessions",
                 "Key events",
+                "Candidate URL",
+                "Normalized candidate",
+                "URL basis",
+                "Match tier",
+                *[field.upper() if field == "ctr" else field.capitalize() for field in extra],
             ],
             rows,
         )
     table(
         "Sources",
-        ["Run", "Provider", "Kind", "Period start", "Observation date", "Locale", "Device", "SHA-256"],
+        ["Run", "Provider", "Kind", "Period start", "Observation date", "Locale", "Device", "SHA-256",
+         "Retrieval", "Property", "Landing origin", "Channel", "Property time zone"],
         (
             [
-                s[k]
-                for k in (
+                *[s[k] for k in (
                     "run_id",
                     "provider",
                     "kind",
@@ -133,7 +168,9 @@ def build_workbook(ctx, request):
                     "locale",
                     "device",
                     "sha256",
-                )
+                )],
+                s.get("retrieval"), s.get("property"), s.get("landing_origin"), s.get("channel"),
+                s.get("response_metadata", {}).get("timeZone"),
             ]
             for s in sources
         ),
@@ -147,7 +184,7 @@ def build_workbook(ctx, request):
     finally:
         Path(name).unlink(missing_ok=True)
     crawl_source = source_info(directory)
-    partial = crawl_source["status"] != "succeeded" or any(s["skipped"] or s["capped"] for s in sources)
+    partial = crawl_source["status"] != "succeeded" or any(s["skipped"] or s["capped"] or s.get("partial") for s in sources)
     write_json(
         ctx.directory / "report.json",
         {
@@ -164,6 +201,6 @@ def build_workbook(ctx, request):
         "status": "partial" if partial else "succeeded",
         "counts": {"pages": len(records), "sources": len(sources), "matches": dict(counts)},
         "warnings": [
-            "GA4 path-only rows use the selected crawl origin. Each source retains its own units and period."
+            "Imported GA4 paths assume the crawl origin. API paths require an origin supplied by the operator."
         ],
     }

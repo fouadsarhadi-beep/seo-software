@@ -72,7 +72,7 @@ seo-analysis import-data landing-pages.csv --kind ga4 --provider "GA4" --period-
 seo-analysis workbook --crawl <crawl-id> --dataset <gsc-id> --dataset <ga4-id>
 ```
 
-Supply repeated `--dataset` arguments to compare dated SERP samples or include keyword, community and backlink exports. The research output includes a keyword map, competitor gaps, overlapping results, sampled rank history, brief candidates and source-row references. The Excel workbook keeps Search Console and GA4 on separate sheets with row-level match status. Query-only Search Console exports retain their clicks and impressions without page attribution. GA4 paths use the crawl origin, so select an export filtered to that host when the property covers several hosts. An optional `--report-url` records an existing Looker Studio report link in the report metadata.
+Supply repeated `--dataset` arguments to compare dated SERP samples or include keyword, community and backlink exports. The research output includes a keyword map, competitor gaps, overlapping results, sampled rank history, brief candidates and source-row references. The Excel workbook keeps Search Console and GA4 on separate sheets with row-level match status. Query-only Search Console exports retain their clicks and impressions without page attribution. GA4 paths from imported files assume the crawl origin, so select an export filtered to that host when the property covers several hosts. An optional `--report-url` records an existing Looker Studio report link in the report metadata.
 
 ## Local site QA and agent access
 
@@ -98,8 +98,65 @@ seo-analysis history reindex
 
 History includes ad hoc runs. `history show` resolves artifact paths and page evidence within a run. `history reindex` rebuilds index entries from manifests, skips active writers and recovers completed observations from a process that exited before finalization. The recovered run shows incomplete coverage. Saved targets use website input by default. Specify `--kind sitemap` to save a sitemap URL.
 
+## Connect a Google property
+
+Install the optional dependencies on the computer where you will give consent. On Windows, use the virtual environment's Python. On Linux, an unlocked Secret Service or KWallet must be available in your desktop session.
+
+```sh
+python -m pip install -e '.[google]'
+```
+
+In Google Cloud, enable the Search Console API for `gsc` or the Google Analytics Admin API and Google Analytics Data API for `ga4`. Configure the OAuth consent screen and create an OAuth client of type **Desktop app**. If the consent screen is in testing mode, add the Google account as a test user. Download the client JSON to a private location outside the repository.
+
+```sh
+seo-analysis google connect gsc --client-file path/to/desktop-client.json
+seo-analysis google status gsc
+seo-analysis google disconnect gsc
+```
+
+Sign in and grant the requested read-only permission in the browser on the same computer, then select one of the properties printed in the terminal. Use `--property sc-domain:example.com` or `--property properties/123456789` to provide the exact property ID instead of choosing from the numbered list. The same commands accept `ga4` for Analytics. Add `--project NAME` to keep a connection with an existing project.
+
+The credential manager holds the refresh token and OAuth client secret. SQLite holds the selected property's ID and display name. Moving the workspace to a different path or computer requires reconnecting. For a grant you also want to remove from your Google account, pass `--revoke` to disconnect. Google may revoke other grants for the same account and OAuth project.
+
+### Retrieve Search Console data
+
+```sh
+seo-analysis google search-analytics --start 2026-11-01 --end 2026-11-21 --dimensions query page device country
+seo-analysis google inspect-url https://example.com/article/
+seo-analysis workbook --crawl <audit-run-id> --dataset <search-analytics-run-id>
+```
+
+Both Google commands use the selected Search Console property. Add `--project NAME` to use that project's connection. Search Analytics uses Pacific Time dates and defaults to finalized web results grouped by query and page. Choose at least one of those two dimensions. You can also group by date, device or country. `--data-state all` includes provisional data when available.
+
+Each pull saves `normalized.csv` and `dataset.json` in its run directory. Use its run ID with the workbook command directly. The pull retrieves up to 50,000 rows, which you can reduce with `--max-rows`. Reaching the selected limit or losing a later batch produces a partial run. Explicit zero values remain zero. Google may omit rows, including anonymized queries. URL Inspection saves Google's indexed assessment for one URL within the property each time you run it.
+
+### Retrieve GA4 landing-page data
+
+```sh
+seo-analysis google landing-pages --start 2026-11-01 --end 2026-11-21 --channel "Organic Search" --stream-id 123456789 --origin https://example.com
+seo-analysis workbook --crawl <audit-run-id> --dataset <ga4-run-id> --dataset <search-analytics-run-id>
+```
+
+The GA4 command uses the selected property and the property's reporting time zone. Add `--project NAME` for a project connection. By default it reports all web channels and streams. The example filters to Organic Search and one web stream. The dataset keeps sessions and key events in separate columns and records Google's reported row count, quota information and any sampling or privacy threshold notices.
+
+Landing paths retain their query strings. Supply `--origin` only when the selected data belongs to that web origin. This assigns a hostname and scheme for crawl matching. Use `--stream-id` or an appropriately scoped property when the property covers several sites. With no supplied origin, live GA4 paths appear as **landing origin unknown** in the workbook. The workbook checks requested URLs first, then final URLs, then site-declared canonicals. If several crawl records match at the same tier, it reports **ambiguous** and lists the candidate evidence.
+
+### Measure page performance
+
+```sh
+seo-analysis google pagespeed https://example.com/ --strategy mobile
+seo-analysis lighthouse-report lighthouse.json
+seo-analysis google performance-key set
+seo-analysis google crux https://example.com/ --form-factor PHONE
+seo-analysis google crux https://example.com --scope origin
+```
+
+PageSpeed Insights runs a Lighthouse lab test for a public URL. It sends the URL, including its query string, to Google. To connect a key, enable the PageSpeed Insights API and Chrome UX Report API in Google Cloud, install the Google extra and run `google performance-key set` in an interactive terminal. The key is shared by the two performance commands within the selected workspace and stored in the OS credential manager. CrUX requires the key. Add `--use-key` to PageSpeed Insights to use it. `google performance-key delete` removes the saved key locally.
+
+Generate local Lighthouse JSON with Chrome DevTools or the Lighthouse CLI, then pass it to `lighthouse-report`. Both lab tools produce `performance.json` with Lighthouse scores, timings, device data and warnings. CrUX produces a separate field report with p75 values, histogram data when available, collection period and form factor. Use `--scope origin` for an explicit whole-origin sample. A missing URL record appears as `no_data` and exits with code 3. Field INP and lab Total Blocking Time remain distinct measurements.
+
 ## Workspace
 
 Run `system doctor` to locate the configuration, data, run and export directories. Configuration is optional. To customize paths, copy [config.example.toml](config.example.toml) to the reported config path, or select a file with `seo-analysis --config-file "<path>" system doctor`. Relative directory settings resolve beside the configuration file. When all commands have exited, back up the config file and complete data directory, including history.sqlite3 and runs/. Restore them to the locations reported by doctor. Reindexing recovers run records from manifests. The database backup also preserves projects and targets that have never been used. To start a fresh workspace, select a new data directory.
 
-See the [architecture](SEO_ANALYSIS_SOFTWARE_ARCHITECTURE.md) for the product roadmap and the [implementation state](docs/IMPLEMENTATION_STATE.md) for verified capabilities and current limits. See the [implementation log](docs/IMPLEMENTATION_LOG.md) for dated changes by stage and step.
+Follow the [roadmap](docs/ROADMAP.md) for the current step and what comes next. See the [architecture](SEO_ANALYSIS_SOFTWARE_ARCHITECTURE.md) for the detailed design, the [implementation state](docs/IMPLEMENTATION_STATE.md) for verification and limits, and the [implementation log](docs/IMPLEMENTATION_LOG.md) for dated changes.

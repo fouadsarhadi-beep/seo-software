@@ -27,6 +27,8 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 - Stage D, Step 4 — Enforced host, origin and form-token checks, and paginated history and findings on 2026-11-22.
 - Stage D, Step 2 follow-up — Made cancellation interrupt retry waits and linked completed observations from cancelled runs on 2026-11-22. The Linux suite passed 109 tests with one optional skip. Chromium passed the audit, evidence and CSV download flow.
 
+- Stage B, Steps 5–7 and Stage D, Step 2 follow-up — Fixed main text extraction for pages with empty containers and clarified crawl and comparison coverage on 2026-11-22. On the first ten current post sitemap pages from samatoos.ir, the old extractor returned zero words for all ten. The updated extractor recovered text from all ten, including 43 words from the reported article. A local replay through the full audit compared nine pages and excluded one marked noindex.
+
 ## Offline work in later stages
 
 - Stage E, Steps 2, 3 and 5 (offline) — Added Search Console and GA4 file imports, URL matching against crawl observations and Excel reporting on 2026-11-22.
@@ -36,4 +38,14 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 - Stage I, Steps 1–3 (partial) — Added a scoped MCP server for selected runs and optional Looker Studio report links in workbook metadata on 2026-11-22.
 - Stage J, Steps 1 and 2 (partial) — Benchmarked and optimized offline content comparison on 2026-11-22. Built and tested the 0.3.0 Python wheel on Linux.
 
-The next integration milestone is Stage E, Step 1. [Current scope and remaining work](IMPLEMENTATION_STATE.md#stage-e-handoff)
+## Connected Google work
+
+- Stage E, Step 1 — Added separate read-only Google consent flows, OS credential storage, property selection and disconnect on 2026-11-22. Verified the flow with simulated consent and API responses. Live authorization is awaiting an owner's property and Desktop OAuth client.
+
+- Stage E, Step 2 — Added bounded Search Analytics pulls and single-URL Inspection for the selected property on 2026-11-22. Verified pagination, missing measurements, duplicate rows, partial pulls and property boundaries using mocked Google responses.
+
+- Stage E, Step 3 — Added bounded GA4 Data API retrieval for web landing-page sessions and key events on 2026-11-22. Verified pagination, quota errors and missing values with mocked responses. Verified that the workbook keeps unscoped paths unresolved and retains all evidence for an ambiguous canonical match.
+
+- Stage E, Step 4 — Added standalone Lighthouse report import, PageSpeed Insights lab tests and CrUX field queries on 2026-11-22. Mocked responses verified separation of lab and field metrics, missing measurements, collection periods and unavailable records. The live keyless PageSpeed check returned HTTP 429.
+
+The next integration milestone is Stage E, Step 5. [Current scope and remaining work](IMPLEMENTATION_STATE.md#stage-e-handoff)

@@ -77,7 +77,9 @@ def test_tool_catalogue_describes_runnable_commands(capsys):
     assert cli.main(["tools", "list", "--json"]) == 0
     catalogue = json.loads(capsys.readouterr().out)
     assert len({tool["id"] for tool in catalogue}) == len(catalogue)
-    assert [tool["command"] for tool in catalogue if tool["uses_network"]] == ["crawl", "audit"]
+    assert {tool["command"] for tool in catalogue if tool["uses_network"]} == {
+        "crawl", "audit", "google search-analytics", "google inspect-url", "google landing-pages", "google pagespeed", "google crux",
+    }
     for tool in catalogue:
         with pytest.raises(SystemExit) as help_exit:
             cli.build_parser().parse_args([*tool["command"].split(), "--help"])

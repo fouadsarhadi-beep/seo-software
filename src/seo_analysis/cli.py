@@ -257,11 +257,148 @@ def cmd_snapshot(args):
     return execute(args, tools.COMPARE, CompareInput(before, after))
 
 
+def cmd_google(args):
+    from seo_analysis.connectors.google import GoogleConnection
+
+    connection = GoogleConnection(args.workspace, args.project, args.service)
+    if args.operation == "connect":
+        def choose(properties):
+            if not properties:
+                raise ValueError("Google returned no accessible properties for this account.")
+            if args.property_id is not None:
+                return args.property_id
+            if not sys.stdin.isatty():
+                raise ValueError("Pass --property ID when connecting from a noninteractive terminal.")
+            choices = sorted(properties)
+            for index, property_id in enumerate(choices, 1):
+                print(f"{index}. {properties[property_id]} ({property_id})")
+            answer = input("Property number: ").strip()
+            if not answer.isdecimal() or not 1 <= int(answer) <= len(choices):
+                raise ValueError("Choose one of the listed property numbers.")
+            return choices[int(answer) - 1]
+        if args.property_id is None and not sys.stdin.isatty():
+            raise ValueError("Pass --property ID when connecting from a noninteractive terminal.")
+        selected = connection.connect(args.client_file, choose)
+    elif args.operation == "disconnect":
+        connection.disconnect(revoke=args.revoke)
+        selected = None
+    else:
+        selected = connection.selected()
+    print(json.dumps({"service": args.service, "project": args.project, "selected": selected}, ensure_ascii=False))
+    return 0
+
+
+def cmd_search_console(args):
+    from seo_analysis.connectors.search_console import InspectionInput, SearchAnalyticsInput
+
+    if args.operation == "inspect-url":
+        return execute(args, tools.URL_INSPECTION, InspectionInput(args.url))
+    request = SearchAnalyticsInput(args.start, args.end, tuple(args.dimensions),
+                                   args.search_type, args.data_state, args.max_rows)
+    return execute(args, tools.SEARCH_ANALYTICS, request)
+
+
+def cmd_ga4(args):
+    from seo_analysis.connectors.ga4 import LandingPagesInput
+
+    request = LandingPagesInput(args.start, args.end, args.origin, args.stream_id, args.channel, args.max_rows)
+    return execute(args, tools.GA4_LANDING_PAGES, request)
+
+
+def cmd_performance_key(args):
+    from getpass import getpass
+    from seo_analysis.connectors.performance import performance_key, validate_key
+
+    if args.action == "set":
+        if not sys.stdin.isatty():
+            raise ValueError("Use an interactive terminal to save a performance API key.")
+        value = validate_key(getpass("Google performance API key: ").strip())
+        performance_key(args.workspace, "set", value)
+        print("Google performance API key saved to the OS credential store.")
+    else:
+        performance_key(args.workspace, "delete")
+        print("Google performance API key removed locally.")
+    return 0
+
+
+def cmd_performance(args):
+    from seo_analysis.connectors.performance import CruxInput, LighthouseInput, PageSpeedInput
+
+    if args.cmd == "lighthouse-report":
+        return execute(args, tools.LIGHTHOUSE, LighthouseInput(args.report))
+    if args.operation == "pagespeed":
+        return execute(args, tools.PAGESPEED, PageSpeedInput(args.url, args.strategy, args.use_key))
+    return execute(args, tools.CRUX, CruxInput(args.url, args.scope, args.form_factor))
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="seo-analysis", description="Analytics-only SEO audit tools. You make the decisions.")
     p.add_argument("--version", action="version", version=__version__)
     p.add_argument("--config-file", type=Path, help="application workspace settings (TOML)")
     sub = p.add_subparsers(dest="cmd", required=True)
+
+    google = sub.add_parser("google", help="manage read-only Google property connections")
+    google_actions = google.add_subparsers(dest="operation", required=True)
+    connect = google_actions.add_parser("connect", help="authorize and select a property on this computer")
+    connect.add_argument("--client-file", type=Path, required=True, help="OAuth client JSON for a Desktop app")
+    connect.add_argument("--property", dest="property_id", help="select this property ID without a numbered prompt")
+    status = google_actions.add_parser("status", help="show the locally selected property")
+    disconnect = google_actions.add_parser("disconnect", help="remove local Google credentials and property selection")
+    disconnect.add_argument("--revoke", action="store_true", help="also revoke the grant with Google")
+    for command in (connect, status, disconnect):
+        command.add_argument("service", choices=("gsc", "ga4"))
+        command.add_argument("--project", help="scope the connection to an existing project")
+        command.set_defaults(func=cmd_google)
+
+
+    from seo_analysis.connectors.search_console import DIMENSIONS, MAX_ROWS, SEARCH_TYPES
+
+    search = google_actions.add_parser("search-analytics", help=tools.SEARCH_ANALYTICS.summary)
+    search.add_argument("--start", required=True, help="First date, YYYY-MM-DD")
+    search.add_argument("--end", required=True, help="Last date, YYYY-MM-DD")
+    search.add_argument("--dimensions", choices=DIMENSIONS, nargs="+", default=("query", "page"))
+    search.add_argument("--search-type", choices=SEARCH_TYPES, default="web")
+    search.add_argument("--data-state", choices=("final", "all"), default="final")
+    search.add_argument("--max-rows", type=int, default=MAX_ROWS)
+    inspection = google_actions.add_parser("inspect-url", help=tools.URL_INSPECTION.summary)
+    inspection.add_argument("url", help="URL in the selected Search Console property")
+    for command in (search, inspection):
+        command.add_argument("--project", help="use this project's Search Console connection")
+        command.add_argument("--json", action="store_true")
+        command.set_defaults(func=cmd_search_console)
+
+    from seo_analysis.connectors.ga4 import MAX_ROWS as GA4_MAX_ROWS
+
+    landing = google_actions.add_parser("landing-pages", help=tools.GA4_LANDING_PAGES.summary)
+    landing.add_argument("--start", required=True, help="First date, YYYY-MM-DD")
+    landing.add_argument("--end", required=True, help="Last date, YYYY-MM-DD")
+    landing.add_argument("--origin", default="", help="web origin to assign to reported paths for crawl matching")
+    landing.add_argument("--stream-id", default="", help="filter to a numeric GA4 web stream ID")
+    landing.add_argument("--channel", default="", help="session default channel group, such as Organic Search")
+    landing.add_argument("--max-rows", type=int, default=GA4_MAX_ROWS)
+    landing.add_argument("--project", help="use this project's GA4 connection")
+    landing.add_argument("--json", action="store_true")
+    landing.set_defaults(func=cmd_ga4)
+
+    from seo_analysis.connectors.performance import FORM_FACTORS
+
+    performance_key = google_actions.add_parser("performance-key", help="manage the optional performance API key")
+    performance_key.add_argument("action", choices=("set", "delete"))
+    performance_key.set_defaults(func=cmd_performance_key)
+    pagespeed = google_actions.add_parser("pagespeed", help=tools.PAGESPEED.summary)
+    pagespeed.add_argument("url", help="public page URL sent to PageSpeed Insights")
+    pagespeed.add_argument("--strategy", choices=("mobile", "desktop"), default="mobile")
+    pagespeed.add_argument("--use-key", action="store_true", help="use the saved Google performance API key")
+    crux = google_actions.add_parser("crux", help=tools.CRUX.summary)
+    crux.add_argument("url", metavar="target", help="public URL or origin sent to CrUX")
+    crux.add_argument("--scope", choices=("url", "origin"), default="url")
+    crux.add_argument("--form-factor", choices=FORM_FACTORS, default="ALL_FORM_FACTORS")
+    lighthouse = sub.add_parser("lighthouse-report", help=tools.LIGHTHOUSE.summary)
+    lighthouse.add_argument("report", help="path to a locally generated Lighthouse JSON report")
+    for command in (pagespeed, crux, lighthouse):
+        command.add_argument("--project")
+        command.add_argument("--json", action="store_true")
+        command.set_defaults(func=cmd_performance)
 
     mcp = sub.add_parser("mcp", help="serve selected local run evidence over stdio")
     mcp.add_argument("--allow-run", required=True, action="append")

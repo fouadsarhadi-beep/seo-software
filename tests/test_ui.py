@@ -13,7 +13,7 @@ def test_ui_end_to_end(site, tmp_path):
     ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
     site.add("/robots.txt", f"User-agent: *\nSitemap: {site.base}/map")
     site.add("/map", f"<urlset><url><loc>{site.base}/</loc></url></urlset>")
-    site.add("/", "<html><main>Hello world</main></html>")
+    site.add("/", "<html><main>متن فارسی مقاله</main></html>")
     with TestClient(create_app(ws, 8972), base_url=origin) as client:
         home = client.get("/")
         token = BeautifulSoup(home.text, "html.parser").select_one("input[name=token]")["value"]
@@ -28,7 +28,12 @@ def test_ui_end_to_end(site, tmp_path):
             time.sleep(.05)
         dom = BeautifulSoup(reply.text, "html.parser")
         assert dom.h1.text == "Run results"
-        assert client.get(dom.select_one('a[href*="/evidence/"]')["href"]).status_code == 200
+        evidence = dom.select_one('a[href*="/evidence/"]')
+        assert evidence.text == site.base + "/"
+        page = client.get(evidence["href"])
+        assert page.status_code == 200 and "متن فارسی مقاله" in page.text
+        assert "3 words" in page.text
+        assert "at least two eligible pages" in reply.text
         assert client.get(dom.select_one('a[href$="inventory.csv"]')["href"]).status_code == 200
 
 

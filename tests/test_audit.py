@@ -145,3 +145,21 @@ def test_duration_budget_during_dns(monkeypatch):
             transport.resolve_endpoints("example.test", 80, transport.CrawlBudget(10, 0.05))
     finally:
         gate.set()
+
+
+def test_capped_audit_reports_extraction_and_comparison_coverage(site, tmp_path, capsys):
+    urls = ("a", "b", "empty", "skipped")
+    site.add("/map", "<urlset>" + "".join(f"<url><loc>{site.base}/{p}</loc></url>" for p in urls) + "</urlset>")
+    for path in urls[:2]:
+        site.add(f"/{path}", "<main></main><article><p>متن فارسی مشترک برای آزمایش محتوای سایت</p></article>")
+    site.add("/empty", "<title>Metadata</title><main><h1>Heading only</h1></main>")
+    code, result = run_cli(tmp_path, capsys, "--sitemap", site.base + "/map", "--allow-local", "--max-pages", "3")
+    assert code == 3
+    assert result["counts"]["skipped"]["page_limit"] == 1
+    assert result["counts"]["html_pages"] == 3
+    assert result["counts"]["pages_extracted"] == result["counts"]["pages_compared"] == 2
+    assert result["counts"]["pairs_flagged"] == 1
+    assert any("configured limit of 3" in w for w in result["warnings"])
+    assert any("covered 2 of 3 HTML pages" in w for w in result["warnings"])
+    findings = json.loads((Path(result["out_dir"]) / "findings.json").read_text(encoding="utf-8"))["findings"]
+    assert any(f["category"] == "coverage" and f["urls"] == [site.base + "/empty"] for f in findings)

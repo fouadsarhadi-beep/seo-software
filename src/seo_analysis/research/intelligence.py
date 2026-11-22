@@ -172,7 +172,7 @@ def build_research(ctx, request):
     warnings = ["Results describe the selected export samples."]
     if omitted_common:
         warnings.append(f"Omitted {omitted_common} common result URLs from pair generation.")
-    partial = omitted_common or any(s["skipped"] or s["capped"] for s in sources.values())
+    partial = omitted_common or any(s["skipped"] or s["capped"] or s.get("partial") for s in sources.values())
     return dict(
         status="partial" if partial else "succeeded",
         warnings=warnings,

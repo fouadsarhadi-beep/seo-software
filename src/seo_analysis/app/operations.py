@@ -13,6 +13,9 @@ from seo_analysis.reporting.workbook import WorkbookInput, build_workbook
 from seo_analysis.analysis.siteqa import SiteQAInput, inspect_build
 
 from seo_analysis.app.audit import run_audit
+from seo_analysis.connectors.performance import CruxInput, LighthouseInput, PageSpeedInput, crux, lighthouse, pagespeed
+from seo_analysis.connectors.ga4 import LandingPagesInput, landing_pages
+from seo_analysis.connectors.search_console import InspectionInput, SearchAnalyticsInput, inspect_url, search_analytics
 from seo_analysis.core import tools
 from seo_analysis.core.artifacts import write_json, write_text
 from seo_analysis.reporting.report import write_csv
@@ -73,9 +76,11 @@ def analyze_snapshot(ctx, request):
         source_status = source["config"].get("status", "unknown")
         result["counts"]["source_status"] = source_status
         if source_status != "succeeded":
-            result.update(status="partial", warnings=[f"Source crawl status: {source_status}"])
+            result["status"] = "partial"
+            result["warnings"].append(f"Source crawl status: {source_status}")
     else:
-        result.update(status="partial", warnings=["Source coverage unavailable."])
+        result["status"] = "partial"
+        result["warnings"].append("Source coverage unavailable.")
     return result
 
 
@@ -117,6 +122,12 @@ def calibrate(ctx, request):
 
 
 OPERATIONS = {
+    tools.PAGESPEED: (PageSpeedInput, pagespeed),
+    tools.CRUX: (CruxInput, crux),
+    tools.LIGHTHOUSE: (LighthouseInput, lighthouse),
+    tools.GA4_LANDING_PAGES: (LandingPagesInput, landing_pages),
+    tools.SEARCH_ANALYTICS: (SearchAnalyticsInput, search_analytics),
+    tools.URL_INSPECTION: (InspectionInput, inspect_url),
     tools.IMPORT: (ExportInput, import_export),
     tools.RESEARCH: (ResearchInput, build_research),
     tools.WORKBOOK: (WorkbookInput, build_workbook),

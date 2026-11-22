@@ -25,6 +25,11 @@ MIGRATIONS = [
         """CREATE TABLE evidence (run_id TEXT REFERENCES runs(id), id TEXT, url TEXT NOT NULL,
                observed_at TEXT NOT NULL, path TEXT NOT NULL, PRIMARY KEY(run_id, id))""",
     ),
+    (
+        """CREATE TABLE google_connections (
+               project TEXT NOT NULL, service TEXT NOT NULL, property_id TEXT NOT NULL,
+               property_name TEXT NOT NULL, PRIMARY KEY(project, service))""",
+    ),
 ]
 
 
@@ -89,6 +94,23 @@ class History:
                 if row is None:
                     raise ValueError("Unknown target in this project.")
                 return dict(row)
+
+    def google_connection(self, project, service):
+        with self.transaction() as db:
+            selected = db.execute("SELECT property_id, property_name FROM google_connections WHERE project=? AND service=?",
+                                  (project or "", service)).fetchone()
+            return dict(selected) if selected else None
+
+    def set_google_connection(self, project, service, property_id, property_name):
+        with self.transaction() as db:
+            db.execute("""INSERT INTO google_connections VALUES (?, ?, ?, ?)
+                          ON CONFLICT(project, service) DO UPDATE SET property_id=excluded.property_id,
+                          property_name=excluded.property_name""",
+                       (project or "", service, property_id, property_name))
+
+    def remove_google_connection(self, project, service):
+        with self.transaction() as db:
+            db.execute("DELETE FROM google_connections WHERE project=? AND service=?", (project or "", service))
 
     def index(self, directory, *, recover=False):
         with self.transaction() as db:

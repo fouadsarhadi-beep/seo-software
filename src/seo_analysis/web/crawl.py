@@ -217,6 +217,8 @@ def run_crawl(cfg: CrawlConfig, input_fn=None, log=print, fetcher=None, *, cance
     warnings = notes + discovery.warnings
     if discovery.skipped:
         warnings.append("Discovery limits: " + str(dict(discovery.skipped)))
+        if discovery.skipped.get("page_limit"):
+            warnings.append(f"Reached the configured limit of {cfg.limit} pages. Other discovered URLs were left outside this sample.")
     with atomic_text(out / "snapshot.jsonl") as stream:
         for row in records:
             stream.write(json.dumps(row, ensure_ascii=False) + "\n")
@@ -265,7 +267,8 @@ def observe(cfg, fetcher, policy, e, page_types, excludes, variants, follow_link
                     "meta": pd.meta_description, "lang": pd.lang, "canonicals_html": pd.canonicals,
                     "canonicals_header": canon.header_canonicals(res.link_headers, res.final_url),
                     "words": pd.words, "chars": pd.chars, "text": pd.text,
-                    "extraction_selector": pd.selector, "extraction_state": "truncated" if res.truncated else pd.state})
+                    "extraction_selector": pd.selector, "extraction_state": "truncated" if res.truncated else pd.state,
+                    "extraction": pd.extraction})
         ix = indexability.evaluate(pd.robots_meta, res.x_robots, True, res.final_status, False)
         if res.truncated and ix.effective == "indexable":
             ix.effective = "unknown"

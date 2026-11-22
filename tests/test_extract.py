@@ -39,3 +39,32 @@ def test_body_fallback_and_empty_state():
     assert p.selector == "body" and p.state == "fallback" and p.words == 3
     e = extract_page("<html><body><script>x</script></body></html>", "https://s.ir/")
     assert e.state == "empty" and e.words == 0
+
+
+def test_empty_first_match_and_excluded_container_fall_through():
+    html = """<html><body><main><aside>Navigation</aside></main>
+    <main><p>متن اصلی مقاله</p><nav>منو</nav></main></body></html>"""
+    page = extract_page(html, "https://example.test/", content_selector="aside")
+    assert (page.selector, page.state, page.text, page.words) == ("main", "fallback", "متن اصلی مقاله", 3)
+    assert page.extraction["attempts"][0] == {"selector": "aside", "matches": 0, "outcome": "no match"}
+    assert page.extraction["attempts"][-1]["matches"] == 2
+
+
+def test_narrow_article_container_preferred_over_page_shell():
+    page = extract_page(
+        '<main><div>Theme banner</div><article><h1>Headline</h1>'
+        '<div class="entry-content"><p>متن واقعی خبر</p></div></article></main>',
+        "https://example.test/",
+    )
+    assert (page.selector, page.text) == (".entry-content", "متن واقعی خبر")
+
+
+def test_javascript_notice_and_headline_do_not_count_as_article_text():
+    page = extract_page(
+        "<title>Head metadata</title><main><h1>Headline</h1><div id='app'></div></main>"
+        "<noscript>Please enable JavaScript.</noscript><script>boot()</script>",
+        "https://example.test/",
+    )
+    assert (page.state, page.words, page.text) == ("empty", 0, "")
+    assert page.extraction["javascript_notice"] is True
+    assert any(a["outcome"] == "headings only" for a in page.extraction["attempts"])
