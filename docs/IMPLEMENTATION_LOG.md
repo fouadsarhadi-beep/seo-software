@@ -42,4 +42,6 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 
 - Stage E, Step 1 — Added separate read-only Google consent flows, OS credential storage, property selection and disconnect on 2026-11-22. Verified the flow with simulated consent and API responses. Live authorization is awaiting an owner's property and Desktop OAuth client.
 
-The next integration milestone is Stage E, Step 2. [Current scope and remaining work](IMPLEMENTATION_STATE.md#stage-e-handoff)
+- Stage E, Step 2 — Added bounded Search Analytics pulls and single-URL Inspection for the selected property on 2026-11-22. Verified pagination, missing measurements, duplicate rows, partial pulls and property boundaries using mocked Google responses.
+
+The next integration milestone is Stage E, Step 3. [Current scope and remaining work](IMPLEMENTATION_STATE.md#stage-e-handoff)

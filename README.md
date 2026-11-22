@@ -118,7 +118,17 @@ Sign in and grant the requested read-only permission in the browser on the same 
 
 The credential manager holds the refresh token and OAuth client secret. SQLite holds the selected property's ID and display name. Moving the workspace to a different path or computer requires reconnecting. For a grant you also want to remove from your Google account, pass `--revoke` to disconnect. Google may revoke other grants for the same account and OAuth project.
 
-This milestone covers authorization and property selection. Use the file import workflow above to analyze or report on Google data.
+### Retrieve Search Console data
+
+```sh
+seo-analysis google search-analytics --start 2026-11-01 --end 2026-11-21 --dimensions query page device country
+seo-analysis google inspect-url https://example.com/article/
+seo-analysis workbook --crawl <audit-run-id> --dataset <search-analytics-run-id>
+```
+
+Both Google commands use the selected Search Console property. Add `--project NAME` to use that project's connection. Search Analytics uses Pacific Time dates and defaults to finalized web results grouped by query and page. Choose at least one of those two dimensions. You can also group by date, device or country. `--data-state all` includes provisional data when available.
+
+Each pull saves `normalized.csv` and `dataset.json` in its run directory. Use its run ID with the workbook command directly. The pull retrieves up to 50,000 rows, which you can reduce with `--max-rows`. Reaching the selected limit or losing a later batch produces a partial run. Explicit zero values remain zero. Google may omit rows, including anonymized queries. URL Inspection saves Google's indexed assessment for one URL within the property each time you run it.
 
 ## Workspace
 

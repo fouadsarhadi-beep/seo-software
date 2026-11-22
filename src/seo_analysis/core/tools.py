@@ -26,4 +26,9 @@ RESEARCH = ToolSpec("research.opportunities", "research", "Compare sourced queri
 WORKBOOK = ToolSpec("report.workbook", "workbook", "Export crawl and first-party measurements to Excel.")
 SITE_QA = ToolSpec("quality.build", "site-qa", "Inspect a selected static build and browser QA reports.")
 
-BUILTIN_TOOLS = (IMPORT, RESEARCH, WORKBOOK, SITE_QA, CHECK, COMPARE, DOCTOR, CRAWL, AUDIT, ANALYZE, VARIANTS, REVIEW, CALIBRATE)
+SEARCH_ANALYTICS = ToolSpec("google.search-analytics", "google search-analytics",
+                            "Fetch Search Analytics for the selected Search Console property.", uses_network=True)
+URL_INSPECTION = ToolSpec("google.inspect-url", "google inspect-url",
+                          "Read Google's indexed assessment of one URL.", uses_network=True)
+
+BUILTIN_TOOLS = (SEARCH_ANALYTICS, URL_INSPECTION, IMPORT, RESEARCH, WORKBOOK, SITE_QA, CHECK, COMPARE, DOCTOR, CRAWL, AUDIT, ANALYZE, VARIANTS, REVIEW, CALIBRATE)

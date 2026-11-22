@@ -28,6 +28,9 @@ class ToolContext:
     log: Callable
     prompt: Callable | None
     cancel: Event | None = None
+    workspace: Workspace | None = None
+    project: str | None = None
+    data_egress: list = field(default_factory=list)
 
     def ask(self, question):
         if self.prompt is None:
@@ -77,7 +80,7 @@ class ToolRunner:
                 parameters["seed_count"] = len(seeds)
                 write_json(directory / "seeds.json", seeds)
         result = ToolResult(directory.name, spec.id, str(directory), parameters, project, saved_target)
-        ctx = ToolContext(directory, log, prompt, cancel)
+        ctx = ToolContext(directory, log, prompt, cancel, self.workspace, project, result.data_egress)
         manifest = directory / "run.json"
         with FileLock(str(directory / ".active.lock")):
             write_json(manifest, asdict(result))
@@ -100,7 +103,7 @@ class ToolRunner:
                 crawl_manifest = directory / "crawl_manifest.json"
                 if not result.counts and crawl_manifest.is_file():
                     result.counts = json.loads(crawl_manifest.read_text(encoding="utf-8"))["counts"]
-                if spec.uses_network and (directory / "requests.json").exists():
+                if isinstance(request, CrawlConfig) and (directory / "requests.json").exists():
                     result.data_egress = [{"method": "GET", "origin": asdict(HttpOrigin.from_url(request.sitemap)),
                                            "attempt_log": "requests.json"}]
                 result.finished_at = timestamp()

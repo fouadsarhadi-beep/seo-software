@@ -1,4 +1,5 @@
 """Read-only Google connections for the local CLI."""
+from contextlib import contextmanager
 from hashlib import sha256
 import json
 import logging
@@ -137,6 +138,33 @@ class GoogleConnection:
             return getattr(backend, method)(APP_NAME, self.key, *args)
         except Exception:
             raise RuntimeError("Unable to access the OS credential store.") from None
+
+    @contextmanager
+    def session(self):
+        """Read the selected property and matching credential under the same lock."""
+        if self.selected() is None:
+            raise ValueError(f"Connect a {self.service} property first.")
+        backend = native_keyring()
+        from google.auth.transport.requests import AuthorizedSession
+        from google.oauth2.credentials import Credentials
+
+        with self.lock:
+            selection = self.selected()
+            record = self._credential_call(backend, "get_password") if selection else None
+        if not record:
+            raise ValueError(f"Reconnect the selected {self.service} property to restore its credentials.")
+        try:
+            saved = json.loads(record)
+            required = ("refresh_token", "client_id", "client_secret")
+            if not all(isinstance(saved[key], str) and saved[key] for key in required):
+                raise ValueError
+            credentials = Credentials(
+                token=None, token_uri=TOKEN_URL, scopes=[self.scope], **{key: saved[key] for key in required}
+            )
+        except (KeyError, ValueError, TypeError):
+            raise RuntimeError("The saved Google credential is invalid. Reconnect the property.") from None
+        with AuthorizedSession(credentials, refresh_timeout=30) as session:
+            yield selection["property_id"], session
 
     def connect(self, client_file, choose):
         from google.auth.transport.requests import AuthorizedSession

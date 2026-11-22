@@ -78,6 +78,8 @@ def build_workbook(ctx, request):
     for seq, (run_id, dataset) in enumerate(datasets, 1):
         s = dataset["source"]
         sources.append({"run_id": run_id, **s})
+        extra = [field for field in ("date", "device", "country", "ctr") if
+                 field in s.get("dimensions", ()) or (field == "ctr" and s.get("retrieval") == "Search Analytics API")]
         rows = []
         for r in dataset["rows"]:
             raw = r.get("url", "")
@@ -100,6 +102,7 @@ def build_workbook(ctx, request):
                     ", ".join(evidence),
                     r.get("query"),
                     *[r.get(k) for k in ("clicks", "impressions", "rank", "sessions", "conversions")],
+                    *[r.get(k) for k in extra],
                 ]
             )
         table(
@@ -115,6 +118,7 @@ def build_workbook(ctx, request):
                 "Average position",
                 "Sessions",
                 "Key events",
+                *[field.upper() if field == "ctr" else field.capitalize() for field in extra],
             ],
             rows,
         )
@@ -147,7 +151,7 @@ def build_workbook(ctx, request):
     finally:
         Path(name).unlink(missing_ok=True)
     crawl_source = source_info(directory)
-    partial = crawl_source["status"] != "succeeded" or any(s["skipped"] or s["capped"] for s in sources)
+    partial = crawl_source["status"] != "succeeded" or any(s["skipped"] or s["capped"] or s.get("partial") for s in sources)
     write_json(
         ctx.directory / "report.json",
         {

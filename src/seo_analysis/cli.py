@@ -288,6 +288,16 @@ def cmd_google(args):
     return 0
 
 
+def cmd_search_console(args):
+    from seo_analysis.connectors.search_console import InspectionInput, SearchAnalyticsInput
+
+    if args.operation == "inspect-url":
+        return execute(args, tools.URL_INSPECTION, InspectionInput(args.url))
+    request = SearchAnalyticsInput(args.start, args.end, tuple(args.dimensions),
+                                   args.search_type, args.data_state, args.max_rows)
+    return execute(args, tools.SEARCH_ANALYTICS, request)
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="seo-analysis", description="Analytics-only SEO audit tools. You make the decisions.")
     p.add_argument("--version", action="version", version=__version__)
@@ -307,6 +317,22 @@ def build_parser():
         command.add_argument("--project", help="scope the connection to an existing project")
         command.set_defaults(func=cmd_google)
 
+
+    from seo_analysis.connectors.search_console import DIMENSIONS, MAX_ROWS, SEARCH_TYPES
+
+    search = google_actions.add_parser("search-analytics", help=tools.SEARCH_ANALYTICS.summary)
+    search.add_argument("--start", required=True, help="First date, YYYY-MM-DD")
+    search.add_argument("--end", required=True, help="Last date, YYYY-MM-DD")
+    search.add_argument("--dimensions", choices=DIMENSIONS, nargs="+", default=("query", "page"))
+    search.add_argument("--search-type", choices=SEARCH_TYPES, default="web")
+    search.add_argument("--data-state", choices=("final", "all"), default="final")
+    search.add_argument("--max-rows", type=int, default=MAX_ROWS)
+    inspection = google_actions.add_parser("inspect-url", help=tools.URL_INSPECTION.summary)
+    inspection.add_argument("url", help="URL in the selected Search Console property")
+    for command in (search, inspection):
+        command.add_argument("--project", help="use this project's Search Console connection")
+        command.add_argument("--json", action="store_true")
+        command.set_defaults(func=cmd_search_console)
 
     mcp = sub.add_parser("mcp", help="serve selected local run evidence over stdio")
     mcp.add_argument("--allow-run", required=True, action="append")
