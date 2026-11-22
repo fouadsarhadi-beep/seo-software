@@ -1,6 +1,6 @@
 # SEO Software Roadmap
 
-**Current checkpoint:** Stage E4 is implemented. **Next: Stage E5**, selected exports and Google Sheets publication for Looker Studio.
+**Current checkpoint:** Stage F has public feed and Brave Search adapters. Stage G now includes keyword clusters, content planning and saved page comparisons. Stage H now includes read-only WordPress inventory and local Chromium and axe checks. Stage I now exposes scoped offline analysis and reporting links through MCP. **Current release checkpoint:** Stage J profiling and Python wheel distribution. Stage H can also generate local Lighthouse reports. Live Google verification remains open.
 
 ## Foundation and audit workbench
 
@@ -19,18 +19,18 @@
 | E2 | Implemented | Search Console Search Analytics exports and single-URL Inspection. |
 | E3 | Implemented | GA4 landing-page sessions and key events, with explicit URL matching in the workbook. |
 | E4 | Implemented | PageSpeed Insights and local Lighthouse lab reports, plus CrUX field metrics. |
-| E5 | **Next** | Publish selected normalized data to Google Sheets for Looker Studio. Local CSV and Excel exports already work. |
+| E5 | Implemented | Preview selected columns in CSV and Excel, then publish an approved selection to a spreadsheet for Looker Studio. |
 
-E1–E4 have automated coverage. Live verification still needs authorized Google properties and a performance API key. The keyless PageSpeed check returned HTTP 429.
+E1–E5 have automated coverage. Live verification still needs authorized Google properties, a performance API key and a Sheets connection. The keyless PageSpeed check returned HTTP 429.
 
 ## After Stage E
 
 | Stage | Work already available | Remaining work |
 | --- | --- | --- |
-| F — Research sources | Import CSV, TSV, XLSX, RSS and Atom with source and row references. | Benchmark a permitted search provider, add controlled live sources and assess authorized browser exports. |
-| G — Keyword and competitor analysis | Keyword maps, observed SERP overlap, sampled rankings and competitor gaps, and imported backlinks. | Expand clustering, editorial briefs, refresh prioritization and selected competitor page comparisons. |
-| H — CMS and site quality | Static build checks, screenshot comparisons, access-log summaries, and Lighthouse and axe report imports. | Add read-only WordPress access and automated browser measurements. |
-| I — Agents and reporting | Scoped MCP tools and optional Looker Studio report links. | Expand report integrations and add reusable workflows or scheduling where useful. |
-| J — Performance and distribution | Benchmarked Python content matching and a tested Linux wheel. | Measure larger real-site runs and verify Windows distribution. Consider native code only for a measured bottleneck. |
+| F — Research sources | Local imports, bounded public RSS and Atom retrieval, and Brave Search samples with source and row references. | Verify a live feed from the deployment environment, benchmark Brave with an eligible key and assess authorized browser exports. |
+| G — Keyword and competitor analysis | Keyword maps, SERP clusters, editorial briefs, Search Console refresh candidates, saved page comparisons, sampled rank history and backlink grouping. | Extend discovery beyond selected datasets as sources become available. |
+| H — CMS and site quality | Read-only WordPress inventory for published posts, pages and registered custom types, plus media metadata, static build checks, local Chromium screenshots and axe checks, baseline comparison, access-log summaries, and Lighthouse lab runs and axe checks and imports. | Verify a live WordPress installation. |
+| I — Agents and reporting | Scoped MCP analysis, snapshot comparisons, editorial decision reads, and links to selected Looker Studio and Sheets reports. | Consider hosted connectors and scheduling where useful. |
+| J — Performance and distribution | Profiled the 300-page audit fixture, replayed saved real pages, reduced extraction overhead and built the 0.4.0 wheel. Windows and Ubuntu CI verify clean wheel installation. | Measure a larger live owner site. Consider native code or a standalone executable if justified. |
 
 [Detailed implementation sequence](../SEO_ANALYSIS_SOFTWARE_ARCHITECTURE.md#14-implementation-sequence--stable-foundation-and-working-vertical-slices) · [Verification and remaining work](IMPLEMENTATION_STATE.md) · [Dated implementation log](IMPLEMENTATION_LOG.md)

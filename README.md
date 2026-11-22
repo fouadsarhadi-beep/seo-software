@@ -15,6 +15,8 @@ py -3.12 -m venv .venv
 
 For a reproducible development environment with uv, run `uv sync --locked` then `uv run --locked pytest`. On macOS and Linux the executable in a pip-created environment is `.venv/bin/seo-analysis`.
 
+To install a built wheel, download the `seo-analysis-wheel` artifact from a successful Foundation checks run and extract it. In the virtual environment, replace the editable install above with `.venv\Scripts\python -m pip install path\to\seo_analysis-0.4.0-py3-none-any.whl`. The Python wheel contains the CLI, workbench templates and Persian stopwords.
+
 ## Run an audit
 
 With the virtual environment active, choose a website, a sitemap or a single-origin list of URLs. A CSV list needs a `URL` column. A text list takes one URL per line.
@@ -83,7 +85,9 @@ seo-analysis tools run seo.check --run <crawl-id> --check canonicals
 seo-analysis mcp --allow-run <crawl-id>
 ```
 
-Each QA input is optional. The PNG comparison requires an explicitly chosen baseline and identical dimensions. The log summary counts paths and HTTP statuses and discards client addresses and query strings. For an MCP client, configure the installed `seo-analysis` executable with arguments `mcp --allow-run <crawl-id>`. Repeat the flag to select additional runs. The stdio server exposes selected summaries, page evidence, paginated findings and offline checks. It exits when the client disconnects.
+Each QA input is optional. The PNG comparison requires an explicitly chosen baseline and identical dimensions. The log summary counts paths and HTTP statuses and discards client addresses and query strings. For an MCP client, configure the installed `seo-analysis` executable with arguments `mcp --allow-run <crawl-id>`. Repeat the flag to select additional runs. The stdio server exposes selected summaries, page evidence, and paginated findings. It exits when the client disconnects.
+
+Select both crawl IDs to compare snapshots, or select one crawl to run offline technical checks and content analysis. Derived runs remain available in the same session. Select a saved review run to read editorial decisions, a workbook run to read its recorded Looker Studio link, or a publication run to read its published Sheets link. The session can create up to 20 offline runs. Reads are limited to 100 rows per page and 32 MB per artifact. Reports returned by these tools are local references and excerpts.
 
 ## Optional projects and history
 
@@ -97,6 +101,33 @@ seo-analysis history reindex
 ```
 
 History includes ad hoc runs. `history show` resolves artifact paths and page evidence within a run. `history reindex` rebuilds index entries from manifests, skips active writers and recovers completed observations from a process that exited before finalization. The recovered run shows incomplete coverage. Saved targets use website input by default. Specify `--kind sitemap` to save a sitemap URL.
+
+## Collect live research samples
+
+```sh
+seo-analysis research-feed https://example.com/feed.xml --max-items 25
+python -m pip install -e '.[research]'
+seo-analysis research-key set
+seo-analysis research-search "example topic" --country us --language en --count 10 --allow-storage
+seo-analysis research --dataset <sample-run-id> --owned-host example.com
+```
+
+The feed reader requests the selected public RSS or Atom feed and its robots.txt. It follows redirects within the same origin and saves entry titles, links and available publication dates. Each response is limited to 2 MB.
+
+The search command sends the selected query and locale to the official Brave Search API. Use a plan that permits storing the selected results and pass `--allow-storage` to confirm. The key is stored in the OS credential manager and can be removed with `research-key delete`. Each request samples up to 20 Brave web results. The dataset preserves sample rank, the requested locale, retrieval time and elapsed time. Device class is unavailable. Add multiple research datasets with repeated `--dataset` flags.
+
+## Plan content from research evidence
+
+```sh
+seo-analysis research --owned-host example.com --dataset <serp-run> --dataset <older-gsc-run> --dataset <newer-gsc-run>
+seo-analysis research --owned-host example.com --dataset <serp-run> --owned-crawl <owned-run> --competitor-crawl <competitor-run>
+```
+
+Open `content-plan.json` in the research run. It groups related queries when observed search results share at least two URLs and half of the combined result set in the same provider, date, locale and device sample. The editorial briefs link to the observed competitor pages and provide prompts for review.
+
+Refresh candidates flag measured declines across the two latest comparable, equal-length and non-overlapping Search Console periods. Supply query-by-page data for both periods. For local imports, use matching property and filters and record each period with `--period-start` and `--observed`. Missing, duplicated, incomplete and segmented measurements are excluded where a comparable pair cannot be established.
+
+Supply both saved crawl IDs to compare the best-ranked observed page from each site for the same query and sample. The report includes titles, H1s, word counts and links by run and evidence ID. Coverage depends on the selected search observations and saved pages.
 
 ## Connect a Google property
 
@@ -154,6 +185,69 @@ seo-analysis google crux https://example.com --scope origin
 PageSpeed Insights runs a Lighthouse lab test for a public URL. It sends the URL, including its query string, to Google. To connect a key, enable the PageSpeed Insights API and Chrome UX Report API in Google Cloud, install the Google extra and run `google performance-key set` in an interactive terminal. The key is shared by the two performance commands within the selected workspace and stored in the OS credential manager. CrUX requires the key. Add `--use-key` to PageSpeed Insights to use it. `google performance-key delete` removes the saved key locally.
 
 Generate local Lighthouse JSON with Chrome DevTools or the Lighthouse CLI, then pass it to `lighthouse-report`. Both lab tools produce `performance.json` with Lighthouse scores, timings, device data and warnings. CrUX produces a separate field report with p75 values, histogram data when available, collection period and form factor. Use `--scope origin` for an explicit whole-origin sample. A missing URL record appears as `no_data` and exits with code 3. Field INP and lab Total Blocking Time remain distinct measurements.
+
+### Export selected data to Google Sheets
+
+Create a local preview from a normalized dataset run, such as a Search Analytics pull, a GA4 landing-page pull or a file import. Repeat `--column` in the order you want the columns written.
+
+```sh
+seo-analysis export-dataset --dataset <dataset-run-id> --title "Search report" --column query --column url --column clicks
+```
+
+Review `selected.csv` or `selected.xlsx` in the export run directory. `export.json` lists the title, columns, row count, coverage and confirmation SHA-256. Preparing the export works offline. Select fewer rows with `--max-rows` if the upload limit is reached.
+
+Enable the Google Sheets API in the Google Cloud project for your Desktop OAuth client. Connect Sheets separately using the app-file permission, then publish the reviewed export.
+
+```sh
+seo-analysis google connect sheets --client-file path/to/desktop-client.json
+seo-analysis google publish-sheets <export-run-id> --confirm <sha256-from-export.json>
+```
+
+Use the same `--project NAME` for preparing, connecting and publishing when working in a project. Publishing creates a spreadsheet in the connected Google account and writes the selected values into its **Data** tab. Google sharing permissions are managed separately. Open the URL in `publication.json`, or select that spreadsheet and tab through the Google Sheets connector in Looker Studio. Strings are written as literal cell values. Empty measurements appear as blank cells and numeric zeros stay numeric.
+
+If a cell upload fails, rerun publication with the same export and checksum to write to the recorded spreadsheet. A completed publication returns the existing receipt. If Google fails to return the spreadsheet ID during creation, the run reports an unknown outcome. Check Drive for the preview title before preparing a fresh export.
+
+## Capture browser QA for a local build
+
+```sh
+python -m pip install -e '.[browser]'
+python -m playwright install chromium
+seo-analysis browser-qa ./build --page /docs/ --width 1365 --height 768
+seo-analysis browser-qa ./build --page /docs/ --axe-script ./node_modules/axe-core/axe.min.js --baseline approved.png
+```
+
+Choose a trusted build directory and an HTML route. Use a trailing slash for a directory index such as `/docs/`. The command runs Chromium with a fresh profile, serves files from the selected build and blocks external resources. Use `--chromium` to select an installed Chromium executable. The run saves `screenshot.png` and `browser-qa.json` with browser version, viewport, resource observations and local navigation timings.
+
+To run accessibility checks, pass the `axe.min.js` file from a trusted axe-core installation. The generated `axe.json` also works with `site-qa --axe`. For visual comparisons, pass an approved PNG at the same viewport size. Changes produce a `changed-pixels.png` mask. Keep browser version and viewport consistent across captures. Browser timings describe this local run. Use the Lighthouse and CrUX commands for their separate performance measurements.
+
+### Generate a local Lighthouse lab report
+
+```sh
+seo-analysis lighthouse-run ./build --page / --device desktop --lighthouse-cli ./node_modules/lighthouse/cli/index.js --chromium /path/to/chromium
+```
+
+Install Lighthouse with npm and use a compatible Node.js version plus an installed Chrome or Chromium executable. The command serves one trusted build on loopback and runs Lighthouse against a fresh browser profile. External resources are blocked, so the lab measurements describe the files in the selected build. The run saves the generated `lighthouse.json` and normalized `performance.json`. Pass the raw report to `site-qa --lighthouse` to include it in a build QA report.
+
+## Inspect published WordPress metadata
+
+```sh
+seo-analysis wordpress inventory https://example.com/blog --resource pages --max-items 50
+```
+
+Pass the installation's exact HTTPS base URL, including its subdirectory if present. Public reads follow the site's robots policy. The run saves `wordpress.json` and `wordpress.csv` with selected metadata from published posts or pages. Yoast canonical and index directives appear when the REST API exposes them. Results reflect the selected item limit and any incomplete pages of API results.
+
+Use `--resource media` for attachment metadata, including source URL, alt text, MIME type, dimensions and attached post ID. Attachment files are not downloaded. Use `--resource types` to list supported REST registrations and then pass a custom type's slug, such as `--resource book`, to inventory its published items. Custom routes must be registered under `wp/v2`.
+
+For authorized access, create an Application Password for a dedicated WordPress user with the minimum access the site requires. Install the optional credential support, save the password with the interactive prompt and explicitly select authenticated inventory.
+
+```sh
+python -m pip install -e '.[wordpress]'
+seo-analysis wordpress connect https://example.com/blog
+seo-analysis wordpress inventory https://example.com/blog --resource posts --authenticated
+seo-analysis wordpress forget https://example.com/blog
+```
+
+Credentials are stored in the OS credential manager and scoped to the installation, workspace and optional `--project NAME`. The connector reads the selected REST route over HTTPS and stops at redirects. `forget` removes the saved copy locally. To revoke the Application Password itself, use WordPress's user profile screen.
 
 ## Workspace
 

@@ -120,7 +120,7 @@ def _store(ctx, report, warnings, status):
                                            for m in report["metrics"].values())}, "warnings": warnings}
 
 
-def _lab_report(ctx, summary, source, **extra):
+def lab_report(ctx, summary, source, **extra):
     warnings = []
     runtime_error = summary["runtime_error"]
     if runtime_error:
@@ -140,7 +140,7 @@ def pagespeed(ctx, request):
         raise ValueError("Save a Google performance API key first.")
     _, payload = _request(ctx, "GET", PSI_URL, key=key,
                           params={"url": target, "strategy": request.strategy, "category": "performance"})
-    return _lab_report(ctx, summarize_lighthouse(payload.get("lighthouseResult")), "PageSpeed Insights",
+    return lab_report(ctx, summarize_lighthouse(payload.get("lighthouseResult")), "PageSpeed Insights",
                        submitted_url=target, requested_strategy=request.strategy)
 
 
@@ -180,4 +180,4 @@ def crux(ctx, request):
 
 
 def lighthouse(ctx, request):
-    return _lab_report(ctx, import_lighthouse(request.report), "Local Lighthouse report")
+    return lab_report(ctx, import_lighthouse(request.report), "Local Lighthouse report")

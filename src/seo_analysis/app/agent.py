@@ -18,7 +18,8 @@ def run_snapshot_tool(workspace, tool_id, run_id, *, previous=None, check="all")
         path = Path(item["directory"])
         if (path.resolve() != workspace.runs_dir.resolve() / rid
                 or "snapshot.jsonl" not in item["manifest"]["artifacts"]
-                or (path / "snapshot.jsonl").is_symlink()):
+                or any((path / name).is_symlink() for name in
+                       ("snapshot.jsonl", "crawl_manifest.json", "persian_variants.json"))):
             raise ValueError("Select a managed crawl snapshot.")
         return str(path)
     current = snapshot(run_id)

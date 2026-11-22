@@ -14,7 +14,7 @@ DEFAULT_CONTENT_SELECTORS = [".entry-content", ".post-content", ".elementor-widg
                              "article", "main", "[role=main]", "#content"]
 HEADING_TAGS = ("h1", "h2", "h3", "h4", "h5", "h6")
 JS_NOTICE = re.compile(r"javascript|جاوا\s*اسکریپت", re.I)
-DEFAULT_EXCLUDE = ["nav", "footer", "header", "aside", "form", "[hidden]", "[role=navigation]"]
+EXCLUDED_TAGS = {"nav", "footer", "header", "aside", "form"}
 ROBOTS_NAMES = re.compile(r"^(robots|googlebot|googlebot-news|bingbot|msnbot|slurp|yandex|[\w-]*bot)$", re.I)
 
 
@@ -71,7 +71,13 @@ def extract_page(html: str, base_url: str, content_selector: str = "", exclude_s
     selectors = list(dict.fromkeys(filter(None, [content_selector, *DEFAULT_CONTENT_SELECTORS])))
     for t in soup(["head", "title", "script", "style", "noscript", "template", "svg", "iframe"]):
         t.decompose()
-    for selector in [*DEFAULT_EXCLUDE, *(exclude_selectors or ())]:
+    excluded = soup.find_all(
+        lambda tag: tag.name in EXCLUDED_TAGS or tag.has_attr("hidden") or tag.get("role") == "navigation"
+    )
+    for tag in excluded:
+        if tag.parent is not None:
+            tag.decompose()
+    for selector in exclude_selectors or ():
         try:
             excluded = soup.select(selector)
         except (ValueError, SyntaxError):

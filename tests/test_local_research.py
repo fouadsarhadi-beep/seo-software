@@ -6,7 +6,7 @@ from pathlib import Path
 from openpyxl import load_workbook
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-from seo_analysis.app.operations import ExportInput, ResearchInput, SiteQAInput, WorkbookInput
+from seo_analysis.app.operations import ExportInput, ResearchInput, ReviewInput, SiteQAInput, WorkbookInput
 from seo_analysis.app.runner import ToolRunner
 from seo_analysis.core import tools
 from seo_analysis.core.workspace import Workspace
@@ -16,9 +16,15 @@ from seo_analysis.web.crawl import CrawlConfig
 def test_local_exports_reporting_research_and_mcp(site, tmp_path):
     ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
     runner = ToolRunner(ws)
-    site.add("/map", f"<urlset><url><loc>{site.base}/page</loc></url></urlset>")
-    site.add("/page", "<html><title>Landing</title><main>صفحه</main></html>")
-    audit = runner.run(tools.AUDIT, CrawlConfig(site.base + "/map", "", allow_local=True, delay=0))
+    site.add("/map", f"<urlset><url><loc>{site.base}/page</loc></url><url><loc>{site.base}/other</loc></url></urlset>")
+    site.add("/page", "<html><title>Landing</title><main><h1>Shared heading</h1>صفحه</main></html>")
+    site.add("/other", "<html><title>Other</title><main><h1>Shared heading</h1>Other page</main></html>")
+    cfg = CrawlConfig(site.base + "/map", "", allow_local=True, delay=0)
+    audit = runner.run(tools.AUDIT, cfg)
+    review = runner.run(tools.REVIEW, ReviewInput(audit.out_dir), prompt=lambda _: "i")
+    assert review.counts["new_decisions"] == 1
+    site.add("/page", "<html><title>Updated page</title><main><h1>Shared heading</h1>صفحه</main></html>")
+    after = runner.run(tools.AUDIT, cfg)
 
     def ingest(kind, contents, ext="csv", observed="2026-01-01"):
         file = tmp_path / (kind + "." + ext)
@@ -51,7 +57,8 @@ def test_local_exports_reporting_research_and_mcp(site, tmp_path):
     assert series["samples"][1]["positions_gained"] == 1
     assert report["brief_candidates"][0]["query"] == "برنامه"
     assert report["questions"][0]["evidence"]["row"] == 1
-    wb = runner.run(tools.WORKBOOK, WorkbookInput(audit.out_dir, (gsc, ga4)))
+    looker = "https://lookerstudio.google.com/reporting/example"
+    wb = runner.run(tools.WORKBOOK, WorkbookInput(audit.out_dir, (gsc, ga4), report_url=looker))
     assert wb.counts["matches"] == {"requested": 2, "unmatched": 1}
     book = load_workbook(Path(wb.out_dir) / "report.xlsx", read_only=True)
     assert book.sheetnames == ["Crawl", "GSC 1", "GA4 2", "Sources"]
@@ -69,6 +76,9 @@ def test_local_exports_reporting_research_and_mcp(site, tmp_path):
                 "mcp",
                 "--allow-run",
                 audit.run_id,
+                "--allow-run", after.run_id,
+                "--allow-run", review.run_id,
+                "--allow-run", wb.run_id,
             ],
         )
         async with stdio_client(params) as (reader, writer), ClientSession(reader, writer) as session:
@@ -78,7 +88,7 @@ def test_local_exports_reporting_research_and_mcp(site, tmp_path):
                 "page_evidence", {"run_id": audit.run_id, "evidence_id": "page-000001"}
             )
             assert not response.isError and json.loads(response.content[0].text)["title"] == "Landing"
-            denied = await session.call_tool("run_summary", {"run_id": wb.run_id})
+            denied = await session.call_tool("run_summary", {"run_id": result.run_id})
             assert denied.isError
             checked = await session.call_tool(
                 "check_snapshot", {"run_id": audit.run_id, "check": "technical"}
@@ -86,6 +96,23 @@ def test_local_exports_reporting_research_and_mcp(site, tmp_path):
             assert not checked.isError
             derived = json.loads(checked.content[0].text)["run_id"]
             assert not (await session.call_tool("read_observations", {"run_id": derived})).isError
+
+            denied = await session.call_tool("compare_snapshots", {"before": result.run_id, "after": after.run_id})
+            assert denied.isError
+            changes = await session.call_tool("compare_snapshots", {"before": audit.run_id, "after": after.run_id})
+            assert not changes.isError
+            change_run = json.loads(changes.content[0].text)
+            assert change_run["counts"]["changed"] == 1
+            observed = await session.call_tool("read_observations", {"run_id": change_run["run_id"], "limit": 2})
+            assert not observed.isError and "Updated page" in str(observed.content)
+            decisions = await session.call_tool("read_decisions", {"run_id": review.run_id, "limit": 1})
+            assert not decisions.isError and "ignore" in str(decisions.content)
+            links = await session.call_tool("reporting_links", {"run_id": wb.run_id})
+            assert not links.isError and looker in str(links.content)
+            analysis = await session.call_tool("analyze_snapshot", {"run_id": audit.run_id})
+            assert not analysis.isError
+            pairs = await session.call_tool("read_content_pairs", {"run_id": json.loads(analysis.content[0].text)["run_id"]})
+            assert not pairs.isError and "same H1" in str(pairs.content)
 
     asyncio.run(verify())
 

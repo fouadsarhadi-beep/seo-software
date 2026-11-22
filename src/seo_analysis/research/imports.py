@@ -47,6 +47,7 @@ ALIASES = {
     "sessions": ("sessions", "organic sessions"),
     "conversions": ("conversions", "key events"),
     "title": ("title", "question", "post title", "topic"),
+    "published": ("published", "publication date", "pubdate"),
 }
 REQUIRED = {
     "keywords": ("query",),
@@ -59,23 +60,31 @@ REQUIRED = {
 METRICS = {"rank", "volume", "clicks", "impressions", "sessions", "conversions"}
 
 
+def feed_records(raw):
+    try:
+        root = ElementTree.fromstring(raw)
+    except ParseError as exc:
+        raise ValueError(f"Invalid feed XML: {exc}") from None
+    if root.tag.rsplit("}", 1)[-1].lower() not in ("rss", "feed", "rdf"):
+        raise ValueError("Expected an RSS or Atom feed.")
+    for entry in root.iter():
+        if entry.tag.rsplit("}", 1)[-1] not in ("entry", "item"):
+            continue
+        row = {"title": "", "url": "", "published": ""}
+        for tag in entry:
+            field = tag.tag.rsplit("}", 1)[-1]
+            if field == "title":
+                row["title"] = "".join(tag.itertext()).strip()
+            elif field == "link" and tag.get("rel", "alternate") == "alternate":
+                row["url"] = tag.get("href") or tag.text
+            elif field in ("published", "pubDate", "date") or (field == "updated" and not row["published"]):
+                row["published"] = (tag.text or "").strip()
+        yield row
+
+
 def records(path, raw, kind):
     if path.suffix.lower() in (".rss", ".atom", ".xml") and kind == "community":
-        try:
-            root = ElementTree.fromstring(raw)
-        except ParseError as exc:
-            raise ValueError(f"Invalid feed XML: {exc}") from exc
-        for entry in root.iter():
-            if entry.tag.rsplit("}", 1)[-1] not in ("entry", "item"):
-                continue
-            row = {}
-            for tag in entry:
-                field = tag.tag.rsplit("}", 1)[-1]
-                if field == "title":
-                    row["title"] = "".join(tag.itertext()).strip()
-                elif field == "link" and tag.get("rel", "alternate") == "alternate":
-                    row["url"] = tag.get("href") or tag.text
-            yield row
+        yield from feed_records(raw)
         return
     if path.suffix.lower() == ".xlsx":
         from openpyxl import load_workbook

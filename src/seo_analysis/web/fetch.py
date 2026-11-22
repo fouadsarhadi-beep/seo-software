@@ -54,6 +54,7 @@ class FetchResult:
     truncated: bool = False
     error: str = ""
     retries_used: int = 0
+    selected_headers: dict[str, str] = field(default_factory=dict)
 
     @property
     def text(self) -> str:
@@ -178,7 +179,7 @@ class Fetcher:
         resp.close()
         res.raw = b"".join(chunks)
 
-    def get(self, url: str) -> FetchResult:
+    def get(self, url: str, *, follow_redirects=True, header_names=()) -> FetchResult:
         res = FetchResult(requested_url=url)
         current, seen = url, set()
         for hop in range(self.max_redirects + 1):
@@ -200,6 +201,10 @@ class Fetcher:
             loc = resp.headers.get("Location")
             if resp.status_code in REDIRECTS and loc:
                 resp.close()
+                if not follow_redirects:
+                    res.redirect_note, res.final_url = "redirect_not_followed", current
+                    res.final_status = resp.status_code
+                    return res
                 try:
                     nxt = urljoin(current, loc)
                 except ValueError:
@@ -213,6 +218,7 @@ class Fetcher:
                 current = nxt
                 continue
             try:
+                res.selected_headers = {name: resp.headers[name] for name in header_names if name in resp.headers}
                 self._read_final(resp, res, current)
             except (requests.RequestException, HTTPError) as exc:
                 res.error = f"Response interrupted: {type(exc).__name__}"

@@ -40,4 +40,20 @@ CRUX = ToolSpec("google.crux", "google crux",
                 "Read Chrome UX Report field metrics for a public URL or origin.", uses_network=True)
 LIGHTHOUSE = ToolSpec("performance.lighthouse", "lighthouse-report", "Import a local Lighthouse JSON report.")
 
-BUILTIN_TOOLS = (PAGESPEED, CRUX, LIGHTHOUSE, GA4_LANDING_PAGES, SEARCH_ANALYTICS, URL_INSPECTION, IMPORT, RESEARCH, WORKBOOK, SITE_QA, CHECK, COMPARE, DOCTOR, CRAWL, AUDIT, ANALYZE, VARIANTS, REVIEW, CALIBRATE)
+DATASET_EXPORT = ToolSpec("report.export-dataset", "export-dataset", "Prepare selected dataset columns as CSV and XLSX.")
+SHEETS_PUBLISH = ToolSpec("google.publish-sheets", "google publish-sheets",
+                          "Publish a reviewed export into a new Google spreadsheet.", uses_network=True)
+
+PUBLIC_FEED = ToolSpec("research.feed", "research-feed", "Sample one public RSS or Atom feed.", uses_network=True)
+BRAVE_SEARCH = ToolSpec("research.brave-search", "research-search",
+                       "Capture one page of Brave web search results.", uses_network=True)
+
+WORDPRESS = ToolSpec("cms.wordpress-inventory", "wordpress inventory",
+                     "Read WordPress post, media and registered type metadata.", uses_network=True)
+
+BROWSER_QA = ToolSpec("quality.browser", "browser-qa", "Capture a Chromium screenshot and optional axe report for a local build.")
+
+LOCAL_LIGHTHOUSE = ToolSpec("performance.lighthouse-run", "lighthouse-run",
+                           "Generate a Lighthouse lab report for a trusted local build.")
+
+BUILTIN_TOOLS = (LOCAL_LIGHTHOUSE, BROWSER_QA, WORDPRESS, PUBLIC_FEED, BRAVE_SEARCH, DATASET_EXPORT, SHEETS_PUBLISH, PAGESPEED, CRUX, LIGHTHOUSE, GA4_LANDING_PAGES, SEARCH_ANALYTICS, URL_INSPECTION, IMPORT, RESEARCH, WORKBOOK, SITE_QA, CHECK, COMPARE, DOCTOR, CRAWL, AUDIT, ANALYZE, VARIANTS, REVIEW, CALIBRATE)

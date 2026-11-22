@@ -48,4 +48,33 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 
 - Stage E, Step 4 — Added standalone Lighthouse report import, PageSpeed Insights lab tests and CrUX field queries on 2026-11-22. Mocked responses verified separation of lab and field metrics, missing measurements, collection periods and unavailable records. The live keyless PageSpeed check returned HTTP 429.
 
-The next integration milestone is Stage E, Step 5. [Current scope and remaining work](IMPLEMENTATION_STATE.md#stage-e-handoff)
+- Stage E, Step 5 — Added offline CSV and Excel previews and checksum-approved Google Sheets publication on 2026-11-22. Mocked responses verified app-file consent, literal cell writes, upload retry and duplicate avoidance after an uncertain create result. Live publication requires a Sheets connection.
+
+## Live research sources
+
+- Stage F, Steps 2, 3 and 5 — Added one-page Brave Search samples and bounded public RSS and Atom retrieval on 2026-11-22. Both feed the existing research dataset format. Verified feed retrieval with a local HTTP fixture and Brave with mocked responses. Live benchmarking needs a Brave key on a plan permitting storage. The cloud could not establish a direct connection for the W3C feed check.
+
+## Content planning and competitor evidence
+
+- Stage G, Steps 2 and 3 — Added sample-scoped keyword clusters, evidence-linked editorial briefs, Search Console refresh candidates and comparisons from selected owned and competitor crawl runs on 2026-11-22. CLI tests cover Persian queries, missing versus zero values, duplicate source rows and links to both crawl and SERP evidence.
+
+## CMS and site quality
+
+- Stage H, Step 1 — Added a read-only inventory of published WordPress posts and pages and installation-scoped Application Password storage on 2026-11-22. Verified bounded pagination, credential isolation, metadata shaping and redirect refusal with fixtures. Live authorization, media and custom types remain open.
+
+- Stage H, Step 3 — Added local Chromium screenshots, navigation timings, optional axe checks and approved baseline comparisons on 2026-11-22. Verified the CLI against a local HTML fixture with Chromium and axe-core 4.11.1.
+
+- Stage H, Step 1 follow-up — Added WordPress media metadata and registered custom post type inventory on 2026-11-22. Fixtures verify media field selection, catalogue filtering and same-installation route selection.
+
+## Scoped agent workflows
+
+- Stage I, Steps 1–3 — Added MCP crawl comparisons, content analysis, paginated reads of saved decisions and retrieval of existing Sheets and Looker Studio links on 2026-11-22. A stdio client verified the allowlist, derived runs and report evidence.
+
+## Performance and distribution checkpoint
+
+- Stage J, Steps 1–2 — Profiled a 300-page audit fixture and replayed ten saved real pages on 2026-11-22. Consolidated default HTML exclusions into one traversal. The fixture's median audit time moved from 2.10 seconds to 1.77 seconds and real-page extraction results matched exactly.
+- Stage J, Step 4 — Built the 0.4.0 Python wheel and extended the cross-platform CI smoke test to run static site QA outside the checkout on 2026-11-22.
+
+- Stage H, Step 3 follow-up — Added the local Lighthouse runner on 2026-11-22. Lighthouse 13.6 and Chromium 156 produced six lab measurements from a local fixture. The HTTP fixture verified that external requests and paths outside the build are refused.
+
+[Current scope and remaining work](ROADMAP.md)
