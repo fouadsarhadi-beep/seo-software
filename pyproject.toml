@@ -24,6 +24,9 @@ dependencies = [
     "requests>=2.32,<3",
 ]
 
+[project.optional-dependencies]
+google = ["google-auth-oauthlib>=1.5,<2", "keyring>=25,<26"]
+
 [project.scripts]
 seo-analysis = "seo_analysis.cli:main"
 

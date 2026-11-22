@@ -257,11 +257,56 @@ def cmd_snapshot(args):
     return execute(args, tools.COMPARE, CompareInput(before, after))
 
 
+def cmd_google(args):
+    from seo_analysis.connectors.google import GoogleConnection
+
+    connection = GoogleConnection(args.workspace, args.project, args.service)
+    if args.operation == "connect":
+        def choose(properties):
+            if not properties:
+                raise ValueError("Google returned no accessible properties for this account.")
+            if args.property_id is not None:
+                return args.property_id
+            if not sys.stdin.isatty():
+                raise ValueError("Pass --property ID when connecting from a noninteractive terminal.")
+            choices = sorted(properties)
+            for index, property_id in enumerate(choices, 1):
+                print(f"{index}. {properties[property_id]} ({property_id})")
+            answer = input("Property number: ").strip()
+            if not answer.isdecimal() or not 1 <= int(answer) <= len(choices):
+                raise ValueError("Choose one of the listed property numbers.")
+            return choices[int(answer) - 1]
+        if args.property_id is None and not sys.stdin.isatty():
+            raise ValueError("Pass --property ID when connecting from a noninteractive terminal.")
+        selected = connection.connect(args.client_file, choose)
+    elif args.operation == "disconnect":
+        connection.disconnect(revoke=args.revoke)
+        selected = None
+    else:
+        selected = connection.selected()
+    print(json.dumps({"service": args.service, "project": args.project, "selected": selected}, ensure_ascii=False))
+    return 0
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="seo-analysis", description="Analytics-only SEO audit tools. You make the decisions.")
     p.add_argument("--version", action="version", version=__version__)
     p.add_argument("--config-file", type=Path, help="application workspace settings (TOML)")
     sub = p.add_subparsers(dest="cmd", required=True)
+
+    google = sub.add_parser("google", help="manage read-only Google property connections")
+    google_actions = google.add_subparsers(dest="operation", required=True)
+    connect = google_actions.add_parser("connect", help="authorize and select a property on this computer")
+    connect.add_argument("--client-file", type=Path, required=True, help="OAuth client JSON for a Desktop app")
+    connect.add_argument("--property", dest="property_id", help="select this property ID without a numbered prompt")
+    status = google_actions.add_parser("status", help="show the locally selected property")
+    disconnect = google_actions.add_parser("disconnect", help="remove local Google credentials and property selection")
+    disconnect.add_argument("--revoke", action="store_true", help="also revoke the grant with Google")
+    for command in (connect, status, disconnect):
+        command.add_argument("service", choices=("gsc", "ga4"))
+        command.add_argument("--project", help="scope the connection to an existing project")
+        command.set_defaults(func=cmd_google)
+
 
     mcp = sub.add_parser("mcp", help="serve selected local run evidence over stdio")
     mcp.add_argument("--allow-run", required=True, action="append")

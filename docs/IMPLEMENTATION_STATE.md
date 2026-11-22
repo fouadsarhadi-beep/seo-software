@@ -17,7 +17,7 @@
 | --- | --- | --- |
 | C3–C5 | Run eight technical checks on captured observations, compare same-origin snapshots, reopen changed review pairs and invoke offline tools by workspace run ID. | JSON-LD covers syntax and observed types. Rich-result eligibility requires additional rules. |
 | D | Run and monitor a website audit through a loopback browser UI, cancel acquisition and inspect completed observations, review history, drill into evidence, download files and manage projects and targets. | Research, build QA and reporting are launched from the CLI. Their results appear in history. |
-| E | Import Search Console and GA4 exports and produce a local Excel report. Every row carries a match status. Ambiguous URLs, unattributed queries and unmatched rows remain visible. | OS-backed credentials, consent, live property selection, GSC and GA4 validation, URL Inspection, PSI, CrUX and Sheets publication. |
+| E | Import Search Console and GA4 exports and produce a local Excel report. Every row carries a match status. Ambiguous URLs, unattributed queries and unmatched rows remain visible. | Live verification of consent and property selection, GSC and GA4 data retrieval, URL Inspection, PSI, CrUX and Sheets publication. |
 | F | Normalize local CSV, TSV, XLSX, RSS and Atom. Keep source hash, column mapping, date, locale, device, import limits and row references. | Provider benchmarking, permitted live feed retrieval and the browser account export adapter. |
 | G | Normalize keywords, compare sampled competitor coverage, find shared search results, follow rank across comparable captures, collect community topics and group imported backlinks by referring host. Brief candidates link to the observed pages. | Broader topical clustering, completed editorial briefs, refresh prioritization and selected competitor page analysis. |
 | H | Inspect static HTML and local asset paths, import Lighthouse and axe reports, count status codes by path in common/combined access logs and compare two explicitly selected PNGs. | WordPress REST authorization, automated browser capture and generating fresh Lighthouse/axe measurements. |
@@ -36,7 +36,7 @@ On the deterministic 600-page synthetic corpus, three runs of content preparatio
 
 ## Stage E handoff
 
-Stages A–D cover the local audit workflow. Stage E starts with E1 in the architecture. It calls for OS-backed credentials, OAuth consent and least-privilege property selection. Existing local imports and joins provide fixtures for later connected reporting.
+Stage E1 implements read-only consent for Search Console and GA4 separately, property selection by workspace or project, and local disconnect with optional Google revocation. OAuth uses Google's installed-app library with PKCE and a loopback callback. The OS credential manager holds the refresh token and client secret. SQLite holds property metadata. Automated tests exercise the schema migration, scoped selection, and disconnect with a substitute credential store. A local Desktop OAuth client, credential manager and property owner are required for the live check. Stage E2 adds Search Analytics retrieval.
 
 ## Coverage and inputs
 
@@ -45,6 +45,6 @@ A live sample from samatoos.ir confirmed that a theme can place an empty `main` 
 
 Each audit records the HTTP requests attempted and the pages actually observed. A page seen in only one snapshot can reflect a crawl limit. When older snapshots lack markup, applicable checks report partial coverage. SERP overlap uses observations with the same provider, capture date, locale and device. Rank history uses the best imported position per host and capture date, with changes between observed samples. Aggregated competitor counts describe the combined selected sample. For a single market or device, select the corresponding datasets.
 
-All account connections and publication remain deferred at the owner's request. The verified reporting route uses selected local files. A fresh account connection, permission model and live provider test are required for the connected Stage E milestone.
+The verified reporting route uses selected local files. The connected Stage E reporting milestone requires a live provider test.
 
 [Architecture](../SEO_ANALYSIS_SOFTWARE_ARCHITECTURE.md) · [Foundation decision](adr/0001-foundation.md)

@@ -11,7 +11,7 @@ from seo_analysis.app.operations import AnalysisInput
 from seo_analysis.app.runner import ToolRunner
 from seo_analysis.core import tools
 from seo_analysis.core.workspace import Workspace
-from seo_analysis.storage.history import History
+from seo_analysis.storage.history import History, MIGRATIONS
 from seo_analysis.web.crawl import CrawlConfig
 
 
@@ -76,7 +76,7 @@ def test_migration_is_concurrent_and_rejects_newer_schema(tmp_path):
         list(pool.map(db.add_project, ["one", "two", "three", "four"]))
     assert len(db.projects()) == 4
     with sqlite3.connect(db.path) as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 1
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS)
         conn.execute("PRAGMA user_version=40")
     with pytest.raises(ValueError, match="newer"):
         db.projects()

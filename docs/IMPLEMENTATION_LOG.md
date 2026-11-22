@@ -38,4 +38,8 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 - Stage I, Steps 1–3 (partial) — Added a scoped MCP server for selected runs and optional Looker Studio report links in workbook metadata on 2026-11-22.
 - Stage J, Steps 1 and 2 (partial) — Benchmarked and optimized offline content comparison on 2026-11-22. Built and tested the 0.3.0 Python wheel on Linux.
 
-The next integration milestone is Stage E, Step 1. [Current scope and remaining work](IMPLEMENTATION_STATE.md#stage-e-handoff)
+## Connected Google work
+
+- Stage E, Step 1 — Added separate read-only Google consent flows, OS credential storage, property selection and disconnect on 2026-11-22. Verified the flow with simulated consent and API responses. Live authorization is awaiting an owner's property and Desktop OAuth client.
+
+The next integration milestone is Stage E, Step 2. [Current scope and remaining work](IMPLEMENTATION_STATE.md#stage-e-handoff)

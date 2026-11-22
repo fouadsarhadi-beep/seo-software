@@ -98,6 +98,28 @@ seo-analysis history reindex
 
 History includes ad hoc runs. `history show` resolves artifact paths and page evidence within a run. `history reindex` rebuilds index entries from manifests, skips active writers and recovers completed observations from a process that exited before finalization. The recovered run shows incomplete coverage. Saved targets use website input by default. Specify `--kind sitemap` to save a sitemap URL.
 
+## Connect a Google property
+
+Install the optional dependencies on the computer where you will give consent. On Windows, use the virtual environment's Python. On Linux, an unlocked Secret Service or KWallet must be available in your desktop session.
+
+```sh
+python -m pip install -e '.[google]'
+```
+
+In Google Cloud, enable the Search Console API for `gsc` or the Google Analytics Admin API for `ga4`. Configure the OAuth consent screen and create an OAuth client of type **Desktop app**. If the consent screen is in testing mode, add the Google account as a test user. Download the client JSON to a private location outside the repository.
+
+```sh
+seo-analysis google connect gsc --client-file path/to/desktop-client.json
+seo-analysis google status gsc
+seo-analysis google disconnect gsc
+```
+
+Sign in and grant the requested read-only permission in the browser on the same computer, then select one of the properties printed in the terminal. Use `--property sc-domain:example.com` or `--property properties/123456789` to provide the exact property ID instead of choosing from the numbered list. The same commands accept `ga4` for Analytics. Add `--project NAME` to keep a connection with an existing project.
+
+The credential manager holds the refresh token and OAuth client secret. SQLite holds the selected property's ID and display name. Moving the workspace to a different path or computer requires reconnecting. For a grant you also want to remove from your Google account, pass `--revoke` to disconnect. Google may revoke other grants for the same account and OAuth project.
+
+This milestone covers authorization and property selection. Use the file import workflow above to analyze or report on Google data.
+
 ## Workspace
 
 Run `system doctor` to locate the configuration, data, run and export directories. Configuration is optional. To customize paths, copy [config.example.toml](config.example.toml) to the reported config path, or select a file with `seo-analysis --config-file "<path>" system doctor`. Relative directory settings resolve beside the configuration file. When all commands have exited, back up the config file and complete data directory, including history.sqlite3 and runs/. Restore them to the locations reported by doctor. Reindexing recovers run records from manifests. The database backup also preserves projects and targets that have never been used. To start a fresh workspace, select a new data directory.
