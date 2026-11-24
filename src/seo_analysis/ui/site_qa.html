@@ -1,0 +1,66 @@
+{% if view == 'site_qa_form' %}
+<h1>Local build QA</h1>
+<div class="links"><a href="/tools">Back to tools</a><a href="/tools/browser-qa">Capture browser screenshot</a></div>
+{% if error %}<p role="alert"><strong>{{error}}</strong></p>{% endif %}
+<section>
+<form method="post" action="/tools/site-qa">
+{{csrf()}}
+<label for="build-folder">Build folder</label>
+<input id="build-folder" name="directory" required value="{{values.get('directory', '')}}" style="width:min(100%,640px)">
+<p>Enter the full path to the folder containing your generated HTML files.</p>
+<details{% if error %} open{% endif %}>
+<summary>Optional report and evidence files</summary>
+{% for name, label in [('lighthouse','Lighthouse JSON'), ('axe','axe JSON'), ('access_log','Access log'), ('baseline','Approved baseline PNG'), ('screenshot','Current screenshot PNG')] %}
+<label for="qa-{{name}}">{{label}}</label>
+<input id="qa-{{name}}" name="{{name}}" value="{{values.get(name, '')}}" style="width:min(100%,640px)">
+{% endfor %}
+</details>
+<button>Inspect build</button>
+</form>
+</section>
+{% else %}
+<h1>Build QA results</h1>
+<div class="links">
+<a href="/tools/site-qa">Inspect another build</a>
+<a href="/tools/browser-qa">Capture browser screenshot</a>
+{% for name, label in [('site-qa.csv','Findings CSV'), ('site-qa.json','QA report JSON'), ('changed-pixels.png','Changed pixels PNG')] if name in run.artifacts %}
+<a href="/runs/{{rid}}/files/{{name}}">{{label}}</a>
+{% endfor %}
+</div>
+<p><strong>{{run.status|capitalize}}</strong>{% if report %} · {{run.counts.pages}} HTML files · {{run.counts.findings}} findings{% endif %}</p>
+{% for warning in run.warnings %}<p>{{warning}}</p>{% endfor %}
+{% if report %}
+<p>{{report.root}}</p>
+{% if report.skipped %}<ul>{% for reason, count in report.skipped.items() %}<li>{{reason|capitalize}} · {{count}}</li>{% endfor %}</ul>{% endif %}
+<h2>Build findings</h2>
+{% if findings %}
+<div class="table"><table>
+<tr><th>Build file</th><th>Observation</th><th>Reference</th></tr>
+{% for file, observation, reference in findings %}<tr><td>{{file}}</td><td>{{observation|replace('_',' ')|replace('-',' ')|capitalize}}</td><td>{{reference}}</td></tr>{% endfor %}
+</table></div>{{pages()}}
+{% else %}<p>No build findings were recorded.</p>{% endif %}
+{% set reports = report.imported_reports %}
+{% if reports.lighthouse %}
+<h2>Lighthouse lab data</h2>
+<p>{{reports.lighthouse.source_file}}{% if reports.lighthouse.device %} · {{reports.lighthouse.device}}{% endif %}</p>
+<ul>{% for label, metric in reports.lighthouse.metrics.items() if metric.value is not none %}<li>{{label}} · {{metric.value}} {{metric.unit}}</li>{% else %}<li>No lab timings available.</li>{% endfor %}</ul>
+{% endif %}
+{% if reports.axe %}
+<h2>Accessibility</h2>
+<p>{{reports.axe.source_file}}</p>
+<ul>{% for item in reports.axe.violations %}<li>{{item.id}} · {{item.impact or 'impact unknown'}} · {{item.nodes}} affected nodes</li>{% else %}<li>No violations recorded in this report.</li>{% endfor %}</ul>
+{% endif %}
+{% if reports.visual_comparison %}
+<h2>Screenshot comparison</h2>
+<p>{{reports.visual_comparison.changed_pixels}} of {{reports.visual_comparison.total_pixels}} pixels changed.</p>
+{% endif %}
+{% if reports.access_log %}
+<h2>Access log summary</h2>
+<p>{{reports.access_log.source_file}} · {{reports.access_log.skipped}} lines skipped</p>
+<div class="table"><table><tr><th>Path</th><th>Status</th><th>Requests</th></tr>
+{% for row in reports.access_log.observations[:20] %}<tr><td>{{row.path}}</td><td>{{row.status}}</td><td>{{row.requests}}</td></tr>{% endfor %}
+</table></div>
+{% if reports.access_log.observations|length > 20 %}<p>Download the QA report for the full summary.</p>{% endif %}
+{% endif %}
+{% endif %}
+{% endif %}

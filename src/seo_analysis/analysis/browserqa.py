@@ -29,6 +29,7 @@ class BrowserQAInput:
     axe_script: str = ""
     baseline: str = ""
     chromium: str = ""
+    baseline_run_id: str = ""
 
 
 def build_file(root, url_path):
@@ -179,6 +180,8 @@ def browser_qa(ctx, request):
               "resource_observations": dict(failures), "axe_report": "axe.json" if axe_source else None}
     if request.baseline:
         report["visual_comparison"] = compare_screenshots(ctx, request.baseline, screenshot)
+        if request.baseline_run_id:
+            report["visual_comparison"]["baseline_run_id"] = request.baseline_run_id
     write_json(ctx.directory / "browser-qa.json", report)
     warnings = ["Timings describe the local Chromium run. They vary by machine and build."]
     warnings.extend(f"{label}: {count}" for label, count in failures.items())

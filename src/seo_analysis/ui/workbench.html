@@ -4,7 +4,7 @@
 *{box-sizing:border-box}body{margin:0;background:#f5f5ef;color:#20291f;font:16px/1.5 "Inter",system-ui,sans-serif}header{background:#1c3229;color:#fff;padding:18px max(5vw,20px);display:flex;align-items:center;gap:38px}header strong{letter-spacing:-.04em;font-size:22px}nav{display:flex;gap:22px}header a{color:#f0f4df;text-decoration:none}main{max-width:1060px;margin:44px auto;padding:0 24px 70px}h1,h2{letter-spacing:-.045em;line-height:1.1}h1{font-size:clamp(38px,6vw,64px);margin:0 0 30px}h2{font-size:26px;margin:32px 0 16px}section{padding:24px;background:white;border:1px solid #d8ddd0;border-radius:12px}label{display:block;font-weight:600;margin-bottom:5px}input,select,button{font:inherit;border-radius:5px;padding:10px;border:1px solid #acb7aa}input[type=url]{width:min(100%,570px)}input[type=number]{width:94px}button{background:#285339;color:white;border:0;cursor:pointer;padding:11px 20px;font-weight:650}form>*{margin:4px 0}details{margin:14px 0}summary{cursor:pointer}.line,.links{display:flex;gap:12px;flex-wrap:wrap;align-items:center}.table{overflow:auto}table{border-collapse:collapse;width:100%;font-size:14px}td,th{padding:12px 8px;border-bottom:1px solid #d8ddd0;text-align:left;vertical-align:top}th{font-size:12px;color:#576754}a{color:#215a39;text-underline-offset:3px}small{color:#536553}code,pre{font:13px/1.4 ui-monospace,monospace}pre{white-space:pre-wrap;overflow-wrap:anywhere}.count{font-size:24px}.links{margin-top:16px}p{overflow-wrap:anywhere}@media(max-width:600px){header{gap:14px;flex-wrap:wrap}nav{gap:12px}main{padding:0 14px}section{padding:15px}}
 
 form.compact{margin:0}button.secondary{background:#edf1ea;color:#254832;border:1px solid #acb7aa;padding:5px 10px}.help{display:block;margin:0 0 12px 25px}.metrics{display:flex;gap:10px 24px;flex-wrap:wrap;margin:16px 0}.metrics strong{font-size:20px}.downloads{margin:20px 0 32px}.project-list li{margin:10px 0}
-</style></head><body><header><strong>SEO Analysis</strong><nav><a href="/">Workbench</a><a href="/history">History</a><a href="/projects">Projects</a></nav></header><main>
+</style></head><body><header><strong>SEO Analysis</strong><nav style="flex-wrap:wrap"><a href="/">Workbench</a><a href="/history">History</a><a href="/projects">Projects</a><a href="/tools">Tools</a></nav></header><main>
 {% macro csrf() %}<input type="hidden" name="token" value="{{ token }}">{% endmacro %}
 {% macro pages() %}
 <div class="links">
@@ -65,6 +65,10 @@ form.compact{margin:0}button.secondary{background:#edf1ea;color:#254832;border:1
 {% elif view in ('compare', 'comparison') %}{% include 'comparison.html' %}
 {% elif view in ('review', 'review_pair') %}{% include 'review.html' %}
 {% elif view in ('report_form', 'report_preview') %}{% include 'workbook.html' %}
+{% elif view in ('tools', 'research_form', 'research_result', 'dataset', 'dataset_row') %}{% include 'research.html' %}
+{% elif view in ('site_qa_form', 'site_qa_result') %}{% include 'site_qa.html' %}
+{% elif view in ('browser_qa_form', 'browser_qa_result') %}{% include 'browser_qa.html' %}
+{% elif view=="workflow_form" %}{% include 'workflow.html' %}
 {% elif view=="projects" %}
 <h1>Projects</h1>
 {% if projects %}
@@ -97,6 +101,23 @@ form.compact{margin:0}button.secondary{background:#edf1ea;color:#254832;border:1
 </form>
 </details>
 </section>
+<h2>Saved audit workflows</h2>
+{% if workflows %}
+<div class="table"><table>
+<tr><th>Workflow</th><th>Target</th><th>Crawl options</th><th>Action</th></tr>
+{% for item in workflows %}
+<tr><td><strong>{{item.name}}</strong></td><td>{{item.target}}<br>{{item.url}}</td>
+<td>Up to {{item.page_limit}} {{'page' if item.page_limit == 1 else 'pages'}}{% if item.link_crawl %}<br>Follow links if no sitemap{% endif %}</td>
+<td><form class="compact" method="post" action="/workflows/{{item.id}}/run">
+{{csrf()}}
+<button class="secondary">Run workflow</button>
+<details><summary>Local or staging site</summary><label><input type="checkbox" name="local"> Allow local or private-network access for this run</label></details>
+</form><a href="/workflows/{{item.id}}/edit">Edit workflow</a></td></tr>
+{% endfor %}
+</table></div>
+{% elif targets %}<p>No saved workflows for this project.</p>
+{% else %}<p>Add a target to save an audit workflow.</p>{% endif %}
+{% if targets %}<p><a href="/workflows/new?project={{project|urlencode}}">Create audit workflow</a></p>{% endif %}
 {% elif view=="job" %}<h1>Audit progress</h1><section><strong>{{job.status}}</strong><p>{{job.detail}}</p>{% if job.status in ("queued","running") %}{% if job.cancel.is_set() %}<p>Cancellation requested.</p>{% else %}<form method="post" action="/jobs/{{jid}}/cancel">{{csrf()}}<button>Cancel audit</button></form>{% endif %}{% endif %}</section>
 {% elif view=="result" %}
 <h1>Run results</h1>
@@ -115,6 +136,9 @@ form.compact{margin:0}button.secondary{background:#edf1ea;color:#254832;border:1
 <p>{{check_labels.get(run.parameters.check, 'All checks')}} · Based on saved crawl data.</p>
 {% else %}
 <p>{{run.parameters.source or run.parameters.sitemap or ''}}</p>
+{% if run.parameters.workflow %}
+<p>Workflow <a href="/workflows/{{run.parameters.workflow.id}}/edit">{{run.parameters.workflow.name}}</a> · Up to {{run.parameters.limit}} {{'page' if run.parameters.limit == 1 else 'pages'}}{% if run.parameters.link_crawl %} · Follow links if no sitemap{% endif %}</p>
+{% endif %}
 {% if 'snapshot.jsonl' in run.artifacts and run.tool_id in ('seo.audit', 'web.crawl') %}
 <form class="line" method="post" action="/runs/{{rid}}/checks">
 {{csrf()}}

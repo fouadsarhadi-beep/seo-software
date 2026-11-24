@@ -31,6 +31,13 @@ MIGRATIONS = [
                property_name TEXT NOT NULL, PRIMARY KEY(project, service))""",
     ),
     ("ALTER TABLE runs ADD COLUMN archived INTEGER NOT NULL DEFAULT 0",),
+    (
+        """CREATE TABLE audit_workflows (
+               id TEXT PRIMARY KEY, project TEXT NOT NULL, target TEXT NOT NULL, name TEXT NOT NULL,
+               page_limit INTEGER NOT NULL CHECK(page_limit BETWEEN 1 AND 500),
+               link_crawl INTEGER NOT NULL CHECK(link_crawl IN (0, 1)), UNIQUE(project, name),
+               FOREIGN KEY(project, target) REFERENCES targets(project, name))""",
+    ),
 ]
 
 
@@ -99,6 +106,38 @@ class History:
                 if row is None:
                     raise ValueError("Unknown target in this project.")
                 return dict(row)
+
+    def audit_workflows(self, project=None):
+        with self.transaction() as db:
+            return [dict(row) for row in db.execute("""SELECT w.*, t.url FROM audit_workflows w
+                JOIN targets t ON t.project=w.project AND t.name=w.target
+                WHERE (? IS NULL OR w.project=?) ORDER BY w.project, w.name""", (project, project))]
+
+    def audit_workflow(self, workflow_id):
+        with self.transaction() as db:
+            row = db.execute("""SELECT w.*, t.url, t.kind FROM audit_workflows w
+                JOIN targets t ON t.project=w.project AND t.name=w.target WHERE w.id=?""", (workflow_id,)).fetchone()
+            if row is None:
+                raise ValueError("Unknown audit workflow.")
+            return dict(row)
+
+    def save_audit_workflow(self, workflow_id, project, target, name, page_limit, link_crawl, *, editing=False):
+        name = name.strip()
+        if not name:
+            raise ValueError("Enter a workflow name.")
+        if not 1 <= page_limit <= 500:
+            raise ValueError("Choose between 1 and 500 pages.")
+        with self.transaction() as db:
+            if not db.execute("SELECT 1 FROM targets WHERE project=? AND name=?", (project, target)).fetchone():
+                raise ValueError("Choose a saved target from this project.")
+            if editing:
+                changed = db.execute("""UPDATE audit_workflows SET target=?, name=?, page_limit=?, link_crawl=?
+                    WHERE id=? AND project=?""", (target, name, page_limit, link_crawl, workflow_id, project)).rowcount
+                if not changed:
+                    raise ValueError("Unknown audit workflow.")
+            else:
+                db.execute("INSERT INTO audit_workflows VALUES (?, ?, ?, ?, ?, ?)",
+                           (workflow_id, project, target, name, page_limit, link_crawl))
 
     def google_connection(self, project, service):
         with self.transaction() as db:

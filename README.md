@@ -61,6 +61,17 @@ Each execution receives its own run directory. Use the analysis directory printe
 
 **Projects** lists saved projects. Open **Create project** to enter a name and optionally save a website. Open a project to view its targets or add another. In **History**, use **Archive** to hide a run from the history and recent-runs lists. You can open or restore it under **View archived runs**. Its evidence and files remain available.
 
+Use **Create audit workflow** inside a project to save a target, page cap and link-crawl fallback. Run or edit it from the project. Each run records the workflow name and its settings. For a trusted local or staging site, enable private-network access on the individual run.
+
+### Run a saved workflow from a scheduler
+
+```text
+seo-analysis workflow list --project "My project"
+seo-analysis workflow run <workflow-id> --json
+```
+
+Use the saved ID to run an audit without prompts. For Windows Task Scheduler, use the installed `seo-analysis.exe` as the program and `workflow run <workflow-id> --json` as the arguments. Run the task as the user whose workbench owns the workflow, with the same workspace configuration. If you use a custom configuration, put `--config-file "C:\path\to\config.toml"` before `workflow` in the arguments. Set the trigger and use **Do not start a new instance** for overlapping task runs. The app also prevents the same workflow from running concurrently from the CLI and workbench. Runs appear in the usual History. Exit code `3` means the audit saved partial results.
+
 Audit results show the sampled coverage and link to the findings CSV, page inventory CSV and text report under **Downloads**. Expand **Technical files** for the raw data and request log. The local or private-network crawl option applies to one audit of a trusted local site, internal staging site or test server on a nonstandard port.
 
 Open a saved audit from **History**, select **All checks** or an individual check, and click **Run technical checks**. The report uses the saved snapshot and appears as a separate run with a CSV and links to the original page evidence. Search and filters narrow the visible findings, observations and crawled URLs. The downloads contain the full reports.
@@ -81,7 +92,9 @@ Omit `--check` to run all eight checks. A broken-link result requires an observe
 
 ## Research and reports from local exports
 
-For a report in the browser, open a saved audit and choose **Create Excel report**. Import or select Search Console and GA4 exports, then choose **Preview matches**. The preview shows example rows and links to their crawl evidence. The Excel download contains every imported row and its match status.
+For a report in the browser, open a saved audit and choose **Create Excel report**. Import or select Search Console and GA4 exports, or select datasets from previous API pulls. Choose **Preview matches** to see example rows and links to their crawl evidence. The Excel download contains each dataset row and its match status.
+
+For keyword and competitor research in the browser, open **Tools → Keyword and competitor research**. Import an export or select saved datasets, enter the owned hostname, and run the report. Open a query to see its observations and source rows. Use the same provider, locale and device for comparable rank samples.
 
 Import an export with its source and observation date. Use `--period-start` for an aggregated measurement and `--locale` and `--device` for search results. Each import prints a dataset run ID. CSV, TSV and the active worksheet in XLSX are supported. Community imports also accept local RSS or Atom feeds. Map custom column headers with `--columns`, a JSON object from normalized field names to original headers.
 
@@ -122,6 +135,8 @@ seo-analysis history reindex
 History includes ad hoc runs. `history show` resolves artifact paths and page evidence within a run. `history reindex` rebuilds index entries from manifests, skips active writers and recovers completed observations from a process that exited before finalization. The recovered run shows incomplete coverage. Saved targets use website input by default. Specify `--kind sitemap` to save a sitemap URL.
 
 ## Collect live research samples
+
+In the workbench, open **Tools → Keyword and competitor research** and choose **Sample a public RSS or Atom feed**. Enter a public feed URL and the maximum number of entries to save. Open the dataset to inspect its source rows or download the request log. Brave samples captured with the CLI also appear in **Saved datasets**.
 
 Brave Search is an optional source for keyword and competitor research. It samples which pages rank for a query in Brave's web results. Saved samples can help compare competing sites, group queries with overlapping results, or track observed ranking changes across comparable dates. The website audit runs independently, and Google rankings require a separate source.
 
@@ -229,6 +244,10 @@ Use the same `--project NAME` for preparing, connecting and publishing when work
 If a cell upload fails, rerun publication with the same export and checksum to write to the recorded spreadsheet. A completed publication returns the existing receipt. If Google fails to return the spreadsheet ID during creation, the run reports an unknown outcome. Check Drive for the preview title before preparing a fresh export.
 
 ## Capture browser QA for a local build
+
+In the workbench, open **Tools → Local build QA** and enter the full path to a local HTML build folder. You can also select existing Lighthouse and axe reports, an access log or two screenshots by their full paths. The result summarizes those files and offers CSV and JSON downloads.
+
+After installing Chromium through Playwright, select **Capture browser screenshot** on that page. Open a completed capture and choose **Use this capture as a baseline** to reuse its page path and viewport. The comparison links the two captures and shows a changed-pixel mask when pixels differ. Capture only trusted local builds.
 
 ```sh
 python -m pip install -e '.[browser]'

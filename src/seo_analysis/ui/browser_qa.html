@@ -1,0 +1,52 @@
+{% if view == 'browser_qa_form' %}
+<h1>Capture browser screenshot</h1>
+<p><a href="/tools/site-qa">Back to local build QA</a></p>
+{% if error %}<p role="alert"><strong>{{error}}</strong></p>{% endif %}
+<section>
+<form method="post" action="/tools/browser-qa">
+{{csrf()}}
+<p>Capture one page from a trusted local HTML build. Requires Chromium installed through Playwright.</p>
+<label for="build-folder">Build folder</label>
+<input id="build-folder" name="directory" required value="{{values.get('directory', '')}}" style="width:min(100%,640px)">
+<label for="build-page">Page path</label>
+<input id="build-page" name="page" required value="{{values.get('page', '/')}}">
+<div class="line">
+<label>Width (px) <input name="width" type="number" min="240" max="3840" required value="{{values.get('width', 1365)}}"></label>
+<label>Height (px) <input name="height" type="number" min="240" max="2160" required value="{{values.get('height', 768)}}"></label>
+</div>
+{% if baselines %}
+<label for="capture-baseline">Approved baseline (optional)</label>
+<select id="capture-baseline" name="baseline" style="max-width:100%">
+<option value="">No comparison</option>
+{% for source in baselines %}
+{% set params = source.parameters %}
+<option value="{{source.run_id}}"{% if values.get('baseline') == source.run_id %} selected{% endif %}>{{source.started_at[:19]|replace('T',' ')}} UTC · {{params.page}} · {{params.width}} × {{params.height}} · {{params.directory}}</option>
+{% endfor %}
+</select>
+{% endif %}
+<p><button>Capture screenshot</button></p>
+</form>
+</section>
+{% else %}
+<h1>Browser capture results</h1>
+<div class="links">
+<a href="/tools/browser-qa">New capture</a>
+{% if report %}<a href="/tools/browser-qa?baseline={{rid}}">Use this capture as a baseline</a>{% endif %}
+{% for name, label in [('browser-qa.json','Capture JSON'), ('screenshot.png','Screenshot PNG'), ('changed-pixels.png','Changed pixels PNG'), ('axe.json','axe report')] if name in run.artifacts %}
+<a href="/runs/{{rid}}/files/{{name}}">{{label}}</a>
+{% endfor %}
+</div>
+<p><strong>{{run.status|capitalize}}</strong>{% if report %} · {{report.page}} · {{report.viewport[0]}} × {{report.viewport[1]}} · Chromium {{report.chromium_version}}{% endif %}</p>
+{% for warning in run.warnings %}<p>{{warning}}</p>{% endfor %}
+{% if 'screenshot.png' in run.artifacts %}<h2>Screenshot</h2><img src="/runs/{{rid}}/preview/screenshot.png" alt="Screenshot of the captured build page" style="max-width:100%;height:auto">{% endif %}
+{% if report.visual_comparison %}
+{% set diff = report.visual_comparison %}
+<h2>Baseline comparison</h2>
+<p>{{diff.changed_pixels}} of {{diff.total_pixels}} pixels changed.{% if diff.baseline_run_id %} <a href="/runs/{{diff.baseline_run_id}}">Open baseline capture</a>{% endif %}</p>
+{% if 'changed-pixels.png' in run.artifacts %}<img src="/runs/{{rid}}/preview/changed-pixels.png" alt="Mask showing changed pixels" loading="lazy" style="max-width:100%;height:auto">{% endif %}
+{% endif %}
+{% if report.timings %}
+<h2>Local navigation timings</h2>
+<ul>{% for key, value in report.timings.items() if value is not none %}<li>{{key|replace('_ms','')|replace('_',' ')|capitalize}} · {{value|round(1)}} ms</li>{% endfor %}</ul>
+{% endif %}
+{% endif %}

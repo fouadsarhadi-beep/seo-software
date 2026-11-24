@@ -2,6 +2,7 @@
 
 from contextlib import asynccontextmanager
 from dataclasses import replace
+import json
 from pathlib import Path, PureWindowsPath
 from tempfile import TemporaryDirectory
 
@@ -11,6 +12,7 @@ from starlette.formparsers import MultiPartException, MultiPartParser
 
 from seo_analysis.app.runner import ToolRunner
 from seo_analysis.core import tools
+from seo_analysis.research.imports import ExportInput
 
 
 @asynccontextmanager
@@ -37,13 +39,25 @@ async def export_form(request):
         await fields.close()
 
 
+def export_input(fields, kind, provider=None):
+    values = {key: fields.get(key, "") for key in ("provider", "observed", "locale", "device", "period_start", "columns")}
+    if any(not isinstance(value, str) for value in values.values()):
+        raise ValueError("Enter export metadata as text.")
+    return ExportInput("", kind, provider if provider is not None else values["provider"], values["observed"],
+                       locale=values["locale"], device=values["device"], period_start=values["period_start"],
+                       mapping=json.loads(values["columns"] or "{}"))
+
+
 def import_upload(workspace, upload, request, *, project=None):
     if not isinstance(upload, UploadFile) or not upload.filename:
         raise ValueError("Select a CSV, TSV or Excel export.")
     filename = PureWindowsPath(upload.filename).name
     suffix = Path(filename).suffix.lower()
-    if suffix not in {".csv", ".tsv", ".xlsx"}:
-        raise ValueError("Select a CSV, TSV or Excel export.")
+    extensions = {".csv", ".tsv", ".xlsx"}
+    if request.kind == "community":
+        extensions.update({".rss", ".atom", ".xml"})
+    if suffix not in extensions:
+        raise ValueError("Select a CSV, TSV or Excel export, or select a feed for a community import.")
     if upload.size is None or upload.size > 20_000_000:
         raise ValueError("Select an export of 20 MB or less.")
     with TemporaryDirectory(prefix="seo-export-") as directory:

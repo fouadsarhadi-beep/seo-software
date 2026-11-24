@@ -10,7 +10,7 @@ The local audit, evidence, project and history workflows are in use. The Windows
 | 2 | C4, D2 — Snapshot comparisons | **Implemented.** Select two same-site runs from History and compare observed pages, findings and coverage. | See the manual audit log. |
 | 3 | C4, G2 — Content review | **Implemented.** Open page pairs side by side, see their match signals, and save decisions that carry across audits. | See the manual audit log. |
 | 4 | D, E2–E5 — Local reporting | **Implemented.** Import or reuse Search Console and GA4 exports, preview how their rows match a saved audit, and download the Excel workbook from the browser. | See the local reporting checkpoint in the manual audit log. |
-| 5 | D, F1, G1–G4 — Research from imported data | Add a small **Tools** entry starting with keyword and competitor research. Reuse the importers and existing reports for SERP overlap, competitor gaps, sampled rank changes and content briefs. Start with user-owned exports. | A user can import comparable samples, read a sourced opportunity and trace it back to the source row. The UI shows provider, capture date, locale, device when available and sample coverage. |
+| 5 | D, F1, G1–G4 — Research from imported data | **Implemented.** Use **Tools** to import or select research exports and inspect keywords, competitor gaps, SERP overlap, rank samples, clusters and content briefs. | See the local research checkpoint in the manual audit log. |
 
 Collect pending Windows checks by checkpoint in the [manual audit log](MANUAL_AUDIT_LOG.md). Keep source URLs, page identity, evidence IDs and existing archive state readable across upgrades.
 
@@ -18,9 +18,9 @@ Collect pending Windows checks by checkpoint in the [manual audit log](MANUAL_AU
 
 | Order | From the original plan | Deliverable and dependency |
 | --- | --- | --- |
-| 6 | E1–E5, I3 — Live Google and reporting | Start with one authorized Search Console property. Compare a date range against a manual export and verify one URL Inspection result. Then verify GA4 joins, PageSpeed and CrUX with the required access, and an approved Sheets publication that can feed Looker Studio. Each connector can be verified independently when access is available. |
-| 7 | F2–F4, G1, G3–G5 — Broader research sources | Benchmark Brave for sample quality, locale coverage and storage terms, verify a live public feed, and assess user-export workflows for SERP and backlink providers. Add sources when they improve a concrete research workflow. Ads Keyword Planner and Trends depend on access and useful data for the target market. |
-| 8 | H, I, J — Site QA and operational expansion | Bring local build QA into the workbench when the Tools flow is established, and verify read-only WordPress against an authorized installation. Add saved workflows and scheduling once repeat runs and permissions are reliable. Consider hosted reporting, an installer or native optimization when there is a demonstrated need. |
+| 6 | E1–E5, I3 — Live Google and reporting | The workbook picker now accepts saved Search Console and GA4 API datasets. The manual audit log records live checks for Search Console, GA4, PageSpeed, CrUX and Sheets. These remain pending authorized access. |
+| 7 | F2–F4, G1, G3–G5 — Broader research sources | The workbench can sample public RSS and Atom feeds and reuse saved Brave samples. Live feed and Brave benchmarking, provider export checks, and access-dependent Ads Keyword Planner and Trends work remain open. |
+| 8 | H, I, J — Site QA and operational expansion | **Tools** supports local build QA, Chromium captures and comparison with a saved baseline. Projects can save audit workflows for manual or scheduler-triggered runs. Validate Windows capture and scheduling, and verify read-only WordPress with an authorized installation. Consider hosted reporting, an installer or native optimization when there is a demonstrated need. |
 
 ## Foundation and audit workbench
 

@@ -14,6 +14,7 @@ from seo_analysis.analysis import similarity
 from seo_analysis.analysis.checks import CHECKS, CompareInput, SnapshotInput
 from seo_analysis.app.operations import AnalysisInput, CalibrationInput, ReviewInput, VariantInput
 from seo_analysis.app.runner import ToolRunner
+from seo_analysis.app.workflows import run_saved_audit
 from seo_analysis.core.artifacts import publish_files
 from seo_analysis.web import crawl
 from seo_analysis.app.system import doctor
@@ -46,6 +47,10 @@ def execute(args, spec, request, prompt=None, export=None, export_names=None):
         names = result.artifacts if export_names is None else export_names
         destination = publish_files(directory, export, names, include_observations=spec.uses_network)
         log(f"Export directory: {destination}")
+    return print_run_result(result, json_mode)
+
+
+def print_run_result(result, json_mode):
     if json_mode:
         summary = asdict(result)
         summary["warning_count"] = len(result.warnings)
@@ -53,7 +58,7 @@ def execute(args, spec, request, prompt=None, export=None, export_names=None):
         print(json.dumps(summary, ensure_ascii=False))
     else:
         print(f"{result.tool_id} {result.status} | {result.run_id}")
-        print(f"Run directory: {directory}")
+        print(f"Run directory: {result.out_dir}")
         print("Coverage:", json.dumps(result.counts, ensure_ascii=False))
         for warning in result.warnings[:20]:
             print(warning)
@@ -209,6 +214,18 @@ def cmd_history(args):
         value = history.list_runs(args.project)
     print(json.dumps(value, ensure_ascii=False, indent=None if args.json else 2))
     return 2 if isinstance(value, dict) and value.get("errors") else 0
+
+
+def cmd_workflow(args):
+    history = History(args.workspace)
+    if args.operation == "list":
+        workflows = history.audit_workflows(args.project)
+        print(json.dumps(workflows, ensure_ascii=False, indent=None if args.json else 2))
+        return 0
+    saved = history.audit_workflow(args.workflow_id)
+    result = run_saved_audit(args.workspace, saved, allow_local=args.allow_local,
+                             log=lambda message: print(message, file=sys.stderr))
+    return print_run_result(result, args.json)
 
 
 def cmd_local_data(args):
@@ -634,6 +651,16 @@ def build_parser():
     for command in (create, project_list, add, target_list, runs, show, rebuild):
         command.add_argument("--json", action="store_true")
         command.set_defaults(func=cmd_history)
+
+    workflow = sub.add_parser("workflow", help="list and run saved audit workflows").add_subparsers(dest="operation", required=True)
+    workflow_list = workflow.add_parser("list", help="show saved workflow IDs")
+    workflow_list.add_argument("--project")
+    workflow_run = workflow.add_parser("run", help="run a saved audit noninteractively")
+    workflow_run.add_argument("workflow_id")
+    workflow_run.add_argument("--allow-local", action="store_true", help="allow private-network access for this run")
+    for command in (workflow_list, workflow_run):
+        command.add_argument("--json", action="store_true")
+        command.set_defaults(func=cmd_workflow)
 
     audit = sub.add_parser(tools.AUDIT.command, help=tools.AUDIT.summary)
     audit.add_argument("url", nargs="?")
