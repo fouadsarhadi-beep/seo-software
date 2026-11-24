@@ -63,6 +63,10 @@ Each execution receives its own run directory. Use the analysis directory printe
 
 Audit results show the sampled coverage and link to the findings CSV, page inventory CSV and text report under **Downloads**. Expand **Technical files** for the raw data and request log. The local or private-network crawl option applies to one audit of a trusted local site, internal staging site or test server on a nonstandard port.
 
+Open a saved audit from **History**, select **All checks** or an individual check, and click **Run technical checks**. The report uses the saved snapshot and appears as a separate run with a CSV and links to the original page evidence. Search and filters narrow the visible findings, observations and crawled URLs. The downloads contain the full reports.
+
+From **History → Compare saved audits**, select an earlier and later run from the same site. The report links to both runs and shows observed page changes, coverage and differences between the saved findings. From an audit with similar-page data, choose **Review similar pages** to see the matching signals and record a decision. The workbench saves decisions in `decisions.jsonl` in the workspace data directory. Pass that file to the CLI with `--decisions` to reuse them for review or calibration.
+
 Use **Cancel audit** to stop a crawl in progress. Completed observations stay available in the cancelled run. Cancellation interrupts pacing and retry waits. An active network read may take until its timeout to return.
 
 Use run IDs printed by the CLI or listed under History. The following commands read existing snapshots offline.
@@ -76,6 +80,8 @@ seo-analysis compare --before <older-crawl-id> --after <newer-crawl-id>
 Omit `--check` to run all eight checks. A broken-link result requires an observed HTTP error at the target. A link to an uncrawled page has unknown status. Older snapshots can lack the new markup inventory. To continue editorial review across crawls, pass the same `--decisions path/to/decisions.jsonl` to successive review and calibration commands. Changed page content reopens its pair for review.
 
 ## Research and reports from local exports
+
+For a report in the browser, open a saved audit and choose **Create Excel report**. Import or select Search Console and GA4 exports, then choose **Preview matches**. The preview shows example rows and links to their crawl evidence. The Excel download contains every imported row and its match status.
 
 Import an export with its source and observation date. Use `--period-start` for an aggregated measurement and `--locale` and `--device` for search results. Each import prints a dataset run ID. CSV, TSV and the active worksheet in XLSX are supported. Community imports also accept local RSS or Atom feeds. Map custom column headers with `--columns`, a JSON object from normalized field names to original headers.
 

@@ -252,9 +252,9 @@ def cmd_snapshot(args):
     history = History(args.workspace)
     if args.cmd == "check":
         source = history.show(args.run)["directory"]
-        return execute(args, tools.CHECK, SnapshotInput(source, args.check))
+        return execute(args, tools.CHECK, SnapshotInput(source, args.check, source_run_id=args.run))
     before, after = (history.show(r)["directory"] for r in (args.before, args.after))
-    return execute(args, tools.COMPARE, CompareInput(before, after))
+    return execute(args, tools.COMPARE, CompareInput(before, after, args.before, args.after))
 
 
 def cmd_google(args):

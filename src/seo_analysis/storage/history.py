@@ -159,6 +159,13 @@ class History:
             if not db.execute("UPDATE runs SET archived=? WHERE id=?", (archived, run_id)).rowcount:
                 raise ValueError("Unknown run ID.")
 
+    def runs_with_artifact(self, name):
+        with self.transaction() as db:
+            rows = db.execute("""SELECT manifest, archived FROM runs WHERE finished IS NOT NULL
+                                 AND EXISTS (SELECT 1 FROM artifacts WHERE run_id=runs.id AND path=?)
+                                 ORDER BY started DESC, id""", (name,))
+            return [json.loads(row["manifest"]) | {"archived": bool(row["archived"])} for row in rows]
+
     def show(self, run_id):
         if UUID(run_id).hex != run_id:
             raise ValueError("Invalid run ID.")

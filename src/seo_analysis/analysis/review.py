@@ -6,8 +6,11 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from filelock import FileLock
+
 from seo_analysis import __version__
 from seo_analysis.connectors.gsc import display_metric
+from seo_analysis.core.artifacts import atomic_text
 from seo_analysis.core.urls import url_key
 
 CHOICES = {
@@ -33,6 +36,27 @@ def load_decisions(path) -> dict:
                 d = json.loads(line)
                 out[pair_key(d["url_a"], d["url_b"])] = d
     return out
+
+
+def needs_review(pair, decision):
+    return decision is None or decision.get("content_revisions") != pair.get("content_revisions")
+
+
+def save_decision(path, pair, decision, note):
+    if decision not in CHOICES.values():
+        raise ValueError("Choose a listed review decision.")
+    record = {"ts": datetime.now(timezone.utc).isoformat(timespec="seconds"), "tool_version": __version__,
+              "url_a": pair["url_a"], "url_b": pair["url_b"], "decision": decision, "note": note,
+              "content_revisions": pair.get("content_revisions"), "source_snapshot": pair.get("source_snapshot"),
+              "scores": {key: pair[key] for key in ("dup", "containment", "topic", "title_sim")},
+              "same_h1": pair["same_h1"], "triggers": pair["triggers"]}
+    path = Path(path)
+    with FileLock(str(path.with_name(f".{path.name}.lock")), timeout=10):
+        previous = path.read_text(encoding="utf-8") if path.exists() else ""
+        with atomic_text(path) as stream:
+            if previous:
+                stream.write(previous.rstrip("\n") + "\n")
+            stream.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
 def _fmt(p: dict) -> str:
@@ -67,10 +91,8 @@ def _fmt(p: dict) -> str:
 
 def review_loop(pairs, decisions_path, min_evidence: int = 1, limit: int = 0, input_fn=input, output_fn=print):
     done = load_decisions(decisions_path)
-    def needs_review(pair):
-        decision = done.get(pair_key(pair["url_a"], pair["url_b"]))
-        return decision is None or decision.get("content_revisions") != pair.get("content_revisions")
-    todo = [p for p in pairs if p["evidence"] >= min_evidence and needs_review(p)]
+    todo = [p for p in pairs if p["evidence"] >= min_evidence
+            and needs_review(p, done.get(pair_key(p["url_a"], p["url_b"])))]
     if limit:
         todo = todo[:limit]
     output_fn(f"{len(todo)} pairs to review ({len(done)} already decided). Nothing is changed on your site.")
@@ -91,13 +113,7 @@ def review_loop(pairs, decisions_path, min_evidence: int = 1, limit: int = 0, in
                 note = input_fn("note: ").strip()
                 continue
             if ans in CHOICES:
-                rec = {"ts": datetime.now(timezone.utc).isoformat(timespec="seconds"), "tool_version": __version__,
-                       "url_a": p["url_a"], "url_b": p["url_b"], "decision": CHOICES[ans], "note": note,
-                       "content_revisions": p.get("content_revisions"), "source_snapshot": p.get("source_snapshot"),
-                       "scores": {k: p[k] for k in ("dup", "containment", "topic", "title_sim")},
-                       "same_h1": p["same_h1"], "triggers": p["triggers"]}
-                with open(decisions_path, "a", encoding="utf-8") as fh:
-                    fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+                save_decision(decisions_path, p, CHOICES[ans], note)
                 saved += 1
                 break
             output_fn("  please choose one of the listed options")

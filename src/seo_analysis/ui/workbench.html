@@ -12,8 +12,21 @@ form.compact{margin:0}button.secondary{background:#edf1ea;color:#254832;border:1
 {% if more %}<a href="?page={{page+1}}{% if archived %}&amp;archived=true{% endif %}">Next</a>{% endif %}
 </div>
 {% endmacro %}
-{% macro observation_pages() %}<div class="links">{% if evidence_page>1 %}<a href="?evidence_page={{evidence_page-1}}&amp;page={{page}}">Previous pages</a>{% endif %}{% if evidence_more %}<a href="?evidence_page={{evidence_page+1}}&amp;page={{page}}">Next pages</a>{% endif %}</div>{% endmacro %}
-{% macro finding_pages() %}<div class="links">{% if page>1 %}<a href="?page={{page-1}}&amp;evidence_page={{evidence_page}}">Previous findings</a>{% endif %}{% if more %}<a href="?page={{page+1}}&amp;evidence_page={{evidence_page}}">Next findings</a>{% endif %}</div>{% endmacro %}
+{% macro result_page(finding_page, observed_page) -%}
+?page={{finding_page}}&amp;evidence_page={{observed_page}}{% if q %}&amp;q={{q|urlencode}}{% endif %}{% if category %}&amp;category={{category|urlencode}}{% endif %}{% if url_q %}&amp;url_q={{url_q|urlencode}}{% endif %}
+{%- endmacro %}
+{% macro observation_pages() %}
+<div class="links">
+{% if evidence_page>1 %}<a href="{{result_page(page, evidence_page-1)}}#crawled-pages">Previous pages</a>{% endif %}
+{% if evidence_more %}<a href="{{result_page(page, evidence_page+1)}}#crawled-pages">Next pages</a>{% endif %}
+</div>
+{% endmacro %}
+{% macro finding_pages() %}
+<div class="links">
+{% if page>1 %}<a href="{{result_page(page-1, evidence_page)}}#observations">Previous {{'observations' if checks_view else 'findings'}}</a>{% endif %}
+{% if more %}<a href="{{result_page(page+1, evidence_page)}}#observations">Next {{'observations' if checks_view else 'findings'}}</a>{% endif %}
+</div>
+{% endmacro %}
 {% macro table(rows, actions=false) %}
 {% if rows %}
 <div class="table"><table>
@@ -47,8 +60,11 @@ form.compact{margin:0}button.secondary{background:#edf1ea;color:#254832;border:1
 <h2>Recent runs</h2>{{table(runs)}}
 {% elif view=="history" %}
 <h1>{{'Archived runs' if archived else 'Run history'}}</h1>
-<p><a href="{{'/history' if archived else '/history?archived=true'}}">{{'Back to run history' if archived else 'View archived runs'}}</a></p>
+<div class="links"><a href="/compare">Compare saved audits</a><a href="{{'/history' if archived else '/history?archived=true'}}">{{'Back to run history' if archived else 'View archived runs'}}</a></div>
 {{table(runs, actions=true)}}{{pages()}}
+{% elif view in ('compare', 'comparison') %}{% include 'comparison.html' %}
+{% elif view in ('review', 'review_pair') %}{% include 'review.html' %}
+{% elif view in ('report_form', 'report_preview') %}{% include 'workbook.html' %}
 {% elif view=="projects" %}
 <h1>Projects</h1>
 {% if projects %}
@@ -85,14 +101,35 @@ form.compact{margin:0}button.secondary{background:#edf1ea;color:#254832;border:1
 {% elif view=="result" %}
 <h1>Run results</h1>
 {% set audit = run.tool_id == 'seo.audit' %}
-{% set highlights = {'observed': 'URLs observed', 'findings': 'findings', 'redirecting': 'redirecting URLs', 'errors': 'fetch errors'} %}
+{% set highlights = {'pages': 'pages checked', 'observations': 'observations'} if checks_view else {'observed': 'URLs observed', 'findings': 'findings', 'redirecting': 'redirecting URLs', 'errors': 'fetch errors'} %}
 {% set labels = {'ok': 'Successful HTML fetches', 'html_pages': 'HTML pages', 'pages_extracted': 'Pages with usable text', 'pages_compared': 'Pages eligible for comparison', 'pairs_flagged': 'Pairs flagged', 'noindex_excluded': 'Noindex pages excluded'} %}
 {% set page_limited = run.counts.skipped is defined and run.counts.skipped.get('page_limit') and run.parameters.limit is defined %}
 <section>
-<strong>{{'Website audit' if audit else run.tool_id}} · {{run.status|replace('_',' ')}}</strong>
+<strong>{{'Technical checks' if checks_view else 'Website audit' if audit else run.tool_id}} · {{run.status|replace('_',' ')}}</strong>
+{% if checks_view %}
+{% if source %}
+<p><a href="/runs/{{source.manifest.run_id}}">Source audit or crawl</a>
+{% set source_url = source.manifest.parameters.source or source.manifest.parameters.sitemap %}
+{% if source_url %} · {{source_url}}{% endif %}</p>
+{% endif %}
+<p>{{check_labels.get(run.parameters.check, 'All checks')}} · Based on saved crawl data.</p>
+{% else %}
 <p>{{run.parameters.source or run.parameters.sitemap or ''}}</p>
+{% if 'snapshot.jsonl' in run.artifacts and run.tool_id in ('seo.audit', 'web.crawl') %}
+<form class="line" method="post" action="/runs/{{rid}}/checks">
+{{csrf()}}
+<label>Checks <select name="check">
+<option value="all">All checks</option>
+{% for kind, label in check_labels.items() %}<option value="{{kind}}">{{label}}</option>{% endfor %}
+</select></label>
+<button>Run technical checks</button>
+</form>
+{% if run.counts.observed %}<p><a href="/runs/{{rid}}/report">Create Excel report</a></p>{% endif %}
+{% endif %}
+{% if 'pairs.json' in run.artifacts and audit %}<p><a href="/runs/{{rid}}/review">Review similar pages</a></p>{% endif %}
+{% endif %}
 <div class="metrics">
-{% for key, label in highlights.items() if audit and key in run.counts %}<span><strong>{{run.counts[key]}}</strong> {{label}}</span>{% endfor %}
+{% for key, label in highlights.items() if (audit or checks_view) and key in run.counts %}<span><strong>{{run.counts[key]}}</strong> {{label}}</span>{% endfor %}
 </div>
 {% if page_limited %}<p>The crawl was capped at {{run.parameters.limit}} pages. Site-wide coverage is unknown.</p>{% endif %}
 {% for w in run.warnings if w != 'robots.txt read' and not w.startswith('Discovery limits: ') and not (page_limited and w.startswith('Reached the configured limit of ')) %}
@@ -101,7 +138,7 @@ form.compact{margin:0}button.secondary{background:#edf1ea;color:#254832;border:1
 <details><summary>Run details</summary>
 <p>Run ID <code>{{rid}}</code></p>
 <dl>
-{% for key, value in run.counts.items() if value is number and not (audit and key in highlights) %}
+{% for key, value in run.counts.items() if value is number and not ((audit or checks_view) and key in highlights) %}
 <dt>{{labels.get(key, key|replace('_',' ')|capitalize)}}</dt><dd>{{value}}</dd>
 {% endfor %}
 </dl>
@@ -109,7 +146,7 @@ form.compact{margin:0}button.secondary{background:#edf1ea;color:#254832;border:1
 </details>
 </section>
 {% if artifacts %}
-{% set reports = {'findings.csv': 'Findings CSV', 'inventory.csv': 'Page inventory CSV', 'issues.txt': 'Text report'} %}
+{% set reports = {'checks.csv': 'Technical checks CSV', 'findings.csv': 'Findings CSV', 'inventory.csv': 'Page inventory CSV', 'issues.txt': 'Text report'} %}
 {% set extra = artifacts|rejectattr('path', 'in', reports)|list %}
 <div class="downloads">
 <h2>Downloads</h2>
@@ -121,15 +158,59 @@ form.compact{margin:0}button.secondary{background:#edf1ea;color:#254832;border:1
 {% endif %}
 </div>
 {% endif %}
-{% if evidence %}<h2>Crawled pages</h2><ul>{% for item in evidence %}<li><a href="/runs/{{rid}}/evidence/{{item.id}}">{{item.url}}</a></li>{% endfor %}</ul>{{observation_pages()}}{% endif %}{% if findings %}<h2>Findings</h2><div class="table"><table><tr><th>Category</th><th>Rule</th><th>Observation</th><th>Evidence</th></tr>{% for f in findings %}<tr><td>{{f.category}}</td><td>{{ {
-'content.extraction': 'Text extraction', 'content.overlap': 'Content overlap',
-'seo.redirect': 'URL redirects', 'seo.multiple-h1': 'Multiple H1 headings',
-'seo.noindex': 'Page marked noindex', 'seo.missing-title': 'Missing title',
-'seo.missing-meta': 'Missing meta description', 'seo.missing-h1': 'Missing H1 heading',
-'seo.canonical': 'Canonical URL',
-'crawl.fetch_error': 'Fetch failed', 'crawl.robots_disallowed': 'Blocked by robots.txt',
-'crawl.non_html': 'Response was not HTML', 'crawl.redirect_blocked_external': 'Redirect leaves the selected origin'
-}.get(f.rule, f.rule|replace('.', ' · ')|replace('_', ' ')|capitalize) }}</td><td>{{f.detail}}</td><td>{% for eid in f.evidence_ids %}<a href="/runs/{{rid}}/evidence/{{eid}}">{{evidence_urls.get(eid, eid)}}</a><br> {% endfor %}</td></tr>{% endfor %}</table></div>{{finding_pages()}}{% endif %}
+{% if has_evidence %}
+<h2 id="crawled-pages">Crawled pages</h2>
+<form class="line" method="get" action="/runs/{{rid}}#crawled-pages">
+<input type="hidden" name="q" value="{{q}}"><input type="hidden" name="category" value="{{category}}">
+<input type="hidden" name="page" value="{{page}}">
+<label>Search URLs <input type="search" name="url_q" value="{{url_q}}"></label>
+<button class="secondary">Filter pages</button>
+</form>
+{% if evidence %}
+<ul>{% for item in evidence %}<li><a href="/runs/{{rid}}/evidence/{{item.id}}">{{item.url}}</a></li>{% endfor %}</ul>
+{{observation_pages()}}
+{% else %}<p>No crawled URLs match.</p>{% endif %}
+{% endif %}
+{% if has_report %}
+<h2 id="observations">{{'Check observations' if checks_view else 'Findings'}}</h2>
+{% if categories %}
+<form class="line" method="get" action="/runs/{{rid}}#observations">
+<input type="hidden" name="url_q" value="{{url_q}}"><input type="hidden" name="evidence_page" value="{{evidence_page}}">
+<label>{{'Search checks' if checks_view else 'Search findings'}} <input type="search" name="q" value="{{q}}"></label>
+<label>{{'Check' if checks_view else 'Category'}} <select name="category">
+<option value="">All</option>
+{% for name in categories %}<option value="{{name}}"{% if name == category %} selected{% endif %}>{{check_labels.get(name, name) if checks_view else name|capitalize}}</option>{% endfor %}
+</select></label>
+<button class="secondary">{{'Filter observations' if checks_view else 'Filter findings'}}</button>
+</form>
+{% endif %}
+{% if rows %}
+<div class="table"><table>
+{% if checks_view %}
+<tr><th>Check</th><th>Observation</th><th>Value</th><th>Target</th><th>Page evidence</th></tr>
+{% for row in rows %}
+<tr>
+<td>{{check_labels.get(row.check, row.check)}}</td>
+<td>{{observation_labels.get(row.observation, row.observation|replace('_', ' '))}}</td>
+<td>{{row.value if row.value is not none else ''}}</td><td>{{row.target if row.target is not none else ''}}</td>
+<td>{% if source and row.evidence in evidence_urls %}
+<a href="/runs/{{source.manifest.run_id}}/evidence/{{row.evidence}}">{{row.url}}</a>
+{% else %}{{row.url}}{% endif %}</td>
+</tr>
+{% endfor %}
+{% else %}
+<tr><th>Category</th><th>Rule</th><th>Observation</th><th>Evidence</th></tr>
+{% for f in rows %}
+<tr><td>{{f.category}}</td><td>{{finding_labels.get(f.rule, f.rule|replace('.', ' · ')|replace('_', ' ')|capitalize)}}</td>
+<td>{{f.detail}}</td><td>{% for eid in f.evidence_ids %}<a href="/runs/{{rid}}/evidence/{{eid}}">{{evidence_urls.get(eid, eid)}}</a><br>{% endfor %}</td></tr>
+{% endfor %}
+{% endif %}
+</table></div>
+{{finding_pages()}}
+{% else %}
+<p>{% if checks_view %}{{'No observations match.' if q or category else 'No check observations were recorded.'}}{% else %}{{'No findings match.' if q or category else 'No findings were recorded.'}}{% endif %}</p>
+{% endif %}
+{% endif %}
 {% else %}<h1>Page evidence</h1><a href="/runs/{{rid}}">Back to results</a><section><strong>{{observation.url}}</strong>
 <dl>
 <dt>HTTP response</dt><dd>{{observation.final_status or 'Unavailable'}}</dd>

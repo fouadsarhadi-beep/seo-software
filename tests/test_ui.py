@@ -1,13 +1,18 @@
 import json
+from pathlib import Path
 import time
 from threading import Event
 from uuid import uuid4
 from bs4 import BeautifulSoup
 from fastapi.testclient import TestClient
 
+from seo_analysis import cli
+from seo_analysis.app.runner import ToolRunner
+from seo_analysis.core import tools
 from seo_analysis.core.workspace import Workspace
 from seo_analysis.storage.history import History
 from seo_analysis.ui.server import create_app
+from seo_analysis.web.crawl import CrawlConfig
 
 
 def test_ui_end_to_end(site, tmp_path):
@@ -209,7 +214,8 @@ def test_ui_result_paginates_observations_and_findings_independently(tmp_path):
     History(ws).index(folder)
     with TestClient(create_app(ws, 8972), base_url="http://127.0.0.1:8972") as client:
         base = f"/runs/{rid}"
-        dom = BeautifulSoup(client.get(base).text, "html.parser")
+        dom = BeautifulSoup(client.get(base, params={"q": "missing meta", "category": "review", "url_q": "page-"}).text,
+                            "html.parser")
         pages = dom.find("h2", string="Crawled pages")
         findings_header = dom.find("h2", string="Findings")
         assert len(pages.find_next("ul").find_all("a")) == 30
@@ -228,3 +234,47 @@ def test_ui_result_paginates_observations_and_findings_independently(tmp_path):
         assert len(findings_two.find("h2", string="Findings").find_next("table").find_all("tr")) == 3
         assert findings_two.find("a", string="Previous findings") is not None
         assert findings_two.find("a", string="Next pages") is not None
+
+        response = client.get(base, params={"q": "page-32", "url_q": "page-35", "category": "review"})
+        filtered = BeautifulSoup(response.text, "html.parser")
+        assert [a.text for a in filtered.find("ul").find_all("a")] == [entries[34]["url"]]
+        assert [a.text for a in filtered.find("table").find_all("a")] == [entries[31]["url"]]
+        assert "No findings match." in client.get(base, params={"q": "unmatched"}).text
+
+
+def test_ui_runs_saved_checks_offline_and_matches_cli(site, tmp_path, capsys):
+    origin = "http://127.0.0.1:8972"
+    ws = Workspace(tmp_path / "config.toml", tmp_path / "data", tmp_path / "exports")
+    ws.config_file.write_text('[paths]\ndata_dir = "data"', encoding="utf-8")
+    site.add("/map", f"<urlset><url><loc>{site.base}/one</loc></url><url><loc>{site.base}/gone</loc></url></urlset>")
+    site.add("/one", '<html><main>Article</main><a href="/gone">Missing</a><a href="/outside">Unobserved</a></html>')
+    audit = ToolRunner(ws).run(tools.AUDIT, CrawlConfig(site.base + "/map", "", delay=0, allow_local=True), log=lambda _: None)
+    hits = dict(site.hits)
+    base = f"/runs/{audit.run_id}"
+    assert cli.main(["--config-file", str(ws.config_file), "check", "--run", audit.run_id, "--json"]) == 0
+    check = json.loads(capsys.readouterr().out)
+    with TestClient(create_app(ws, 8972), base_url=origin) as client:
+        dom = BeautifulSoup(client.get(base).text, "html.parser")
+        form = dom.select_one(f'form[action="{base}/checks"]')
+        token = form.select_one('input[name="token"]')["value"]
+        assert client.post(form["action"], data={"token": token}).status_code == 403
+        reply = client.post(form["action"], headers={"Origin": origin}, data={"token": token, "check": "all"})
+        assert reply.is_success
+        dom = BeautifulSoup(reply.text, "html.parser")
+        assert dom.select_one(f'a[href="{base}"]')
+        evidence = dom.select_one(f'a[href^="{base}/evidence/"]')
+        assert client.get(evidence["href"]).is_success
+        json_link = dom.select_one('a[href$="checks.json"]')["href"]
+        assert client.get(json_link).json() == json.loads((Path(check["out_dir"]) / "checks.json").read_text(encoding="utf-8"))
+        assert client.get(dom.select_one('a[href$="checks.csv"]')["href"]).is_success
+        assert "Unknown (target not observed)" in client.get(reply.url, params={"category": "links", "q": "unknown"}).text
+        broken = client.get(reply.url, params={"category": "broken-links"}).text
+        assert "Observed HTTP error" in broken and "/outside" not in broken
+
+        snapshot = Path(audit.out_dir) / "snapshot.jsonl"
+        rows = [json.loads(line) for line in snapshot.read_text(encoding="utf-8").splitlines()]
+        rows[0]["markup"].pop("assets")
+        snapshot.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+        older = client.post(form["action"], headers={"Origin": origin}, data={"token": token, "check": "assets"})
+        assert "Technical checks · partial" in older.text and "markup fields unavailable: 1" in older.text
+    assert site.hits == hits

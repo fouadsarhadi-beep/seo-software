@@ -1,0 +1,83 @@
+{% if view == 'compare' %}
+<h1>Compare saved audits</h1>
+<p><a href="/history">Back to history</a></p>
+{% if snapshots|length > 1 %}
+<section>
+<form method="post" action="/compare">
+{{csrf()}}
+<p>Choose two runs from the same site. Their saved data is used for the comparison.</p>
+{% for side in ('before', 'after') %}
+<label for="{{side}}">{{side|capitalize}} run</label>
+<select id="{{side}}" name="{{side}}" required style="max-width:100%">
+<option value="">Select a run</option>
+{% for run in snapshots %}
+<option value="{{run.run_id}}">{{run.started_at[:19]|replace('T',' ')}} UTC · {{run.parameters.source or run.parameters.sitemap or run.tool_id}} · {{run.status}}{% if run.archived %} · archived{% endif %}</option>
+{% endfor %}
+</select>
+{% endfor %}
+<p><button>Compare runs</button></p>
+</form>
+</section>
+{% else %}<p>Save at least two audits or crawls before comparing them.</p>{% endif %}
+{% else %}
+<h1>Audit comparison</h1>
+<p><a href="/compare">Compare other runs</a></p>
+<section>
+<strong>{{run.status|capitalize}}</strong>
+{% if report %}
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:24px">
+{% for info in report.sources %}
+{% set linked = sources[loop.index0] %}
+<div>
+<h2>{{'Before' if loop.first else 'After'}}</h2>
+{% if linked %}<p><a href="/runs/{{linked.manifest.run_id}}">Open source run</a> · {{linked.manifest.started_at[:19]|replace('T',' ')}} UTC</p>{% endif %}
+{% if info.target %}<p>{{info.target}}</p>{% endif %}
+<p>{{info.status|replace('_',' ')|capitalize}}{% if 'observed' in info.coverage %} · {{info.coverage.observed}} URLs observed{% endif %}{% if info.limit is defined and info.limit is not none %} · {{info.limit}}-page limit{% endif %}</p>
+</div>
+{% endfor %}
+</div>
+<p>Coverage can differ between runs. A URL seen in only one run has unknown status in the other.</p>
+{% else %}
+{% for warning in run.warnings %}<p>{{warning}}</p>{% endfor %}
+{% endif %}
+</section>
+{% if report %}
+<div class="links">
+<a href="/runs/{{rid}}">Changed and one-sided pages</a>
+<a href="?category=all">All observed pages</a>
+<a href="?category=findings">Finding changes</a>
+<a href="/runs/{{rid}}/files/comparison.csv">Pages CSV</a>
+{% if 'finding_changes.csv' in run.artifacts %}<a href="/runs/{{rid}}/files/finding_changes.csv">Finding changes CSV</a>{% endif %}
+</div>
+<h2>{{'Finding changes' if findings else 'Page observations'}}</h2>
+{% if findings and not unavailable %}<p>Items are shown as reported in each audit. Coverage and available evidence affect which findings appear.</p>{% endif %}
+{% if unavailable %}<p>Finding changes require findings reports from both runs.</p>
+{% elif rows %}
+<div class="table"><table>
+{% if findings %}
+<tr><th>Reported</th><th>Finding</th><th>Page evidence</th></tr>
+{% for row in rows %}
+{% set item = row.finding %}
+{% set source = sources[0 if row.state == 'reported only before' else 1] %}
+<tr><td>{{row.state|capitalize}}</td><td><strong>{{finding_labels.get(item.rule, item.rule)}}</strong><br>{{item.detail}}</td>
+<td>{% for url in item.urls %}{% if source and item.evidence_ids[loop.index0] is defined %}<a href="/runs/{{source.manifest.run_id}}/evidence/{{item.evidence_ids[loop.index0]}}">{{url}}</a>{% else %}{{url}}{% endif %}<br>{% endfor %}</td></tr>
+{% endfor %}
+{% else %}
+<tr><th>URL</th><th>Observation</th><th>Changes</th><th>Evidence</th></tr>
+{% for row in rows %}
+<tr><td>{{row.url}}</td><td>{{row.state|capitalize}}</td><td>
+{% if row.changes %}<details><summary>{{row.changes|length}} changed fields</summary>
+<dl>{% for field, values in row.changes.items() %}<dt>{{field|replace('_',' ')|capitalize}}</dt><dd>{{values[0]}} → {{values[1]}}</dd>{% endfor %}</dl></details>{% endif %}
+</td><td>{% for id in row.evidence %}{% set source = sources[loop.index0] %}
+{% if id and source %}<a href="/runs/{{source.manifest.run_id}}/evidence/{{id}}">{{'Before' if loop.first else 'After'}}</a><br>{% endif %}
+{% endfor %}</td></tr>
+{% endfor %}
+{% endif %}
+</table></div>
+<div class="links">
+{% if page > 1 %}<a href="?category={{category|urlencode}}&amp;page={{page - 1}}">Previous</a>{% endif %}
+{% if more %}<a href="?category={{category|urlencode}}&amp;page={{page + 1}}">Next</a>{% endif %}
+</div>
+{% else %}<p>{{'No finding changes in these reports.' if findings else 'No page observations in this view.'}}</p>{% endif %}
+{% endif %}
+{% endif %}

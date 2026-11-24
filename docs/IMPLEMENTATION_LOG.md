@@ -78,4 +78,8 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 
 - Stage H, Step 3 follow-up — Added the local Lighthouse runner on 2026-11-22. Lighthouse 13.6 and Chromium 156 produced six lab measurements from a local fixture. The HTTP fixture verified that external requests and paths outside the build are refused.
 
+- Stage C, Step 3 and Stage D, Steps 2–4 follow-up — Added offline technical checks and searchable results to the browser workbench on 2026-11-24. Verified that browser and CLI checks produce matching reports, preserve source evidence and make no requests to the audited site. Saved snapshots with missing markup fields report partial coverage for affected checks.
+- Stage C, Step 4, Stage D, Step 2 and Stage G, Step 2 follow-up — Added comparison of saved same-site runs and a browser queue for reviewing similar pages on 2026-11-24. Comparisons preserve source evidence and coverage. Review decisions use the shared CLI format and reopen when a still-flagged pair changes.
+- Stage D and Stage E, Steps 2–5 follow-up — Added local Search Console and GA4 imports, match previews and Excel downloads to the workbench on 2026-11-24. Moved pending Windows checks into the [manual audit log](MANUAL_AUDIT_LOG.md).
+
 [Current scope and remaining work](ROADMAP.md)
