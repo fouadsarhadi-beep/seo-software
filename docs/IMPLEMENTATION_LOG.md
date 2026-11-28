@@ -111,4 +111,10 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 - Workbench Stage 2, Step 4 — Added a dedicated Start an audit screen that explains the page cap and the local-network permission beside their fields, separated importing a source from analyzing saved sources, and replaced internal tool identifiers with task names in results, history and deletion screens.
 - Workbench Stage 2, Step 5 — Added a Search and traffic landing screen that states which entries are import-ready and which need a connected property. Added coverage for the empty workspace, the selected project, two projects, an ad hoc run, task navigation and active state. The suite passed 169 tests with Hazm and Chromium skipped.
 
+## Workbench stage 3 — exploring an audit
+
+- Workbench Stage 3, Step 1 — Added a read model over saved audit runs on 2026-11-28 (`ui/audit_read.py`). It maps each observed page from `snapshot.jsonl` to its requested URL, final URL, HTTP status, redirect target, indexability and reason, title, word count and evidence ID, then joins `findings.json` through those evidence IDs. One finding with two evidence IDs resolves to one finding and two affected pages. Missing fields stay Unknown instead of defaulting to a value.
+- Workbench Stage 3, Step 2 — Added one page query used by the table and, later, filtered exports. It combines a URL term (matching the stored and decoded forms), an HTTP status or status class, a redirect state, an indexability state and a finding rule; sorts with a stable URL tie-breaker; clamps the page; and returns total observed, total matched, bounds and a filter-preserving link.
+- Workbench Stage 3, Step 2 follow-up — Captured the results-route baseline before changing it: a 100-page fixture observed 100 URLs in 102 requests and the results request took 0.2145 s.
+
 [Current scope and remaining work](ROADMAP.md)
