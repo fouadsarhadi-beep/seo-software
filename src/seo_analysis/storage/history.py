@@ -49,6 +49,12 @@ MIGRATIONS = [
                evidence_id TEXT, run_id TEXT, updated_at TEXT NOT NULL,
                PRIMARY KEY (project, rule, page_key))""",
     ),
+    (
+        """CREATE TABLE brief_items (
+               project TEXT NOT NULL, query TEXT NOT NULL, note TEXT NOT NULL DEFAULT '',
+               source_run TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+               PRIMARY KEY (project, query))""",
+    ),
 ]
 
 
@@ -220,6 +226,28 @@ class History:
             row = db.execute("""SELECT * FROM finding_reviews WHERE project=? AND rule=? AND page_key=?""",
                              (project, rule, page_key)).fetchone()
             return dict(row) if row else None
+
+    def add_brief_item(self, project, query, *, note="", source_run=""):
+        """Collect one query into the project's brief. Adding the same query again updates it."""
+        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        with self.transaction() as db:
+            db.execute("""INSERT INTO brief_items (project, query, note, source_run, created_at, updated_at)
+                          VALUES (?, ?, ?, ?, ?, ?)
+                          ON CONFLICT(project, query) DO UPDATE SET note=excluded.note,
+                          source_run=excluded.source_run, updated_at=excluded.updated_at""",
+                       (project, query, note, source_run, now, now))
+            row = db.execute("SELECT * FROM brief_items WHERE project=? AND query=?", (project, query)).fetchone()
+            return dict(row)
+
+    def brief_items(self, project):
+        with self.transaction() as db:
+            rows = db.execute("""SELECT * FROM brief_items WHERE project=?
+                                 ORDER BY updated_at DESC, query""", (project,))
+            return [dict(row) for row in rows]
+
+    def remove_brief_item(self, project, query):
+        with self.transaction() as db:
+            db.execute("DELETE FROM brief_items WHERE project=? AND query=?", (project, query))
 
     def index(self, directory, *, recover=False):
         with self.transaction() as db:

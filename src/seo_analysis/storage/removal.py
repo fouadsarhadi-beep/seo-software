@@ -125,4 +125,5 @@ def remove_saved_data(history: History, scope: str, *, run_id: str | None = None
                 db.execute("DELETE FROM projects")
                 db.execute("DELETE FROM google_connections")
                 db.execute("DELETE FROM finding_reviews")
+                db.execute("DELETE FROM brief_items")
         return len(selected), _clean_pending(history)

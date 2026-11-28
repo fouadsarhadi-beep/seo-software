@@ -345,7 +345,7 @@ def test_ui_overview_and_task_navigation_guide_a_first_session(tmp_path):
         assert tasks == {"Overview": "/", "Website audit": "/audit/new",
                          "Keyword and competitor research": "/tools/research",
                          "Search and traffic": "/tools/search-traffic", "Site QA": "/tools/site-qa",
-                         "History": "/history", "Review queue": "/review-queue",
+                         "History": "/history", "Review queue": "/review-queue", "Content brief": "/brief",
                          "Manage saved data": "/history/data"}
         assert home.select_one('nav.tasks a[aria-current="page"]').get_text(strip=True) == "Overview"
 
@@ -718,6 +718,39 @@ def test_ui_question_outline_expands_a_seed_and_exports_the_branch(tmp_path):
                            params={"dataset": rid, "seed": "insurance", "limit": 10, "export": 1})
         assert export.status_code == 200 and export.text.startswith("\ufeff")
         assert "insurance,how,1" in export.text
+
+
+def test_ui_brief_collects_a_query_from_a_gap_row_and_keeps_one_row_per_query(tmp_path):
+    origin = "http://127.0.0.1:8972"
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    History(ws).add_project("Acme")
+    rid = uuid4().hex
+    report = {"owned_host": "mine.test", "keywords": [{"query": "alpha", "state": "shared",
+                                                      "domains": ["mine.test"], "observations": []}],
+              "competitors": [{"host": "rival.test", "observed_queries": 1, "shared_with_owned": 0,
+                               "only_in_owned_sample": ["alpha"], "only_in_competitor_sample": ["delta"]}],
+              "sources": {"a": {"kind": "serp", "provider": "Brave", "locale": "en-US", "device": "desktop"}}}
+    _saved_run(ws, {"run_id": rid, "tool_id": "research.opportunities", "status": "succeeded", "project": None,
+                    "saved_target": None, "started_at": "2026-11-20T00:00:00Z",
+                    "finished_at": "2026-11-20T00:00:09Z", "parameters": {}, "counts": {"keywords": 1},
+                    "warnings": [], "artifacts": ["research.json"]},
+               {"research.json": json.dumps(report)})
+    with TestClient(create_app(ws, 8972), base_url=origin) as client:
+        assert "/brief/add" in client.get(f"/runs/{rid}", params={"category": "competitors"}).text
+        token = BeautifulSoup(client.get("/brief").text, "html.parser").select_one("input[name=token]")["value"]
+        headers = {"Origin": origin}
+        client.post("/brief/add", headers=headers,
+                    data={"token": token, "project": "Acme", "query": "delta", "source_run": rid})
+        brief = client.get("/brief", params={"project": "Acme"}).text
+        assert "delta" in brief and "Research run" in brief
+        client.post("/brief/add", headers=headers,
+                    data={"token": token, "project": "Acme", "query": "delta", "note": "priority"})
+        items = History(ws).brief_items("Acme")
+        assert len(items) == 1 and items[0]["note"] == "priority"
+        client.post("/brief/remove", headers=headers, data={"token": token, "project": "Acme", "query": "delta"})
+        assert History(ws).brief_items("Acme") == []
+    remove_saved_data(History(ws), "workspace")
+    assert History(ws).brief_items("Acme") == []
 
 
 def test_ui_review_queue_keeps_a_decision_and_reopens_it_when_the_page_changes(tmp_path):

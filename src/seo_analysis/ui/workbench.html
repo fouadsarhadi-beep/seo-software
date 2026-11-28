@@ -121,6 +121,7 @@ p{overflow-wrap:anywhere}
 <span class="nav-label">Workspace</span>
 <a href="/history"{% if view == 'history' %} aria-current="page"{% endif %}>History</a>
 <a href="/review-queue"{% if view == 'review_queue' %} aria-current="page"{% endif %}>Review queue</a>
+<a href="/brief"{% if view == 'brief' %} aria-current="page"{% endif %}>Content brief</a>
 <a href="/history/data">Manage saved data</a>
 </nav>
 <p class="rail-foot">Local only. Pages are fetched, measured and stored on this computer.</p>
@@ -415,6 +416,29 @@ p{overflow-wrap:anywhere}
 <p><small>Showing up to {{ limit }} children per question. A question marked as a cycle already appeared on its own path, so it is not expanded again.</small></p>
 <ul class="ruled" aria-label="Question outline">{{ node(tree) }}</ul>
 {% endif %}
+{% elif view=="brief" %}
+<div class="page-head"><div>
+<p class="crumbs">Workspace</p>
+<h1>Content brief{% if selected %} · {{ selected.name }}{% endif %}</h1>
+<p class="lede">Queries collected from research and kept with the project. Add one from a gap row, or type a query below; adding the same query again updates its note instead of duplicating it.</p>
+</div></div>
+<form class="filters" method="post" action="/brief/add">
+{{ csrf() }}<input type="hidden" name="project" value="{{ selected.name if selected else '' }}">
+<label>Query <input name="query" required placeholder="A query to write for"></label>
+<label>Note <input name="note" placeholder="Why it matters"></label>
+<button>Add to brief</button>
+</form>
+{% if items %}
+<div class="table"><table>
+<tr><th>Query</th><th>Note</th><th>Source</th><th>Updated (UTC)</th><th></th></tr>
+{% for item in items %}
+<tr><td dir="auto">{{ item.query }}</td><td dir="auto">{{ item.note or '—' }}</td>
+<td>{% if item.source_run %}<a href="/runs/{{item.source_run}}">Research run</a>{% else %}—{% endif %}</td>
+<td>{{ item.updated_at[:19]|replace('T',' ') }}</td>
+<td><form class="compact" method="post" action="/brief/remove">{{ csrf() }}<input type="hidden" name="project" value="{{ selected.name }}"><input type="hidden" name="query" value="{{ item.query }}"><button class="secondary">Remove</button></form></td></tr>
+{% endfor %}
+</table></div>
+{% else %}<p>No queries collected yet.</p>{% endif %}
 {% elif view=="history" %}
 <h1>{{'Archived runs' if archived else 'Run history'}}</h1>
 <div class="links"><a href="/compare">Compare saved audits</a><a href="{{'/history' if archived else '/history?archived=true'}}">{{'Back to run history' if archived else 'View archived runs'}}</a><a href="/history/data">Manage saved data</a></div>

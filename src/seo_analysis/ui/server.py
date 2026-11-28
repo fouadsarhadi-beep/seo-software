@@ -572,6 +572,33 @@ def create_app(workspace, port=8765):
         return render("review_queue", selected=selected, projects=projects, items=items,
                       latest=latest[0] if latest else None, finding_labels=FINDING_LABELS)
 
+    @app.get("/brief")
+    def brief(project: str = ""):
+        projects = history.projects()
+        selected = next((item for item in projects if item["name"] == project), None)
+        if selected is None and projects:
+            selected = projects[0]
+        items = history.brief_items(selected["name"]) if selected else []
+        return render("brief", selected=selected, projects=projects, items=items)
+
+    @app.post("/brief/add")
+    async def brief_add(request: Request):
+        fields = await form(request)
+        project = fields.get("project", "")
+        query = (fields.get("query") or "").strip()
+        if not project or not query:
+            raise HTTPException(400, "Choose a project and a query.")
+        history.add_brief_item(project, query, note=(fields.get("note") or "").strip()[:500],
+                               source_run=fields.get("source_run", ""))
+        return RedirectResponse("/brief?" + urlencode({"project": project}), 303)
+
+    @app.post("/brief/remove")
+    async def brief_remove(request: Request):
+        fields = await form(request)
+        project = fields.get("project", "")
+        history.remove_brief_item(project, fields.get("query", ""))
+        return RedirectResponse("/brief?" + urlencode({"project": project}), 303)
+
     @app.post("/runs/{rid}/review-finding")
     async def review_finding(rid: str, request: Request):
         fields = await form(request)
@@ -1002,6 +1029,8 @@ def create_app(workspace, port=8765):
         contexts = {(item.get("provider"), item.get("locale"), item.get("device"))
                     for item in sources.values() if isinstance(item, dict) and item.get("kind") == "serp"}
         incompatible = len(contexts) > 1
+        projects = history.projects()
+        brief_project = run.get("project") or (projects[0]["name"] if projects else "")
         sections = {key: label for key, label in RESEARCH_SECTIONS.items() if report.get(key)}
         section = category if category in sections or category == "observations" else next(iter(sections), "keywords")
         if section == "observations":
@@ -1012,7 +1041,7 @@ def create_app(workspace, port=8765):
         page = min(max(1, page), max(1, (len(rows) + 29) // 30))
         return render("research_result", rid=run["run_id"], run=run, report=report, sections=sections, section=section,
                       q=q, rows=rows[(page - 1) * 30:page * 30], page=page, more=len(rows) > page * 30,
-                      dataset_labels=RESEARCH_DATASETS, incompatible=incompatible)
+                      dataset_labels=RESEARCH_DATASETS, incompatible=incompatible, brief_project=brief_project)
 
     def feed_failure(data):
         manifest = data["manifest"]
