@@ -1,6 +1,7 @@
 from seo_analysis.research.questions import (
     build_question_tree,
     capture_changes,
+    capture_rows,
     outline_edges,
     question_edges,
     question_seeds,
@@ -82,6 +83,57 @@ def test_an_empty_seed_column_falls_back_to_parentless_roots():
     ]
     assert question_seeds(rows) == ["insurance"]
     assert build_question_tree(rows, "insurance").children[0].question == "how"
+
+
+def test_a_seed_that_is_only_a_topic_heading_shows_the_observed_roots():
+    """The seed names the capture; it need not be a parent question itself."""
+    rows = [
+        {"row": 1, "seed": "insurance", "parent": "how", "child": "documents"},
+        {"row": 2, "seed": "insurance", "parent": "how", "child": "cost"},
+    ]
+    tree = build_question_tree(rows, "insurance")
+    assert tree.topic_only is True
+    assert [child.question for child in tree.children] == ["how"]
+    assert [child.question for child in tree.children[0].children] == ["cost", "documents"]
+
+
+def test_edges_belong_to_their_own_capture_topic():
+    rows = [
+        {"row": 1, "seed": "insurance", "parent": "how", "child": "documents"},
+        {"row": 2, "seed": "tax", "parent": "how", "child": "documents"},
+    ]
+    assert question_edges(capture_rows(rows, "insurance"))["how"] == [("documents", 1)]
+    tree = build_question_tree(rows, "tax")
+    assert [child.row for child in tree.children[0].children] == [2]
+
+
+def test_updating_one_topic_leaves_another_untouched():
+    before = [{"row": 1, "seed": "insurance", "parent": "how", "child": "documents"},
+              {"row": 2, "seed": "tax", "parent": "how", "child": "filing"}]
+    after = before + [{"row": 3, "seed": "tax", "parent": "how", "child": "deadline"}]
+    assert capture_changes(after, before, "insurance") == {
+        "added": [], "removed": [], "persisted": [("how", "documents")]}
+    assert capture_changes(after, before, "tax")["added"] == [("how", "deadline")]
+
+
+def test_more_than_fifty_siblings_are_reachable_by_raising_the_limit():
+    rows = [{"row": index, "seed": "topic", "parent": "topic", "child": f"child {index:02d}"}
+            for index in range(1, 61)]
+    narrow = build_question_tree(rows, "topic", limit=50)
+    assert len(narrow.children) == 50 and narrow.hidden == 10
+    wide = build_question_tree(rows, "topic", limit=200)
+    assert len(wide.children) == 60 and wide.hidden == 0
+
+
+def test_a_deep_branch_stops_at_the_depth_bound():
+    rows = [{"row": index, "seed": "topic", "parent": f"q{index}", "child": f"q{index + 1}"}
+            for index in range(10)]
+    rows.insert(0, {"row": 99, "seed": "topic", "parent": "topic", "child": "q0"})
+    tree = build_question_tree(rows, "topic", max_depth=3)
+    node, depth = tree, 0
+    while node.children:
+        node, depth = node.children[0], depth + 1
+    assert depth == 3 and node.truncated
 
 
 def test_outline_edges_lists_the_visible_branch():

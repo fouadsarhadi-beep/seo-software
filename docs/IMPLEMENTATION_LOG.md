@@ -195,4 +195,12 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 - Batch 3 — A failed feed now says that parameters were removed from the address shown and that a signed address must be pasted again in Edit source.
 - Batch 3 — Focused regression: bundle entry rules, unlisted and missing files, a successful signed feed and a failed signed feed, plus the existing workbench and source suites. The symlink refusal is covered by a test that skips on machines where creating a link needs elevation, so it stayed unverified here.
 
+## DS delivery plan — batch 4: question captures, bounds and export
+
+- Batch 4 — The seed is now the capture topic. Rows are grouped by their seed, so two topics that share a parent–child edge stay separate and an update under one topic leaves another untouched; a seed that is only a heading, with no supplied edge from it, shows the questions observed under that capture and is marked as a topic heading rather than an edge.
+- Batch 4 — Traversal is bounded. Children per question default to 50 and can be raised to 200, total rendered nodes stop at 200, depth stops at 6, and a node that stopped early is marked so the outline never truncates silently.
+- Batch 4 — The branch export carries the seed, applies spreadsheet-formula protection to every cell so a question beginning with `=` cannot execute, and re-imports with its parent links intact.
+- Batch 4 — The bundle's link guard now has a deterministic test instead of skipping on machines where creating a symlink needs elevation.
+- Batch 4 — Still open in this batch: restricting comparison to compatible captures (project, provider, locale) and showing both dates with the direction of change; and driving the Persian fixture with a shared child, a cycle, a deep branch and more than 50 siblings through the UI.
+
 [Current scope and remaining work](ROADMAP.md)

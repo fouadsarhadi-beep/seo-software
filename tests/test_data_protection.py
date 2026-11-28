@@ -44,19 +44,17 @@ def test_bundle_refuses_an_unlisted_file_and_reports_a_missing_one(tmp_path):
     assert reasons["analysis/findings.json"] == "not written by this run"
 
 
-def test_bundle_does_not_follow_a_link_out_of_the_run(tmp_path):
+def test_bundle_does_not_follow_a_link_out_of_the_run(tmp_path, monkeypatch):
+    """The guard is exercised directly: creating a real link needs elevation on this platform."""
     run = tmp_path / "run"
     run.mkdir()
     (run / "snapshot.jsonl").write_text('{"url": "https://example.org/"}\n', encoding="utf-8")
-    outside = tmp_path / "outside.jsonl"
-    outside.write_text('{"url": "https://elsewhere.test/"}\n', encoding="utf-8")
-    link = run / "pairs.json"
-    try:
-        link.symlink_to(outside)
-    except (OSError, NotImplementedError):
-        pytest.skip("this machine cannot create symlinks without elevation")
+    (run / "pairs.json").write_text('{"pairs": []}\n', encoding="utf-8")
     manifest = {"run_id": "r" * 32, "artifacts": ["snapshot.jsonl", "pairs.json"]}
     (run / "run.json").write_text(json.dumps(manifest), encoding="utf-8")
+    real = Path.is_symlink
+    monkeypatch.setattr(Path, "is_symlink",
+                        lambda self: True if self.name == "pairs.json" else real(self))
     with ZipFile(BytesIO(build_bundle(run, manifest))) as archive:
         names = set(archive.namelist())
         index = json.loads(archive.read("index.json"))

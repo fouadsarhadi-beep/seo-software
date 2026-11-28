@@ -36,6 +36,7 @@ from seo_analysis.connectors.search_console import InspectionInput, SearchAnalyt
 from seo_analysis.core import tools
 from seo_analysis.core.network import HttpOrigin
 from seo_analysis.reporting.workbook import WorkbookInput
+from seo_analysis.reporting.report import csv_safe
 from seo_analysis.reporting.export import build_bundle, page_csv, stamp
 from seo_analysis.research.intelligence import ResearchInput
 from seo_analysis.research.questions import build_question_tree, capture_changes, outline_edges, question_seeds
@@ -345,7 +346,7 @@ def create_app(workspace, port=8765):
             {"project": project, "error": error, "fetched": fetched}), 303)
 
     @app.get("/tools/research/questions")
-    def question_explorer(dataset: str = "", seed: str = "", limit: int = 10, export: int = 0,
+    def question_explorer(dataset: str = "", seed: str = "", limit: int = 50, export: int = 0,
                           compare: str = "", project: str = ""):
         if not dataset:
             raise HTTPException(400, "Choose a question-relationship dataset.")
@@ -355,7 +356,7 @@ def create_app(workspace, port=8765):
             raise HTTPException(400, "Choose a question-relationship dataset.")
         payload = json.loads(artifact_path(data, "dataset.json").read_text(encoding="utf-8"))
         rows = payload.get("rows") or []
-        limit = min(max(1, limit), 50)
+        limit = min(max(1, limit), 200)
         tree = build_question_tree(rows, seed, limit=limit) if seed else None
         others = [item for item in saved_datasets({"questions": "Question relationships"}, RESEARCH_SOURCE_TOOLS)
                   if item["id"] != dataset]
@@ -365,13 +366,13 @@ def create_app(workspace, port=8765):
             if (other["manifest"].get("parameters") or {}).get("kind") != "questions":
                 raise HTTPException(400, "Compare with another question-relationship dataset.")
             earlier = json.loads(artifact_path(other, "dataset.json").read_text(encoding="utf-8"))
-            changes = capture_changes(rows, earlier.get("rows") or [])
+            changes = capture_changes(rows, earlier.get("rows") or [], seed)
         if export and tree is not None:
             buffer = StringIO()
-            buffer.write("\ufeffparent,child,source_row\r\n")
+            buffer.write("\ufeffseed,parent,child,source_row\r\n")
             writer = csv.writer(buffer)
             for parent, child, row in outline_edges(tree):
-                writer.writerow([parent, child, row])
+                writer.writerow([csv_safe(item) for item in (seed, parent, child, row)])
             return PlainTextResponse(buffer.getvalue(), media_type="text/csv",
                                      headers={"Content-Disposition":
                                               f'attachment; filename="questions-{dataset[:8]}.csv"'})
