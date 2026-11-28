@@ -1,12 +1,40 @@
 import json
 from pathlib import Path
 from shutil import which
+import subprocess
 
 from PIL import Image
 import pytest
 
 from seo_analysis.analysis.browserqa import build_file
 from seo_analysis.cli import main
+
+
+def _launchable_chromium():
+    """A Chromium that can actually start, preferring the build Playwright manages.
+
+    A browser merely appearing on PATH is not enough: a packaged stub can exist and still
+    refuse to launch, which would make this test fail for an environmental reason.
+    """
+    try:
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as playwright:
+            managed = playwright.chromium.executable_path
+        if managed and Path(managed).exists():
+            return managed
+    except Exception:
+        pass
+    for name in ("chromium", "chromium-browser", "google-chrome"):
+        candidate = which(name)
+        if not candidate:
+            continue
+        try:
+            subprocess.run([candidate, "--version"], capture_output=True, timeout=20, check=True)
+        except (OSError, subprocess.SubprocessError):
+            continue
+        return candidate
+    return None
 
 
 def test_browser_build_path_resolution_stays_within_selected_directory(tmp_path):
@@ -24,9 +52,9 @@ def test_browser_build_path_resolution_stays_within_selected_directory(tmp_path)
 
 def test_browser_qa_captures_local_build_and_blocks_external_fetch(site, tmp_path, capsys):
     pytest.importorskip("playwright.sync_api")
-    chromium = which("chromium") or which("chromium-browser")
+    chromium = _launchable_chromium()
     if chromium is None:
-        pytest.skip("System Chromium is unavailable.")
+        pytest.skip("No launchable Chromium is available.")
 
     build = tmp_path / "build"
     build.mkdir()
