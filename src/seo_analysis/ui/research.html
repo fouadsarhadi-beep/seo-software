@@ -77,6 +77,7 @@
 {% elif view == 'dataset' %}
 <h1>Research dataset</h1>
 <div class="links">{% if run.counts.rows %}<a href="/tools/research?added={{rid}}">Use in research</a>{% else %}<a href="/tools/research">Back to research</a>{% endif %}
+{% if dataset.kind == 'questions' %}<a href="/tools/research/questions?dataset={{rid}}">Explore questions</a>{% endif %}
 {% for name, label in [('normalized.csv', 'Normalized CSV'), ('dataset.json', 'Dataset JSON'), ('requests.json', 'Request log')] if name in run.artifacts %}
 <a href="/runs/{{rid}}/files/{{name}}">{{label}}</a>{% endfor %}
 </div>

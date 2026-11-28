@@ -687,6 +687,39 @@ def test_ui_research_report_warns_when_search_samples_are_not_comparable(tmp_pat
         assert "Samples are not comparable." not in client.get(f"/runs/{research_run(same)}").text
 
 
+def test_ui_question_outline_expands_a_seed_and_exports_the_branch(tmp_path):
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    rows = [
+        {"row": 1, "seed": "insurance", "parent": "insurance", "child": "how"},
+        {"row": 2, "seed": "insurance", "parent": "how", "child": "documents"},
+        {"row": 3, "seed": "insurance", "parent": "how", "child": "cost"},
+        {"row": 4, "seed": "insurance", "parent": "cost", "child": "documents"},
+        {"row": 5, "seed": "insurance", "parent": "documents", "child": "how"},
+    ]
+    rid = uuid4().hex
+    _saved_run(ws, {"run_id": rid, "tool_id": "research.import", "status": "succeeded", "project": None,
+                    "saved_target": None, "started_at": "2026-11-20T00:00:00Z",
+                    "finished_at": "2026-11-20T00:00:05Z",
+                    "parameters": {"kind": "questions", "provider": "AlsoAsked", "observed": "2026-11-20",
+                                   "locale": "fa-IR"},
+                    "counts": {"rows": len(rows)}, "warnings": [], "artifacts": ["dataset.json"]},
+               {"dataset.json": json.dumps({"schema_version": 1, "source": {
+                   "kind": "questions", "provider": "AlsoAsked", "observed": "2026-11-20", "locale": "fa-IR"},
+                   "rows": rows})})
+    with TestClient(create_app(ws, 8972), base_url="http://127.0.0.1:8972") as client:
+        picker = client.get("/tools/research/questions", params={"dataset": rid}).text
+        assert "Choose a seed" in picker and "insurance" in picker
+        page = client.get("/tools/research/questions",
+                          params={"dataset": rid, "seed": "insurance", "limit": 1}).text
+        assert 'dir="auto"' in page and "cycle" in page
+        assert f'href="/runs/{rid}/dataset/1"' in page
+        assert "Show 1 more" in page
+        export = client.get("/tools/research/questions",
+                           params={"dataset": rid, "seed": "insurance", "limit": 10, "export": 1})
+        assert export.status_code == 200 and export.text.startswith("\ufeff")
+        assert "insurance,how,1" in export.text
+
+
 def test_ui_review_queue_keeps_a_decision_and_reopens_it_when_the_page_changes(tmp_path):
     origin = "http://127.0.0.1:8972"
     ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")

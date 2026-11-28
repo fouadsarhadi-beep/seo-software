@@ -37,6 +37,28 @@ def test_question_import_keeps_relationships_and_collapses_duplicate_edges(tmp_p
     assert (Path(run["out_dir"]) / "normalized.csv").is_file()
 
 
+def test_exported_branch_can_be_reimported_and_keeps_parent_relationships(tmp_path, capsys):
+    from seo_analysis.research.questions import build_question_tree, outline_edges
+
+    rows = [
+        {"row": 1, "seed": "insurance", "parent": "insurance", "child": "how"},
+        {"row": 2, "seed": "insurance", "parent": "how", "child": "documents"},
+        {"row": 3, "seed": "insurance", "parent": "how", "child": "cost"},
+        {"row": 4, "seed": "insurance", "parent": "cost", "child": "documents"},
+        {"row": 5, "seed": "insurance", "parent": "documents", "child": "how"},
+    ]
+    tree = build_question_tree(rows, "insurance", limit=10)
+    export = tmp_path / "branch.csv"
+    lines = ["parent,child,source_row"] + [f"{parent},{child},{row}" for parent, child, row in outline_edges(tree)]
+    export.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    assert main([*_prefix(tmp_path), "import-data", str(export), "--kind", "questions",
+                 "--provider", "Branch export", "--observed", "2026-11-21", "--json"]) in (0, 3)
+    run = json.loads(capsys.readouterr().out)
+    dataset = json.loads((Path(run["out_dir"]) / "dataset.json").read_text(encoding="utf-8"))
+    recovered = {(row["parent"], row["child"]) for row in dataset["rows"]}
+    assert {("insurance", "how"), ("how", "documents"), ("cost", "documents")} <= recovered
+
+
 def test_question_import_rejects_a_file_without_relationship_columns(tmp_path, capsys):
     export = tmp_path / "flat.csv"
     export.write_text("query,volume\nبیمه,120\n", encoding="utf-8")
