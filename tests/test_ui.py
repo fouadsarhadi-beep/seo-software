@@ -660,6 +660,33 @@ def test_ui_research_picker_states_what_each_source_can_answer(tmp_path):
         assert "Search results (SERP)" in page and "12 rows" in page
 
 
+def test_ui_research_report_warns_when_search_samples_are_not_comparable(tmp_path):
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    base = {"owned_host": "mine.test",
+            "keywords": [{"query": "alpha", "state": "shared", "domains": ["mine.test"], "observations": []}],
+            "competitors": [{"host": "rival.test", "observed_queries": 1, "shared_with_owned": 0,
+                             "only_in_owned_sample": [], "only_in_competitor_sample": ["delta"]}]}
+    mixed = base | {"sources": {
+        "a": {"kind": "serp", "provider": "Brave", "locale": "en-US", "device": "desktop"},
+        "b": {"kind": "serp", "provider": "Brave", "locale": "en-US", "device": "mobile"}}}
+    same = base | {"sources": {
+        "a": {"kind": "serp", "provider": "Brave", "locale": "en-US", "device": "desktop"},
+        "b": {"kind": "serp", "provider": "Brave", "locale": "en-US", "device": "desktop"}}}
+
+    def research_run(report):
+        rid = uuid4().hex
+        _saved_run(ws, {"run_id": rid, "tool_id": "research.opportunities", "status": "succeeded", "project": None,
+                        "saved_target": None, "started_at": "2026-11-20T00:00:00Z",
+                        "finished_at": "2026-11-20T00:00:09Z", "parameters": {},
+                        "counts": {"keywords": 1}, "warnings": [], "artifacts": ["research.json"]},
+                   {"research.json": json.dumps(report)})
+        return rid
+
+    with TestClient(create_app(ws, 8972), base_url="http://127.0.0.1:8972") as client:
+        assert "Samples are not comparable." in client.get(f"/runs/{research_run(mixed)}").text
+        assert "Samples are not comparable." not in client.get(f"/runs/{research_run(same)}").text
+
+
 def test_ui_review_queue_keeps_a_decision_and_reopens_it_when_the_page_changes(tmp_path):
     origin = "http://127.0.0.1:8972"
     ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")

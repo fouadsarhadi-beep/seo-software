@@ -158,4 +158,6 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 
 - Workbench Stage 7, Step 2 (partial) — Split the competitor report into three evidence-scoped sets on 2026-11-28: shared with the owned site, owned sample only, and competitor sample only. The computation moved into `competitor_gaps` so it is unit-tested directly, and the page states that "owned sample only" means the competitor was not seen for that query in these captures, not that it never ranks. Still open in 7.2: an explicit warning when the selected samples differ in provider, locale or device, and an add-to-brief action from a gap row.
 
+- Workbench Stage 7, Step 2 follow-up — Warned when the selected search samples are not comparable on 2026-11-28. The research report detects two or more SERP sources whose provider, locale or device differ and states that rank history and gaps stay within each capture, so a difference between them is not a ranking change. The last open part of 7.2 is an add-to-brief action from a gap row; that needs a product decision about what a brief is before it is built.
+
 [Current scope and remaining work](ROADMAP.md)

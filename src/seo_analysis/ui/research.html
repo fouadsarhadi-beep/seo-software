@@ -109,6 +109,7 @@
 {% for id, source in report.sources.items() %}<li><a href="/runs/{{id}}">{{source.filename or source.url or source.query or dataset_labels.get(source.kind, source.kind)}}</a> · {{source_context(source)}}{% if source.sample_rows is defined %} · {{source.sample_rows}} rows{% endif %}{% if source.skipped %} · {{source.skipped}} skipped{% endif %}{% if source.capped %} · capped{% endif %}</li>{% endfor %}
 </ul>
 </details>
+{% if incompatible %}<p class="notice"><strong>Samples are not comparable.</strong> Two or more search samples were captured with a different provider, locale or device. Rank history and keyword gaps stay within each capture, so a difference between them is not a ranking change.</p>{% endif %}
 <div class="links">{% for key, label in sections.items() %}<a href="?category={{key}}"{% if key == section %} aria-current="page"{% endif %}>{{label}}</a>{% endfor %}</div>
 <h2>{{'Observations for ' ~ q if section == 'observations' else sections.get(section, 'Observations')}}</h2>
 {% if section == 'competitors' %}<p>Each column is limited to the selected samples. <strong>Owned sample only</strong> means the competitor was not seen for that query in these captures — not that it never ranks for it. Compare samples captured with the same provider, locale and device.</p>{% endif %}

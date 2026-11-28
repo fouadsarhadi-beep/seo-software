@@ -969,6 +969,10 @@ def create_app(workspace, port=8765):
         if report and "content-plan.json" in run["artifacts"]:
             plan = json.loads(artifact_path(data, "content-plan.json").read_text(encoding="utf-8"))
             report.update({key: plan.get(key, []) for key in ("content_briefs", "keyword_clusters")})
+        sources = report.get("sources") or {}
+        contexts = {(item.get("provider"), item.get("locale"), item.get("device"))
+                    for item in sources.values() if isinstance(item, dict) and item.get("kind") == "serp"}
+        incompatible = len(contexts) > 1
         sections = {key: label for key, label in RESEARCH_SECTIONS.items() if report.get(key)}
         section = category if category in sections or category == "observations" else next(iter(sections), "keywords")
         if section == "observations":
@@ -979,7 +983,7 @@ def create_app(workspace, port=8765):
         page = min(max(1, page), max(1, (len(rows) + 29) // 30))
         return render("research_result", rid=run["run_id"], run=run, report=report, sections=sections, section=section,
                       q=q, rows=rows[(page - 1) * 30:page * 30], page=page, more=len(rows) > page * 30,
-                      dataset_labels=RESEARCH_DATASETS)
+                      dataset_labels=RESEARCH_DATASETS, incompatible=incompatible)
 
     def feed_failure(data):
         manifest = data["manifest"]
