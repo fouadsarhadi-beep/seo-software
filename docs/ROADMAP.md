@@ -54,3 +54,5 @@ E1–E5 have automated coverage. Live verification still needs authorized Google
 | J — Performance and distribution | Profiled the 300-page audit fixture, replayed saved real pages, reduced extraction overhead and built the 0.4.0 wheel. Windows and Ubuntu CI verify clean wheel installation. | Measure a larger live owner site. Consider native code or a standalone executable if justified. |
 
 [Detailed implementation sequence](../SEO_ANALYSIS_SOFTWARE_ARCHITECTURE.md#14-implementation-sequence--stable-foundation-and-working-vertical-slices) · [Verification and remaining work](IMPLEMENTATION_STATE.md) · [Dated implementation log](IMPLEMENTATION_LOG.md)
+
+[Workbench product plan and stage acceptance checks](WORKBENCH_PRODUCT_PLAN.md)
