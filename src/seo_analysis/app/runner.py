@@ -1,5 +1,6 @@
 """Run one registered operation and preserve its inputs, coverage and artifact references."""
 from collections.abc import Callable
+from contextlib import ExitStack
 from dataclasses import asdict, dataclass, field, is_dataclass
 from datetime import datetime, timezone
 import json
@@ -66,27 +67,30 @@ class ToolRunner:
         if not isinstance(request, expected) or not is_dataclass(request) or isinstance(request, type):
             raise TypeError(f"{spec.id} requires {expected.__name__}")
         history = History(self.workspace)
-        selection = history.selection(project, saved_target)
-        if selection and (not isinstance(request, CrawlConfig) or request.sitemap != selection["url"]
-                          or request.kind != selection["kind"]):
-            raise ValueError("Run input differs from the selected target.")
-        directory = self.workspace.create_run_directory()
-        parameters = asdict(request)
-        if workflow is not None:
-            parameters["workflow"] = workflow
-        if isinstance(request, CrawlConfig):
-            parameters.pop("out_dir")
-            seeds = parameters.pop("seeds")
-            if seeds:
-                parameters["seed_file"] = "seeds.json"
-                parameters["seed_count"] = len(seeds)
-                write_json(directory / "seeds.json", seeds)
-        result = ToolResult(directory.name, spec.id, str(directory), parameters, project, saved_target)
-        ctx = ToolContext(directory, log, prompt, cancel, self.workspace, project, result.data_egress)
-        manifest = directory / "run.json"
-        with FileLock(str(directory / ".active.lock")):
-            write_json(manifest, asdict(result))
-            history.index(directory)
+        with ExitStack() as active:
+            with history.run_storage_lock():
+                history.check_reset_complete()
+                selection = history.selection(project, saved_target)
+                if selection and (not isinstance(request, CrawlConfig) or request.sitemap != selection["url"]
+                                  or request.kind != selection["kind"]):
+                    raise ValueError("Run input differs from the selected target.")
+                directory = self.workspace.create_run_directory()
+                active.enter_context(FileLock(str(directory / ".active.lock")))
+                parameters = asdict(request)
+                if workflow is not None:
+                    parameters["workflow"] = workflow
+                if isinstance(request, CrawlConfig):
+                    parameters.pop("out_dir")
+                    seeds = parameters.pop("seeds")
+                    if seeds:
+                        parameters["seed_file"] = "seeds.json"
+                        parameters["seed_count"] = len(seeds)
+                        write_json(directory / "seeds.json", seeds)
+                result = ToolResult(directory.name, spec.id, str(directory), parameters, project, saved_target)
+                manifest = directory / "run.json"
+                write_json(manifest, asdict(result))
+                history.index(directory)
+            ctx = ToolContext(directory, log, prompt, cancel, self.workspace, project, result.data_egress)
             try:
                 outcome = operation(ctx, request)
                 result.status = outcome.get("status", "succeeded")

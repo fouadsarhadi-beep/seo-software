@@ -3,6 +3,7 @@ from contextlib import contextmanager
 import json
 from pathlib import Path
 import sqlite3
+from tempfile import TemporaryDirectory
 from uuid import UUID
 
 from filelock import FileLock, Timeout
@@ -38,13 +39,39 @@ MIGRATIONS = [
                link_crawl INTEGER NOT NULL CHECK(link_crawl IN (0, 1)), UNIQUE(project, name),
                FOREIGN KEY(project, target) REFERENCES targets(project, name))""",
     ),
+    ("CREATE TABLE pending_removals (path TEXT PRIMARY KEY)",),
 ]
+
+
+def workspace_access_error(error: BaseException) -> bool:
+    if isinstance(error, PermissionError):
+        return True
+    code = getattr(error, "sqlite_errorcode", 0) & 0xff
+    return isinstance(error, sqlite3.OperationalError) and code in (sqlite3.SQLITE_READONLY, sqlite3.SQLITE_CANTOPEN)
 
 
 class History:
     def __init__(self, workspace):
         self.workspace = workspace
         self.path = workspace.data_dir / "history.sqlite3"
+
+    def run_storage_lock(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        return FileLock(str(self.path.parent / ".run-storage.lock"), timeout=20)
+
+    def check_writable(self):
+        with self.transaction() as db:
+            # SQLite can read an existing schema even when it cannot write to it.
+            db.execute("UPDATE projects SET name = name WHERE 0")
+        self.workspace.runs_dir.mkdir(exist_ok=True)
+        for directory in (self.workspace.data_dir, self.workspace.runs_dir):
+            with TemporaryDirectory(prefix=".write-check-", dir=directory):
+                pass
+
+    def check_reset_complete(self):
+        with self.transaction() as db:
+            if db.execute("SELECT 1 FROM pending_removals WHERE path IN ('decisions.jsonl', 'sheets-publications')").fetchone():
+                raise ValueError("Finish pending cleanup under History → Manage saved data first.")
 
     @contextmanager
     def transaction(self):
@@ -162,6 +189,8 @@ class History:
             if record["run_id"] != directory.name:
                 raise ValueError("Manifest ID and run directory differ.")
             rid = directory.name
+            if db.execute("SELECT 1 FROM pending_removals WHERE path=?", ("runs/" + rid,)).fetchone():
+                raise ValueError("This run was deleted and its saved files are pending cleanup.")
             if recover and record["project"] is not None:
                 db.execute("INSERT OR IGNORE INTO projects VALUES (?)", (record["project"],))
                 if record["saved_target"] is not None:
@@ -219,10 +248,18 @@ class History:
             return dict(manifest=manifest, directory=str(directory), artifacts=artifacts, evidence=evidence)
 
     def reindex(self):
+        with self.run_storage_lock():
+            return self._reindex()
+
+    def _reindex(self):
         from seo_analysis.app.runner import timestamp
         stats = {"indexed": 0, "active": 0, "recovered": 0, "errors": []}
+        with self.transaction() as db:
+            pending = {row["path"] for row in db.execute("SELECT path FROM pending_removals")}
         for path in sorted(self.workspace.runs_dir.glob("*/run.json")):
             directory = path.parent
+            if "runs/" + directory.name in pending:
+                continue
             try:
                 with FileLock(str(directory / ".active.lock"), timeout=0):
                     manifest = json.loads(path.read_text(encoding="utf-8"))

@@ -100,6 +100,10 @@ The sample inherits the crawl's coverage. Calibration reports weighted estimates
 
 **Projects** lists saved projects. Open **Create project** to enter a name and optionally save a website. Open a project to view its targets or add another. In **History**, use **Archive** to hide a run from the history and recent-runs lists. You can open or restore it under **View archived runs**. Its evidence and files remain available.
 
+Use **Delete** next to a run to permanently remove its database entries, reports and page evidence. Under **History → Manage saved data**, choose **Delete all audits**, **Delete all runs**, or **Clear workspace data**. Read the scope on the confirmation screen and check the workspace path before confirming. Clearing workspace data also removes projects, targets, saved workflows, review decisions and local connection and publication records. If another program holds a saved file open, close it and choose **Retry file cleanup**.
+
+If startup reports a read-only workspace on Windows, stop the terminal server and open **Start SEO Workbench.cmd**, then accept the writable copy. The launcher uses that copy on subsequent starts. The data management screen shows the folder currently in use.
+
 Use **Create audit workflow** inside a project to save a target, page cap and link-crawl fallback. Run or edit it from the project. Each run records the workflow name and its settings. For a trusted local or staging site, enable private-network access on the individual run.
 
 ### Run a saved workflow from a scheduler

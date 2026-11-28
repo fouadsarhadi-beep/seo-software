@@ -8,7 +8,7 @@ from pathlib import Path
 import shutil
 import socket
 import sqlite3
-from tempfile import TemporaryDirectory, mkdtemp
+from tempfile import mkdtemp
 from threading import Thread
 from time import monotonic
 import webbrowser
@@ -18,7 +18,7 @@ import uvicorn
 
 from seo_analysis.core.artifacts import write_text
 from seo_analysis.core.workspace import Workspace
-from seo_analysis.storage.history import History
+from seo_analysis.storage.history import History, workspace_access_error as needs_writable_copy
 from seo_analysis.ui.server import create_app
 
 HOST = "127.0.0.1"
@@ -36,19 +36,7 @@ def load_workspace(state: Path, config_file: Path | None) -> Workspace:
 
 
 def check_workspace(workspace: Workspace) -> None:
-    with History(workspace).transaction() as db:
-        # SQLite can open and query a read-only database. Check a write without changing any rows.
-        db.execute("UPDATE projects SET name = name WHERE 0")
-    workspace.runs_dir.mkdir(exist_ok=True)
-    with TemporaryDirectory(prefix=".write-check-", dir=workspace.runs_dir):
-        pass
-
-
-def needs_writable_copy(error: OSError | sqlite3.OperationalError) -> bool:
-    return isinstance(error, PermissionError) or (
-        isinstance(error, sqlite3.OperationalError)
-        and getattr(error, "sqlite_errorcode", 0) & 0xff == sqlite3.SQLITE_READONLY
-    )
+    History(workspace).check_writable()
 
 
 def recover_workspace(workspace: Workspace, state: Path) -> Workspace:

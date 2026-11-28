@@ -218,9 +218,18 @@ def cmd_mcp(args):
 
 def cmd_serve(args):
     import uvicorn
+    from seo_analysis.storage.history import workspace_access_error
     from seo_analysis.ui.server import create_app
     if not 1 <= args.port <= 65535:
         raise ValueError("Select a port between 1 and 65535.")
+    try:
+        History(args.workspace).check_writable()
+    except (OSError, sqlite3.Error) as exc:
+        if workspace_access_error(exc):
+            raise RuntimeError(f"The workspace is read-only or inaccessible: {args.workspace.data_dir}. "
+                               "On Windows, open Start SEO Workbench.cmd to make a writable copy, "
+                               "or use --config-file to open a writable workspace.") from exc
+        raise
     uvicorn.run(create_app(args.workspace, args.port), host="127.0.0.1", port=args.port)
     return 0
 

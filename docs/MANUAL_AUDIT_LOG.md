@@ -9,6 +9,11 @@ Run these checks after the development batch is ready on your Windows test copy.
 - [ ] Open the app under the Windows account that owns your Samatoos workspace. Check projects, history and a saved report download. Start a small audit and confirm that it appears in History.
 - [ ] If Windows blocks writes to the workspace, accept the copy prompt and verify the same projects and history are available. Exit and reopen to check that the copied workspace is reused. Leave the original workspace in place.
 
+## Workspace cleanup checkpoint — Stage C, Step 2
+
+- [ ] In a disposable workspace, save two audits and archive one. Use **Delete** on the archived audit and verify that its history entry, report download and evidence are gone.
+- [ ] In that workspace, open **History → Manage saved data** and verify the displayed folder. Delete all audits and confirm the sample project's other saved runs are still listed. Use **Clear workspace data** and verify that the project, saved workflows and remaining runs are removed. Start one new audit in the same workspace.
+
 ## Workbench checkpoint — Checks, comparisons and review (steps 1–3)
 
 - [ ] **Technical checks (C3, D2–D4).** Open the saved 100-page audit from **History** and run **All checks**. Open the source link, original page evidence and CSV. Filter **Internal links** for `unknown` and confirm unobserved targets differ from recorded HTTP errors. Search for a known URL in the source audit. If you have an older snapshot without markup, check that the affected checks show partial coverage.

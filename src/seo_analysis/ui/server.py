@@ -4,8 +4,10 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from functools import partial
 import json
+import logging
 from pathlib import Path, PureWindowsPath
 from secrets import compare_digest, token_urlsafe
+import sqlite3
 from threading import Event, Lock
 from urllib.parse import parse_qs, unquote, urlencode
 from uuid import uuid4
@@ -28,9 +30,17 @@ from seo_analysis.core.network import HttpOrigin
 from seo_analysis.reporting.workbook import WorkbookInput
 from seo_analysis.research.intelligence import ResearchInput
 from seo_analysis.research.sources import FeedInput
-from seo_analysis.storage.history import History
+from seo_analysis.storage.history import History, workspace_access_error
+from seo_analysis.storage.removal import RemovalConflict, pending_removals, remove_saved_data, retry_removals
 from seo_analysis.ui.uploads import export_form, export_input, import_upload
 from seo_analysis.web.crawl import CrawlConfig
+
+LOG = logging.getLogger("uvicorn.error")
+DELETE_SCOPES = {
+    "audits": ("Delete all audits", "Includes archived audits, their reports and page evidence. Reports from other tools may lose links to this evidence."),
+    "runs": ("Delete all runs", "Removes saved audits, reports, imported datasets, research and other runs, including archived runs."),
+    "workspace": ("Clear workspace data", "Removes saved runs, projects, targets, workflows, review decisions, local connection selections and publication records."),
+}
 
 FINDING_LABELS = {
     "content.extraction": "Text extraction", "content.overlap": "Content overlap",
@@ -124,8 +134,24 @@ def create_app(workspace, port=8765):
         verify_token(fields.pop("token", [""])[0])
         return {name: values if name in repeated else values[0] for name, values in fields.items()}
 
-    def render(view, **fields):
-        return HTMLResponse(templates.get_template("workbench.html").render(view=view, token=token, **fields))
+    def render(view, *, status_code=200, **fields):
+        return HTMLResponse(templates.get_template("workbench.html").render(view=view, token=token, **fields),
+                            status_code=status_code)
+
+    async def storage_error(request: Request, exc: Exception):
+        LOG.error("Workspace storage error for %s %s", request.method, request.url.path, exc_info=exc)
+        if workspace_access_error(exc):
+            message = ("The workbench cannot write to its saved data. On Windows, close this server and open "
+                       "Start SEO Workbench.cmd. Choose Yes if it offers a writable copy.")
+        elif isinstance(exc, Timeout) or getattr(exc, "sqlite_errorcode", 0) & 0xff in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED):
+            message = "The workspace is busy. Wait for the other operation to finish and try again."
+        else:
+            message = "The workbench could not access its saved data. Check the launcher log or server console for details."
+        return render("storage_error", message=message, path=workspace.data_dir, status_code=503)
+
+    app.add_exception_handler(sqlite3.Error, storage_error)
+    app.add_exception_handler(PermissionError, storage_error)
+    app.add_exception_handler(Timeout, storage_error)
 
     def detail(rid):
         try:
@@ -167,6 +193,57 @@ def create_app(workspace, port=8765):
         page = max(1, page)
         records = history.list_runs(limit=31, offset=(page - 1) * 30, archived=archived)
         return render("history", runs=records[:30], page=page, more=len(records) > 30, archived=archived)
+
+    @app.get("/history/data")
+    def saved_data(updated: bool = False):
+        return render("saved_data", pending=pending_removals(history), updated=updated, scopes=DELETE_SCOPES,
+                      path=workspace.data_dir)
+
+    @app.get("/history/data/{scope}")
+    def confirm_clear(scope: str):
+        if scope not in DELETE_SCOPES:
+            raise HTTPException(404, "Unknown deletion option.")
+        title, message = DELETE_SCOPES[scope]
+        return render("confirm_delete", title=title, message=message, back="/history/data", path=workspace.data_dir)
+
+    @app.get("/runs/{rid}/delete")
+    def confirm_run_delete(rid: str):
+        item = detail(rid)["manifest"]
+        return render("confirm_delete", title="Delete saved run", run=item, back="/history",
+                      message="Deletes this run, its reports and page evidence. Other runs may lose links to this evidence.")
+
+    async def delete_saved(request, scope, *, run_id=None):
+        fields = await form(request)
+        if fields.get("confirm") != "delete":
+            raise HTTPException(400, "Confirm the permanent deletion first.")
+        with guard:
+            if any(job.status in ("queued", "running") for job in jobs.values()):
+                raise HTTPException(409, "Wait for the active audit to finish before deleting data.")
+        try:
+            _, pending = await run_in_threadpool(remove_saved_data, history, scope, run_id=run_id)
+        except RemovalConflict as exc:
+            raise HTTPException(409, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        if scope == "single" and not pending:
+            return RedirectResponse("/history", 303)
+        return RedirectResponse("/history/data?updated=true", 303)
+
+    @app.post("/history/data/retry")
+    async def retry_data_cleanup(request: Request):
+        await form(request)
+        await run_in_threadpool(retry_removals, history)
+        return RedirectResponse("/history/data?updated=true", 303)
+
+    @app.post("/history/data/{scope}")
+    async def delete_data(scope: str, request: Request):
+        if scope not in DELETE_SCOPES:
+            raise HTTPException(404, "Unknown deletion option.")
+        return await delete_saved(request, scope)
+
+    @app.post("/runs/{rid}/delete")
+    async def delete_run(rid: str, request: Request):
+        return await delete_saved(request, "single", run_id=rid)
 
     @app.get("/compare")
     def comparison_form():
@@ -713,12 +790,18 @@ def create_app(workspace, port=8765):
     @app.post("/runs/{rid}/review/{index}")
     async def save_review(rid: str, index: int, request: Request):
         fields = await form(request)
-        pairs = json.loads(artifact_path(detail(rid), "pairs.json").read_text(encoding="utf-8"))
-        if not 0 <= index < len(pairs):
-            raise HTTPException(404, "Unknown review pair")
+
+        def save():
+            with history.run_storage_lock():
+                history.check_reset_complete()
+                pairs = json.loads(artifact_path(detail(rid), "pairs.json").read_text(encoding="utf-8"))
+                if not 0 <= index < len(pairs):
+                    raise HTTPException(404, "Unknown review pair")
+                review.save_decision(workspace.data_dir / "decisions.jsonl", pairs[index],
+                                     fields.get("decision", ""), fields.get("note", "").strip())
+
         try:
-            await run_in_threadpool(review.save_decision, workspace.data_dir / "decisions.jsonl", pairs[index],
-                                    fields.get("decision", ""), fields.get("note", "").strip())
+            await run_in_threadpool(save)
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
         except Timeout as exc:
