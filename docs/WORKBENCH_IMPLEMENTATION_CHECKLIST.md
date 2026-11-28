@@ -1,6 +1,6 @@
 # Workbench implementation checklist
 
-**Status on 2026-11-28:** stages 1–6 are implemented with automated coverage; live Google checks remain pending owner credentials. Stage 7 has 7.1–7.4 done except the two-dated-captures and arbitrary-selection parts of 7.5. Acceptance closed: rule inventory, tool inventory, capability status, interrupted-work recovery, backup and responsiveness. Stage 7 expands its research follow-up. The first release target is stages 1–4: launch, crawl, investigate, share. The second is stages 5–7: explain performance, track decisions, explore opportunities.
+**Status on 2026-11-28:** all seven stages are implemented with automated coverage. Outstanding work is not stage work: live Google checks await owner credentials, and the owner acceptance items (first install and upgrade, screen design review, return visit, both release walkthroughs and product sign-off) await an operator. Stage 7 expands its research follow-up. The first release target is stages 1–4: launch, crawl, investigate, share. The second is stages 5–7: explain performance, track decisions, explore opportunities.
 
 ## How to pick up the work
 
@@ -86,7 +86,7 @@ Depends on stage 2 and existing research datasets. Can follow stage 5 offline wo
 - [x] **7.2 Build keyword gap.** Select owned and competitor samples; check locale, date, device and source compatibility. Group comparable normalized queries while retaining original strings and provenance. Offer Shared, Owned sample only and Competitor sample only. Include scope in labels and exports. Pick a query to inspect contributing source rows or add it to a brief.
 - [x] **7.3 Import question relationships.** Require seed, parent and child; preserve source row, locale, country and observation date. Validate rows individually with a preview and explicit skipped-row count. Preserve original Persian spelling for display. Deduplicate identical edges within a source, retain provenance across samples and preserve multiple parents. Flat keyword imports open as lists.
 - [x] **7.4 Build Explore questions.** Choose seed and dataset, expand one branch at a time, provide an accessible outline and RTL display, and detect cycles on the current traversal path. Limit expansion per page with a visible “show more” action. Selecting a question opens the source. Export selected edges or add selected questions to an existing editorial brief. Leave a live question provider for a later integration.
-- [ ] **7.5 Verify together.** Use a Persian fixture with duplicate edges, a child shared by two parents, a cycle, two dates and an empty seed. Re-import the branch export and recover its parent relationships. Use asymmetric keyword samples and confirm an absent query is described only within the selected sample.
+- [x] **7.5 Verify together.** Use a Persian fixture with duplicate edges, a child shared by two parents, a cycle, two dates and an empty seed. Re-import the branch export and recover its parent relationships. Use asymmetric keyword samples and confirm an absent query is described only within the selected sample.
 
 ## Product acceptance across stages
 

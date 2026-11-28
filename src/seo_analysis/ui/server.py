@@ -38,7 +38,7 @@ from seo_analysis.core.network import HttpOrigin
 from seo_analysis.reporting.workbook import WorkbookInput
 from seo_analysis.reporting.export import build_bundle, page_csv, stamp
 from seo_analysis.research.intelligence import ResearchInput
-from seo_analysis.research.questions import build_question_tree, outline_edges, question_seeds
+from seo_analysis.research.questions import build_question_tree, capture_changes, outline_edges, question_seeds
 from seo_analysis.research.sources import FeedInput, redact_url
 from seo_analysis.storage.history import History, workspace_access_error
 from seo_analysis.storage.removal import RemovalConflict, pending_removals, remove_saved_data, retry_removals
@@ -322,7 +322,8 @@ def create_app(workspace, port=8765):
             {"project": project, "error": error, "fetched": fetched}), 303)
 
     @app.get("/tools/research/questions")
-    def question_explorer(dataset: str = "", seed: str = "", limit: int = 10, export: int = 0):
+    def question_explorer(dataset: str = "", seed: str = "", limit: int = 10, export: int = 0,
+                          compare: str = ""):
         if not dataset:
             raise HTTPException(400, "Choose a question-relationship dataset.")
         data = detail(dataset)
@@ -333,6 +334,15 @@ def create_app(workspace, port=8765):
         rows = payload.get("rows") or []
         limit = min(max(1, limit), 50)
         tree = build_question_tree(rows, seed, limit=limit) if seed else None
+        others = [item for item in saved_datasets({"questions": "Question relationships"}, RESEARCH_SOURCE_TOOLS)
+                  if item["id"] != dataset]
+        changes = None
+        if compare and seed:
+            other = detail(compare)
+            if (other["manifest"].get("parameters") or {}).get("kind") != "questions":
+                raise HTTPException(400, "Compare with another question-relationship dataset.")
+            earlier = json.loads(artifact_path(other, "dataset.json").read_text(encoding="utf-8"))
+            changes = capture_changes(rows, earlier.get("rows") or [])
         if export and tree is not None:
             buffer = StringIO()
             buffer.write("\ufeffparent,child,source_row\r\n")
@@ -342,8 +352,11 @@ def create_app(workspace, port=8765):
             return PlainTextResponse(buffer.getvalue(), media_type="text/csv",
                                      headers={"Content-Disposition":
                                               f'attachment; filename="questions-{dataset[:8]}.csv"'})
+        projects = history.projects()
         return render("question_tree", dataset_id=dataset, dataset=payload.get("source") or {},
-                      seeds=question_seeds(rows), seed=seed, tree=tree, limit=limit, total=len(rows))
+                      seeds=question_seeds(rows), seed=seed, tree=tree, limit=limit, total=len(rows),
+                      others=others, compare=compare, changes=changes,
+                      brief_project=projects[0]["name"] if projects else "")
 
     @app.get("/tools/search-traffic")
     def search_traffic(project: str = "", error: str = "", fetched: str = "", connect: str = ""):

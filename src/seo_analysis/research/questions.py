@@ -76,3 +76,14 @@ def outline_edges(node):
         seen.append((node.question, child.question, child.row))
         seen.extend(outline_edges(child))
     return seen
+
+
+def capture_changes(rows, previous_rows):
+    """Question edges that appeared or disappeared between two captures of the same seed."""
+    current = {(parent, child) for parent, items in question_edges(rows).items() for child, _ in items}
+    previous = {(parent, child) for parent, items in question_edges(previous_rows).items() for child, _ in items}
+    return {
+        "added": sorted(current - previous),
+        "removed": sorted(previous - current),
+        "persisted": sorted(current & previous),
+    }

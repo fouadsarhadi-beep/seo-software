@@ -753,6 +753,34 @@ def test_ui_brief_collects_a_query_from_a_gap_row_and_keeps_one_row_per_query(tm
     assert History(ws).brief_items("Acme") == []
 
 
+def test_ui_question_outline_compares_two_captures_and_offers_the_brief(tmp_path):
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    History(ws).add_project("Acme")
+
+    def capture(rows, observed):
+        rid = uuid4().hex
+        _saved_run(ws, {"run_id": rid, "tool_id": "research.import", "status": "succeeded", "project": None,
+                        "saved_target": None, "started_at": observed + "T00:00:00Z",
+                        "finished_at": observed + "T00:00:05Z",
+                        "parameters": {"kind": "questions", "observed": observed}, "counts": {"rows": len(rows)},
+                        "warnings": [], "artifacts": ["dataset.json"]},
+                   {"dataset.json": json.dumps({"schema_version": 1,
+                                                "source": {"kind": "questions", "observed": observed},
+                                                "rows": rows})})
+        return rid
+
+    earlier = capture([{"row": 1, "parent": "insurance", "child": "how"},
+                       {"row": 2, "parent": "how", "child": "retired question"}], "2026-10-01")
+    later = capture([{"row": 1, "parent": "insurance", "child": "how"},
+                     {"row": 2, "parent": "how", "child": "fresh question"}], "2026-11-20")
+    with TestClient(create_app(ws, 8972), base_url="http://127.0.0.1:8972") as client:
+        page = client.get("/tools/research/questions",
+                          params={"dataset": later, "seed": "insurance", "compare": earlier}).text
+        assert "Compared with another capture" in page
+        assert "No longer observed" in page and "retired question" in page
+        assert 'action="/brief/add"' in page
+
+
 def test_ui_review_queue_keeps_a_decision_and_reopens_it_when_the_page_changes(tmp_path):
     origin = "http://127.0.0.1:8972"
     ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")

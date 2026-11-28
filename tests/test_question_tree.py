@@ -1,5 +1,6 @@
 from seo_analysis.research.questions import (
     build_question_tree,
+    capture_changes,
     outline_edges,
     question_edges,
     question_seeds,
@@ -55,6 +56,32 @@ def test_seeds_come_from_the_seed_column_or_from_parentless_roots():
 def test_edges_group_by_parent_and_ignore_incomplete_rows():
     edges = question_edges(ROWS + [{"row": 7, "parent": "how", "child": ""}])
     assert [child for child, _ in edges["how"]] == ["cost", "documents"]
+
+
+def test_two_captures_show_what_appeared_and_what_stopped_appearing():
+    earlier = [
+        {"row": 1, "parent": "insurance", "child": "how"},
+        {"row": 2, "parent": "how", "child": "documents"},
+        {"row": 3, "parent": "how", "child": "old question"},
+    ]
+    later = [
+        {"row": 1, "parent": "insurance", "child": "how"},
+        {"row": 2, "parent": "how", "child": "documents"},
+        {"row": 3, "parent": "documents", "child": "new question"},
+    ]
+    changes = capture_changes(later, earlier)
+    assert changes["added"] == [("documents", "new question")]
+    assert changes["removed"] == [("how", "old question")]
+    assert changes["persisted"] == [("how", "documents"), ("insurance", "how")]
+
+
+def test_an_empty_seed_column_falls_back_to_parentless_roots():
+    rows = [
+        {"row": 1, "seed": "", "parent": "insurance", "child": "how"},
+        {"row": 2, "seed": "", "parent": "how", "child": "documents"},
+    ]
+    assert question_seeds(rows) == ["insurance"]
+    assert build_question_tree(rows, "insurance").children[0].question == "how"
 
 
 def test_outline_edges_lists_the_visible_branch():
