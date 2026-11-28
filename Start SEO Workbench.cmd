@@ -22,4 +22,4 @@ if errorlevel 1 (
     exit /b 1
 )
 
-start "" "%SEO_WORKBENCH_SCRIPTS%\pythonw.exe" -P -m seo_analysis.desktop %*
+start "" "%SEO_WORKBENCH_SCRIPTS%\pythonw.exe" -P -m seo_analysis.desktop --project-dir "%~dp0." %*

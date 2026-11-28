@@ -6,7 +6,7 @@ Run these checks after the development batch is ready on your Windows test copy.
 
 - [ ] Double-click `Start SEO Workbench.cmd` from the project folder with the existing `.venv` in the parent folder. Confirm the workbench opens and shows the usual projects and history.
 - [ ] Double-click `SEO-Workbench.exe` to open the workbench. Close the browser tab, reopen it with **Open Workbench**, and confirm **Exit** stops the local server.
-- [ ] Open the app under the Windows account that owns your Samatoos workspace. Check projects, history and a saved report download. Start a small audit and confirm that it appears in History.
+- [ ] From a writable checkout, use the script to start a small audit and verify it reopens from the checkout's `.seo-workbench` folder after restarting. If importing the earlier Samatoos workspace, check its projects, history and a saved report download.
 - [ ] If Windows blocks writes to the workspace, accept the copy prompt and verify the same projects and history are available. Exit and reopen to check that the copied workspace is reused. Leave the original workspace in place.
 
 ## Workspace cleanup checkpoint — Stage C, Step 2

@@ -227,7 +227,7 @@ def cmd_serve(args):
     except (OSError, sqlite3.Error) as exc:
         if workspace_access_error(exc):
             raise RuntimeError(f"The workspace is read-only or inaccessible: {args.workspace.data_dir}. "
-                               "On Windows, open Start SEO Workbench.cmd to make a writable copy, "
+                               "On Windows, open Start SEO Workbench.cmd to use the project workspace, "
                                "or use --config-file to open a writable workspace.") from exc
         raise
     uvicorn.run(create_app(args.workspace, args.port), host="127.0.0.1", port=args.port)

@@ -16,6 +16,7 @@ from time import monotonic
 import webbrowser
 
 from platformdirs import PlatformDirs
+from filelock import FileLock
 import uvicorn
 
 from seo_analysis.core.artifacts import write_text
@@ -49,7 +50,7 @@ def open_launcher_state(
         for location in locations:
             try:
                 with (location / WORKSPACE_POINTER).open(encoding="utf-8") as pointer:
-                    candidate = Path(pointer.read())
+                    candidate = location / pointer.read()
                     modified = os.fstat(pointer.fileno()).st_mtime_ns
             except (FileNotFoundError, NotADirectoryError, PermissionError):
                 continue
@@ -74,6 +75,16 @@ def open_launcher_state(
 
 def check_workspace(workspace: Workspace) -> None:
     History(workspace).check_writable()
+
+
+def project_config(project: Path) -> Path:
+    directory = project / ".seo-workbench"
+    directory.mkdir(exist_ok=True)
+    config = directory / "config.toml"
+    with FileLock(str(directory / ".config.lock"), timeout=10):
+        if not config.exists():
+            write_text(config, '[paths]\ndata_dir = "data"\n')
+    return config
 
 
 def recover_workspace(workspace: Workspace, state: Path) -> Workspace:
@@ -102,7 +113,7 @@ def recover_workspace(workspace: Workspace, state: Path) -> Workspace:
         write_text(config, '[paths]\ndata_dir = "data"\n')
         copied = Workspace.load(config)
         check_workspace(copied)
-        write_text(state / WORKSPACE_POINTER, str(config))
+        write_text(state / WORKSPACE_POINTER, str(config.relative_to(state)))
     except Exception:
         shutil.rmtree(recovery, ignore_errors=True)
         raise
@@ -215,6 +226,7 @@ def serve_desktop(
 
 def main() -> int:
     parser = ArgumentParser(prog="SEO-Workbench", description="Start the local SEO workbench.")
+    parser.add_argument("--project-dir", type=Path, help="Keep launcher files and workspace data in this project.")
     parser.add_argument("--config-file", type=Path, help="Use a specific workspace configuration.")
     parser.add_argument("--state-dir", type=Path, help="Set the folder for launcher logs and recovered workspaces.")
     parser.add_argument("--no-window", action="store_true", help="Serve without opening the launcher or browser.")
@@ -223,18 +235,23 @@ def main() -> int:
     if args.port is not None and not 1 <= args.port <= 65535:
         parser.error("--port must be between 1 and 65535")
 
-    from tkinter import Tk, messagebox
+    root = None
+    if not args.no_window:
+        from tkinter import Tk, messagebox
 
-    root = None if args.no_window else Tk()
-    if root is not None:
+        root = Tk()
         root.title(TITLE)
         root.resizable(False, False)
         root.withdraw()
     log_path = None
     try:
-        state, handler, config_file = open_launcher_state(launcher_locations(args.state_dir), args.config_file)
+        project = args.project_dir.resolve() if args.project_dir else None
+        state_dir = args.state_dir or (project / ".seo-workbench" if project else None)
+        state, handler, config_file = open_launcher_state(launcher_locations(state_dir), args.config_file)
         log_path = state / "launcher.log"
         logging.basicConfig(handlers=[handler], level=logging.INFO)
+        if config_file is None and project is not None:
+            config_file = project_config(project)
         workspace = Workspace.load(config_file)
         try:
             check_workspace(workspace)

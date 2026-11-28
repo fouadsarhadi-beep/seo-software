@@ -28,8 +28,7 @@ class Workspace:
 
     @classmethod
     def load(cls, config_file: Path | None = None) -> "Workspace":
-        defaults = PlatformDirs("SEOAnalysisSoftware", appauthor=False)
-        path = config_file or defaults.user_config_path / "config.toml"
+        path = config_file or PlatformDirs("SEOAnalysisSoftware", appauthor=False).user_config_path / "config.toml"
         path = path.expanduser().absolute()
         try:
             with path.open("rb") as fh:
@@ -47,9 +46,7 @@ class Workspace:
         if not isinstance(paths, dict) or paths.keys() - {"data_dir", "export_dir"}:
             raise ConfigurationError("Use data_dir and export_dir under [paths].")
 
-        def directory(name: str, default: Path) -> Path:
-            if name not in paths:
-                return default
+        def directory(name: str) -> Path:
             value = paths[name]
             if not isinstance(value, str) or not value.strip():
                 raise ConfigurationError(f"paths.{name} must be a nonempty directory path.")
@@ -58,5 +55,7 @@ class Workspace:
                 raise ConfigurationError(f"paths.{name} points to a file.")
             return result
 
-        data = directory("data_dir", defaults.user_data_path)
-        return cls(path, data, directory("export_dir", data / "exports"))
+        data = (directory("data_dir") if "data_dir" in paths
+                else PlatformDirs("SEOAnalysisSoftware", appauthor=False).user_data_path)
+        exports = directory("export_dir") if "export_dir" in paths else data / "exports"
+        return cls(path, data, exports)

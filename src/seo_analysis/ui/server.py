@@ -142,7 +142,7 @@ def create_app(workspace, port=8765):
         LOG.error("Workspace storage error for %s %s", request.method, request.url.path, exc_info=exc)
         if workspace_access_error(exc):
             message = ("The workbench cannot write to its saved data. On Windows, close this server and open "
-                       "Start SEO Workbench.cmd. Choose Yes if it offers a writable copy.")
+                       "Start SEO Workbench.cmd from a writable checkout to use the project workspace.")
         elif isinstance(exc, Timeout) or getattr(exc, "sqlite_errorcode", 0) & 0xff in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED):
             message = "The workspace is busy. Wait for the other operation to finish and try again."
         else:

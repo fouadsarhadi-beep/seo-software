@@ -4,9 +4,44 @@ import sqlite3
 
 import pytest
 
+from seo_analysis import desktop
+from seo_analysis.core import workspace as workspace_module
 from seo_analysis.core.workspace import Workspace
 from seo_analysis.desktop import check_workspace, needs_writable_copy, open_launcher_state, recover_workspace
 from seo_analysis.storage.history import History
+
+
+def test_project_launcher_reopens_history_with_profile_locations_unavailable(tmp_path, monkeypatch):
+    project = tmp_path / "SEO محیط"
+    project.mkdir()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("sys.argv", ["SEO Workbench", "--project-dir", str(project), "--no-window"])
+
+    def blocked(*args, **kwargs):
+        raise PermissionError("Profile access denied")
+
+    monkeypatch.setattr(desktop, "PlatformDirs", blocked)
+    monkeypatch.setattr(workspace_module, "PlatformDirs", blocked)
+    monkeypatch.setattr(Path, "home", blocked)
+    folder = project / ".seo-workbench"
+    projects = []
+
+    def serve(listener, workspace, root):
+        assert workspace.config_file == folder / "config.toml"
+        assert workspace.data_dir == folder / "data"
+        assert workspace.export_dir == folder / "data" / "exports"
+        history = History(workspace)
+        projects.append(history.projects())
+        if not projects[-1]:
+            history.add_project("Local project")
+        return 0
+
+    monkeypatch.setattr(desktop, "serve_desktop", serve)
+    assert desktop.main() == 0
+    assert desktop.main() == 0
+    assert projects == [[], [{"name": "Local project"}]]
+    assert (folder / "launcher.log").is_file()
+    assert (folder / "data" / "history.sqlite3").is_file()
 
 
 def test_desktop_workspace_recovery_preserves_history_and_files(tmp_path):

@@ -8,9 +8,9 @@ You can also compare saved audits, turn Search Console and GA4 exports into an E
 
 If you've already installed the project, double-click **Start SEO Workbench.cmd** in the project folder. It checks for `.venv` in the project folder and then in its parent. For a first-time installation, follow the Windows setup under [Run from Python](#run-from-python).
 
-The launcher opens the workbench in your default browser. Use **Open Workbench** to reopen the tab and **Exit** to stop the app. It starts with your usual workspace in `%LOCALAPPDATA%\SEOAnalysisSoftware`. If Windows prevents writes, the launcher offers to copy your projects, history and saved files to a writable workspace. It reopens the copy on later launches. You may need to reconnect external accounts after switching to a copy. To open a custom workspace, pass `--config-file "C:\path\to\config.toml"` to the launcher.
+The script runs the checkout with your installed Python. It creates `.seo-workbench` beside the script and stores `config.toml`, `launcher.log` and the `data` folder there. Git ignores this directory. Use **Open Workbench** to reopen the browser tab and **Exit** to stop the app. To use the same workspace from the CLI, pass `--config-file ".seo-workbench\config.toml"` before the command.
 
-If Windows blocks the launcher folder in Local AppData, the launcher tries `%USERPROFILE%\SEOAnalysisWorkbench` for its logs and recovered workspaces. To choose a location yourself, pass `--state-dir "C:\path\to\writable-folder"` to the launcher.
+The first project-local launch starts with an empty history. To bring earlier audits across, close all workbench and CLI processes using the old workspace. Copy the contents of the old data folder (including `history.sqlite3`, any SQLite sidecar files, and `runs`) into an **empty** `.seo-workbench\data` before first launch. If you've already saved new work there, copy the old files into a separate `.seo-workbench\legacy-data` folder and change `data_dir` in the local `config.toml` to `"legacy-data"` to open that history. Use the earlier workspace's active data folder, which may be a recovered copy. Connected services may need to be reconnected after moving data.
 
 ### Optional standalone Windows app
 
@@ -104,7 +104,7 @@ The sample inherits the crawl's coverage. Calibration reports weighted estimates
 
 Use **Delete** next to a run to permanently remove its database entries, reports and page evidence. Under **History → Manage saved data**, choose **Delete all audits**, **Delete all runs**, or **Clear workspace data**. Read the scope on the confirmation screen and check the workspace path before confirming. Clearing workspace data also removes projects, targets, saved workflows, review decisions and local connection and publication records. If another program holds a saved file open, close it and choose **Retry file cleanup**.
 
-If startup reports a read-only workspace on Windows, stop the terminal server and open **Start SEO Workbench.cmd**, then accept the writable copy. The launcher uses that copy on subsequent starts. The data management screen shows the folder currently in use.
+If the terminal server reports a read-only workspace on Windows, close it and open **Start SEO Workbench.cmd** from a writable checkout. The data management screen shows the active folder. See [Open the workbench on Windows](#open-the-workbench-on-windows) to bring an older workspace into the project.
 
 Use **Create audit workflow** inside a project to save a target, page cap and link-crawl fallback. Run or edit it from the project. Each run records the workflow name and its settings. For a trusted local or staging site, enable private-network access on the individual run.
 
