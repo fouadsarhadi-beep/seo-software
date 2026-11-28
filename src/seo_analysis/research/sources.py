@@ -90,8 +90,9 @@ def _advertised_feed(response) -> str:
     except (ValueError, TypeError):
         return ""
     for tag in soup.find_all("link", href=True):
-        rel = tag.get("rel") or []
-        rel = [str(item).casefold() for item in rel] if isinstance(rel, list) else str(rel).casefold().split()
+        raw_rel: list | str = tag.get("rel") or []
+        rel: list[str] = ([str(item).casefold() for item in raw_rel] if isinstance(raw_rel, list)
+                          else str(raw_rel).casefold().split())
         if "alternate" not in rel:
             continue
         kind = str(tag.get("type", "")).casefold()

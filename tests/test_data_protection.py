@@ -6,7 +6,6 @@ from zipfile import ZipFile
 
 from bs4 import BeautifulSoup
 from fastapi.testclient import TestClient
-import pytest
 
 from seo_analysis.cli import main
 from seo_analysis.core.workspace import Workspace

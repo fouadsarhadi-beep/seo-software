@@ -222,4 +222,11 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 - Batch 6 — The everyday `seo.bat` and `SEO-Workbench.bat` now pass `--config-file` for the project-local `.seo-workbench` workspace when it exists, so the CLI, the browser launcher and `Start SEO Workbench.cmd` share one history instead of the launcher writing to a different workspace.
 - Batch 6 — Verified by test: page-two and evidence-page bookmarks, a findings search, the exclusion filter and the filtered CSV. The actual Windows launch from a path with spaces and Persian text stays owner-pending until observed.
 
+## DS delivery plan — batch 7: quality and CI parity
+
+- Batch 7 — Repaired the quality findings the plan reported: three Ruff violations (unused imports) and three mypy errors (one narrowed assignment in the read model, two unannotated locals). `ruff check src tests` and `mypy src` now pass across 68 source files.
+- Batch 7 — Bandit reports nothing at medium or high severity, and the dependency audit reports no known vulnerabilities in the locked runtime.
+- Batch 7 — The full suite passes 229 tests with two optional skips and the known sandbox-only MCP failure, and `uv build --wheel` produces `seo_analysis-0.4.0-py3-none-any.whl`.
+- Batch 7 — Still open: review-queue ordering by verified severity with traffic provenance and rationale, the Windows/Linux CI matrix and its URL (which need a push the owner controls), and the hand-off to Codex for independent review.
+
 [Current scope and remaining work](ROADMAP.md)

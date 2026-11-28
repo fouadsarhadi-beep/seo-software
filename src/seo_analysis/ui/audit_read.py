@@ -171,9 +171,9 @@ def load_audit(directory, manifest: dict) -> Audit:
             ))
     for finding in findings:
         for evidence_id in finding.evidence_ids:
-            page = evidence.get(evidence_id)
-            if page is not None and finding.rule not in page.rules:
-                page.rules.append(finding.rule)
+            target = evidence.get(evidence_id)
+            if target is not None and finding.rule not in target.rules:
+                target.rules.append(finding.rule)
     return Audit(manifest=manifest, pages=pages, findings=findings, evidence=evidence)
 
 

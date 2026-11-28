@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Red
 from filelock import Timeout
 from jinja2 import Environment, PackageLoader, select_autoescape
 from secrets import token_hex
-from threading import Event, Thread
+from threading import Thread
 
 from starlette.concurrency import run_in_threadpool
 
@@ -679,7 +679,7 @@ def create_app(workspace, port=8765):
         if selected is None and projects:
             selected = projects[0]
         items = history.brief_items(selected["name"]) if selected else []
-        grouped = {}
+        grouped: dict[str, list] = {}
         for row in (history.brief_sources(selected["name"]) if selected else []):
             grouped.setdefault(row["query"], []).append(row | {"available": run_exists(row["run_id"])})
         return render("brief", selected=selected, projects=projects, items=items, grouped=grouped)

@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 
 from seo_analysis.ui.audit_read import load_audit, query_pages
 
