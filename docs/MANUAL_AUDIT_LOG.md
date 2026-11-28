@@ -2,6 +2,8 @@
 
 Run these checks after the development batch is ready on your Windows test copy. Start with the saved Samatoos runs. For any mismatch, record the test date, commit, run ID, affected URL or source row, and what you saw.
 
+This file is the owner's action list. Checks are grouped first by the original feature checkpoints and then by the delivery batch that introduced them; work top to bottom. A provider marked **Pending** in [CAPABILITY_STATUS.md](CAPABILITY_STATUS.md) always has its live check here, and that status file is a register rather than a second list of tasks.
+
 ## Windows desktop checkpoint — Stage J, Step 4
 
 - [ ] Double-click `Start SEO Workbench.cmd` from the project folder with the existing `.venv` in the parent folder. Confirm the workbench opens and shows the usual projects and history.
@@ -115,7 +117,7 @@ Use authorized properties and the documented [Google connection and CLI commands
 - [ ] **Record a decision.** Open an audit, choose a finding, pick an affected page and save a decision with a note. It should appear in **Review queue** with that page, status and note.
 - [ ] **A decision survives a restart, and reopens when the page changes.** Restart the workbench and confirm the decision is still there. Run a new audit where that page's title or status changed, then reopen the queue: the item should read **needs re-review** with the previous note still visible.
 
-## Workbench stage 7 checkpoint — research sources (pending owner check)
+## Delivery-plan checkpoints — batches 1–7 (pending owner check)
 
 - [ ] **The picker explains itself.** Open **Keyword and competitor research**. Each saved dataset should say what it can answer, and the page should explain that two comparable samples support a gap comparison while an absent query is not proof of no ranking.
 - [ ] **A gap uses comparable samples only.** Import two search-result exports from the same provider, locale and device but different sites. The competitor section should show **Shared**, **Owned sample only** and **Competitor sample only** counts, each expandable to example queries that open their source rows. Confirm the page states that a missing query is a property of these samples, not of the site.
@@ -131,3 +133,5 @@ Use authorized properties and the documented [Google connection and CLI commands
 - [ ] **The launchers share one workspace.** From the project folder, open the workbench with `SEO-Workbench.bat` and run one command with `seo.bat`. Both should use the same `.seo-workbench` history as `Start SEO Workbench.cmd`, including from a path with spaces and Persian characters.
 - [ ] **A failed feed explains the trimmed address in the browser.** Import a feed address that carries a token and fails. The error screen should name the reason, show the address without its sensitive parameters, and say the full address must be pasted again in Edit source.
 - [ ] **Every advertised task leads somewhere.** Work through the navigation and confirm each entry reaches a working screen or explains its prerequisite; nothing should be a dead link. Run a local HTML build through **Site QA** and follow one observation to its evidence.
+- [ ] **Browser capture with Playwright.** Install the browser (`python -m playwright install chromium`), then capture a trusted local build from **Local build QA**. The screenshot, timings and any axe report should save, and the capture should be reusable as a baseline. Without that install the automated test correctly skips, so this is the only way to prove capture works.
+- [ ] **WordPress live inventory.** Against an authorized installation, run `seo-analysis wordpress inventory <https://site/blog> --resource posts` and confirm titles, links and Yoast directives match the site; repeat with `--authenticated` after saving an Application Password and confirm `forget` removes only the local copy.

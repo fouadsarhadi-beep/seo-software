@@ -4,6 +4,8 @@ What is available offline, what is verified with fixtures, and what has actually
 
 **How to read a row:** *wired* means the code path exists and runs; *fixture-verified* means tests exercise it against fixtures; *live-verified* means it has been observed against the real provider. A row can be wired and fixture-verified while its live check is still pending — that combination is the normal state for a provider nobody has connected yet.
 
+**This is a register, not a task list.** Every *Pending* row has its owner check in [MANUAL_AUDIT_LOG.md](MANUAL_AUDIT_LOG.md) — the Connected Google checkpoint for Search Console, GA4, PageSpeed, CrUX and Sheets; the Research source checkpoint for Brave and public feeds; the delivery-plan checkpoints for WordPress and browser capture. When a check passes, promote the row here with the date and environment.
+
 | Capability | Offline | Fixture-verified | Live-verified | Notes |
 | --- | --- | --- | --- | --- |
 | Website audit and crawl | Yes | Yes | **Yes** | 100-page sample on samatoos.ir; one noindex page excluded |
