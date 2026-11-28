@@ -55,6 +55,16 @@ MIGRATIONS = [
                source_run TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
                PRIMARY KEY (project, query))""",
     ),
+    (
+        """CREATE TABLE brief_sources (
+               project TEXT NOT NULL, query TEXT NOT NULL, run_id TEXT NOT NULL,
+               row_ref TEXT NOT NULL DEFAULT '', added_at TEXT NOT NULL,
+               PRIMARY KEY (project, query, run_id, row_ref))""",
+        # Existing items keep their note and gain the source they were collected from.
+        """INSERT OR IGNORE INTO brief_sources (project, query, run_id, row_ref, added_at)
+           SELECT project, query, source_run, '', updated_at FROM brief_items
+           WHERE source_run IS NOT NULL AND source_run <> ''""",
+    ),
 ]
 
 
@@ -239,6 +249,38 @@ class History:
             row = db.execute("SELECT * FROM brief_items WHERE project=? AND query=?", (project, query)).fetchone()
             return dict(row)
 
+    def collect_brief_item(self, project, query, *, note="", source_run="", row_ref=""):
+        """Collect a query: create it once, record where it came from, never overwrite an edited note."""
+        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        with self.transaction() as db:
+            db.execute("""INSERT INTO brief_items (project, query, note, source_run, created_at, updated_at)
+                          VALUES (?, ?, ?, ?, ?, ?)
+                          ON CONFLICT(project, query) DO UPDATE SET updated_at=excluded.updated_at""",
+                       (project, query, note, source_run, now, now))
+            if source_run:
+                db.execute("""INSERT OR IGNORE INTO brief_sources (project, query, run_id, row_ref, added_at)
+                              VALUES (?, ?, ?, ?, ?)""", (project, query, source_run, row_ref or "", now))
+            row = db.execute("SELECT * FROM brief_items WHERE project=? AND query=?", (project, query)).fetchone()
+            return dict(row)
+
+    def set_brief_note(self, project, query, note):
+        """Edit the human decision, leaving the collected sources untouched."""
+        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        with self.transaction() as db:
+            db.execute("UPDATE brief_items SET note=?, updated_at=? WHERE project=? AND query=?",
+                       (note, now, project, query))
+
+    def brief_sources(self, project, query=None):
+        with self.transaction() as db:
+            rows = db.execute("""SELECT * FROM brief_sources WHERE project=? AND (? IS NULL OR query=?)
+                                 ORDER BY added_at, run_id, row_ref""", (project, query, query))
+            return [dict(row) for row in rows]
+
+    def remove_brief_source(self, project, query, run_id, row_ref=""):
+        with self.transaction() as db:
+            db.execute("""DELETE FROM brief_sources WHERE project=? AND query=? AND run_id=? AND row_ref=?""",
+                       (project, query, run_id, row_ref or ""))
+
     def brief_items(self, project):
         with self.transaction() as db:
             rows = db.execute("""SELECT * FROM brief_items WHERE project=?
@@ -256,6 +298,7 @@ class History:
 
     def remove_brief_item(self, project, query):
         with self.transaction() as db:
+            db.execute("DELETE FROM brief_sources WHERE project=? AND query=?", (project, query))
             db.execute("DELETE FROM brief_items WHERE project=? AND query=?", (project, query))
 
     def index(self, directory, *, recover=False):

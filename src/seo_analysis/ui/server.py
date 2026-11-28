@@ -658,6 +658,13 @@ def create_app(workspace, port=8765):
         return render("review_queue", selected=selected, projects=projects, items=items,
                       latest=latest_id, finding_labels=FINDING_LABELS)
 
+    def run_exists(run_id):
+        try:
+            history.show(run_id)
+            return True
+        except (ValueError, OSError):
+            return False
+
     @app.get("/brief")
     def brief(project: str = ""):
         projects = history.projects()
@@ -665,7 +672,10 @@ def create_app(workspace, port=8765):
         if selected is None and projects:
             selected = projects[0]
         items = history.brief_items(selected["name"]) if selected else []
-        return render("brief", selected=selected, projects=projects, items=items)
+        grouped = {}
+        for row in (history.brief_sources(selected["name"]) if selected else []):
+            grouped.setdefault(row["query"], []).append(row | {"available": run_exists(row["run_id"])})
+        return render("brief", selected=selected, projects=projects, items=items, grouped=grouped)
 
     @app.post("/brief/add")
     async def brief_add(request: Request):
@@ -674,8 +684,31 @@ def create_app(workspace, port=8765):
         query = (fields.get("query") or "").strip()
         if not project or not query:
             raise HTTPException(400, "Choose a project and a query.")
-        history.add_brief_item(project, query, note=(fields.get("note") or "").strip()[:500],
-                               source_run=fields.get("source_run", ""))
+        source_run = fields.get("source_run", "")
+        if source_run and not run_exists(source_run):
+            raise HTTPException(400, "That source is no longer available. Reload the research screen and collect again.")
+        history.collect_brief_item(project, query, note=(fields.get("note") or "").strip()[:500],
+                                   source_run=source_run, row_ref=fields.get("row", ""))
+        return RedirectResponse("/brief?" + urlencode({"project": project}), 303)
+
+    @app.post("/brief/note")
+    async def brief_note(request: Request):
+        fields = await form(request)
+        project = require_project(fields.get("project", ""))
+        query = (fields.get("query") or "").strip()
+        if not project or not query:
+            raise HTTPException(400, "Choose a project and a query.")
+        history.set_brief_note(project, query, (fields.get("note") or "").strip()[:500])
+        return RedirectResponse("/brief?" + urlencode({"project": project}), 303)
+
+    @app.post("/brief/remove-source")
+    async def brief_remove_source(request: Request):
+        fields = await form(request)
+        project = require_project(fields.get("project", ""))
+        if not project:
+            raise HTTPException(400, "Choose a project.")
+        history.remove_brief_source(project, fields.get("query", ""), fields.get("run_id", ""),
+                                    fields.get("row_ref", ""))
         return RedirectResponse("/brief?" + urlencode({"project": project}), 303)
 
     @app.post("/brief/remove")

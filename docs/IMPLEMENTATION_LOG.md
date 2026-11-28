@@ -205,4 +205,11 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 - Batch 4 — The Persian fixture now runs through the real UI import and explorer: a shared child under two parents, a path-local cycle, a deep branch and 55 siblings all render, and the sibling cap is reachable by raising the limit. Roots in the same capture that the chosen seed does not reach are listed separately, so a branch cannot be silently unreachable.
 - Batch 4 — The transient-secret hook is documented as general: only a feed request carries a signed address, while every other connector keeps its secret in the OS credential store and puts only identifiers in the request.
 
+## DS delivery plan — batch 5: brief provenance
+
+- Batch 5 — Collect and Edit are now separate actions. Collecting a query creates the item once, records the run and source row it came from, and never overwrites an edited note; **Save note** edits the human decision on its own. The brief screen lists every source with a link to its row and a **Remove source** action, so removing one leaves the decision and the remaining evidence readable.
+- Batch 5 — Sources are validated: collecting from a run that no longer exists is refused with a recoverable error instead of filing a broken reference.
+- Batch 5 — The migration adds `brief_sources` and backfills each existing item's stored source, so earlier briefs keep their notes and gain provenance rather than being rewritten.
+- Batch 5 — Still open in this batch: computing gap sets only within compatible captures (provider, locale, device, period) with contributing rows and an explicit distinction from any broader aggregate; and identifying a source whose run has since been deleted as unavailable.
+
 [Current scope and remaining work](ROADMAP.md)

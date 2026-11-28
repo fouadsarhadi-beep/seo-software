@@ -720,6 +720,56 @@ def test_ui_question_outline_expands_a_seed_and_exports_the_branch(tmp_path):
         assert "insurance,how,1" in export.text
 
 
+def test_ui_brief_keeps_the_decision_and_every_source(tmp_path):
+    origin = "http://127.0.0.1:8972"
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    History(ws).add_project("Acme")
+
+    def source_run(query):
+        rid = uuid4().hex
+        _saved_run(ws, {"run_id": rid, "tool_id": "research.import", "status": "succeeded", "project": "Acme",
+                        "saved_target": None, "started_at": "2026-11-20T00:00:00Z",
+                        "finished_at": "2026-11-20T00:00:05Z",
+                        "parameters": {"kind": "serp", "provider": "Export", "observed": "2026-11-20",
+                                       "locale": "en-US", "device": "desktop"},
+                        "counts": {"rows": 1}, "warnings": [], "artifacts": ["dataset.json"]},
+                   {"dataset.json": json.dumps({"schema_version": 1, "source": {
+                       "kind": "serp", "provider": "Export", "observed": "2026-11-20",
+                       "locale": "en-US", "device": "desktop", "skipped": 0, "capped": False},
+                       "rows": [{"row": 1, "query": query, "url": "https://mine.test/a", "rank": 1}]})})
+        return rid
+
+    first, second = source_run("delta"), source_run("delta")
+    with TestClient(create_app(ws, 8972), base_url=origin) as client:
+        headers = {"Origin": origin}
+        token = BeautifulSoup(client.get("/brief").text, "html.parser").select_one("input[name=token]")["value"]
+        for run_id, row_ref in ((first, "3"), (second, "9")):
+            client.post("/brief/add", headers=headers,
+                        data={"token": token, "project": "Acme", "query": "delta",
+                              "source_run": run_id, "row": row_ref})
+        items = History(ws).brief_items("Acme")
+        assert len(items) == 1
+        assert len(History(ws).brief_sources("Acme", "delta")) == 2
+        # Editing the note is a separate action and does not disturb the collected sources.
+        client.post("/brief/note", headers=headers,
+                    data={"token": token, "project": "Acme", "query": "delta", "note": "human decision"})
+        assert History(ws).brief_items("Acme")[0]["note"] == "human decision"
+        # Collecting again must not overwrite that decision.
+        client.post("/brief/add", headers=headers,
+                    data={"token": token, "project": "Acme", "query": "delta", "source_run": first, "row": "3"})
+        assert History(ws).brief_items("Acme")[0]["note"] == "human decision"
+    # A restart still shows one item, its note and both sources.
+    with TestClient(create_app(ws, 8972), base_url=origin) as client:
+        page = client.get("/brief", params={"project": "Acme"}).text
+        assert "human decision" in page and page.count("Source ") >= 2
+        token = BeautifulSoup(page, "html.parser").select_one("input[name=token]")["value"]
+        client.post("/brief/remove-source", headers={"Origin": origin},
+                    data={"token": token, "project": "Acme", "query": "delta",
+                          "run_id": first, "row_ref": "3"})
+    assert len(History(ws).brief_sources("Acme", "delta")) == 1
+    assert History(ws).brief_items("Acme")[0]["note"] == "human decision"
+
+
 def test_ui_brief_collects_a_query_from_a_gap_row_and_keeps_one_row_per_query(tmp_path):
     origin = "http://127.0.0.1:8972"
     ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
@@ -742,8 +792,8 @@ def test_ui_brief_collects_a_query_from_a_gap_row_and_keeps_one_row_per_query(tm
         client.post("/brief/add", headers=headers,
                     data={"token": token, "project": "Acme", "query": "delta", "source_run": rid})
         brief = client.get("/brief", params={"project": "Acme"}).text
-        assert "delta" in brief and "Research run" in brief
-        client.post("/brief/add", headers=headers,
+        assert "delta" in brief and "Source 1" in brief
+        client.post("/brief/note", headers=headers,
                     data={"token": token, "project": "Acme", "query": "delta", "note": "priority"})
         items = History(ws).brief_items("Acme")
         assert len(items) == 1 and items[0]["note"] == "priority"

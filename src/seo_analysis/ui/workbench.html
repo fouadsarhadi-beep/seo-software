@@ -426,7 +426,7 @@ p{overflow-wrap:anywhere}
 </section>
 {% endif %}
 {% macro node(item) %}
-<li><span dir="auto">{{ item.question }}</span>{% if item.cycle %} <span class="badge">cycle</span>{% endif %}{% if item.row %} <a href="/runs/{{dataset_id}}/dataset/{{item.row}}">source row {{item.row}}</a>{% endif %}{% if brief_project %} <form class="compact" method="post" action="/brief/add">{{ csrf() }}<input type="hidden" name="project" value="{{ brief_project }}"><input type="hidden" name="query" value="{{ item.question }}"><button class="secondary">Brief</button></form>{% endif %}
+<li><span dir="auto">{{ item.question }}</span>{% if item.cycle %} <span class="badge">cycle</span>{% endif %}{% if item.row %} <a href="/runs/{{dataset_id}}/dataset/{{item.row}}">source row {{item.row}}</a>{% endif %}{% if brief_project %} <form class="compact" method="post" action="/brief/add">{{ csrf() }}<input type="hidden" name="project" value="{{ brief_project }}"><input type="hidden" name="source_run" value="{{ dataset_id }}"><input type="hidden" name="row" value="{{ item.row }}"><input type="hidden" name="query" value="{{ item.question }}"><button class="secondary">Brief</button></form>{% endif %}
 {% if item.children %}<ul>{% for child in item.children %}{{ node(child) }}{% endfor %}</ul>{% endif %}
 {% if item.hidden %}<p><a href="?dataset={{dataset_id}}&amp;seed={{seed|urlencode}}&amp;limit={{limit * 2}}">Show {{ item.hidden }} more</a></p>{% endif %}
 </li>
@@ -453,10 +453,12 @@ p{overflow-wrap:anywhere}
 </form>
 {% if items %}
 <div class="table"><table>
-<tr><th>Query</th><th>Note</th><th>Source</th><th>Updated (UTC)</th><th></th></tr>
+<tr><th>Query</th><th>Note</th><th>Sources</th><th>Updated (UTC)</th><th></th></tr>
 {% for item in items %}
-<tr><td dir="auto">{{ item.query }}</td><td dir="auto">{{ item.note or '—' }}</td>
-<td>{% if item.source_run %}<a href="/runs/{{item.source_run}}">Research run</a>{% else %}—{% endif %}</td>
+<tr><td dir="auto">{{ item.query }}</td>
+<td><form class="line" method="post" action="/brief/note">{{ csrf() }}<input type="hidden" name="project" value="{{ selected.name }}"><input type="hidden" name="query" value="{{ item.query }}"><input name="note" value="{{ item.note }}" placeholder="Why it matters"><button class="secondary">Save note</button></form></td>
+<td>{% set sources = grouped.get(item.query, []) %}{% if sources %}<ul class="ruled">{% for source in sources %}<li>{% if source.available %}<a href="/runs/{{source.run_id}}{% if source.row_ref %}/dataset/{{source.row_ref}}{% endif %}">Source {{ loop.index }}</a>{% else %}<span class="badge">unavailable</span> source {{ loop.index }} · {{ source.run_id[:8] }}{% endif %}
+<form class="compact" method="post" action="/brief/remove-source">{{ csrf() }}<input type="hidden" name="project" value="{{ selected.name }}"><input type="hidden" name="query" value="{{ item.query }}"><input type="hidden" name="run_id" value="{{ source.run_id }}"><input type="hidden" name="row_ref" value="{{ source.row_ref }}"><button class="secondary">Remove source</button></form></li>{% endfor %}</ul>{% else %}—{% endif %}</td>
 <td>{{ item.updated_at[:19]|replace('T',' ') }}</td>
 <td><form class="compact" method="post" action="/brief/remove">{{ csrf() }}<input type="hidden" name="project" value="{{ selected.name }}"><input type="hidden" name="query" value="{{ item.query }}"><button class="secondary">Remove</button></form></td></tr>
 {% endfor %}
