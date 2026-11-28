@@ -13,8 +13,9 @@ from seo_analysis import __version__
 from seo_analysis.analysis import similarity
 from seo_analysis.analysis.checks import CHECKS, CompareInput, SnapshotInput
 from seo_analysis.app.operations import AnalysisInput, CalibrationInput, ReviewInput, VariantInput
-from seo_analysis.app.runner import ToolRunner
-from seo_analysis.core.artifacts import publish_files
+from seo_analysis.app.workflows import run_saved_audit
+from seo_analysis.cli_integrations import add_integration_commands
+from seo_analysis.cli_runtime import execute, print_run_result
 from seo_analysis.web import crawl
 from seo_analysis.app.system import doctor
 from seo_analysis.core import tools
@@ -32,34 +33,6 @@ def ask(question, default="", input_fn=input):
 
 def _interactive(args) -> bool:
     return sys.stdin.isatty() and not getattr(args, "yes", False) and not getattr(args, "json", False)
-
-
-def execute(args, spec, request, prompt=None, export=None, export_names=None):
-    workspace = args.workspace
-    json_mode = getattr(args, "json", False)
-    log = lambda message: print(message, file=sys.stderr)
-    result = ToolRunner(workspace).run(spec, request, log=log, prompt=None if json_mode else prompt,
-                                       project=getattr(args, "project", None),
-                                       saved_target=getattr(args, "target", None))
-    directory = Path(result.out_dir)
-    if export and result.status in {"succeeded", "partial"}:
-        names = result.artifacts if export_names is None else export_names
-        destination = publish_files(directory, export, names, include_observations=spec.uses_network)
-        log(f"Export directory: {destination}")
-    if json_mode:
-        summary = asdict(result)
-        summary["warning_count"] = len(result.warnings)
-        summary["warnings"] = result.warnings[:20]
-        print(json.dumps(summary, ensure_ascii=False))
-    else:
-        print(f"{result.tool_id} {result.status} | {result.run_id}")
-        print(f"Run directory: {directory}")
-        print("Coverage:", json.dumps(result.counts, ensure_ascii=False))
-        for warning in result.warnings[:20]:
-            print(warning)
-        if len(result.warnings) > 20:
-            print("See run.json for all warnings.")
-    return {"succeeded": 0, "partial": 3, "cancelled": 130}.get(result.status, 2)
 
 
 def cmd_crawl(args, input_fn=input):
@@ -109,7 +82,7 @@ def cmd_analyze(args, input_fn=input):
                             thr_contain=args.min_contain, thr_topic=args.min_topic, thr_title=args.min_title,
                             bigrams=not args.no_bigrams, brand_terms=tuple(args.brand or []))
     request = AnalysisInput(args.in_dir, s, pages, qp, args.stopwords, args.variants, args.normalizer,
-                            args.stem, args.include_noindex)
+                            args.stem, args.include_noindex, args.sample_per_stratum, args.sample_seed)
     export = args.out_dir
     if export is None and not (Path(args.in_dir) / "run.json").exists():
         export = args.in_dir
@@ -117,12 +90,12 @@ def cmd_analyze(args, input_fn=input):
 
 
 def cmd_review(args, input_fn=input):
-    request = ReviewInput(args.in_dir, args.decisions, args.min_evidence, args.limit)
+    request = ReviewInput(args.in_dir, args.decisions, args.min_evidence, args.limit, args.sample)
     return execute(args, tools.REVIEW, request, input_fn, args.in_dir, ["decisions.csv"])
 
 
 def cmd_calibrate(args, input_fn=input):
-    return execute(args, tools.CALIBRATE, CalibrationInput(args.in_dir, args.decisions),
+    return execute(args, tools.CALIBRATE, CalibrationInput(args.in_dir, args.decisions, args.sample),
                    export=args.in_dir, export_names=["calibration.txt"])
 
 
@@ -211,6 +184,18 @@ def cmd_history(args):
     return 2 if isinstance(value, dict) and value.get("errors") else 0
 
 
+def cmd_workflow(args):
+    history = History(args.workspace)
+    if args.operation == "list":
+        workflows = history.audit_workflows(args.project)
+        print(json.dumps(workflows, ensure_ascii=False, indent=None if args.json else 2))
+        return 0
+    saved = history.audit_workflow(args.workflow_id)
+    result = run_saved_audit(args.workspace, saved, allow_local=args.allow_local,
+                             log=lambda message: print(message, file=sys.stderr))
+    return print_run_result(result, args.json)
+
+
 def cmd_local_data(args):
     from seo_analysis.app.operations import ExportInput, ResearchInput, WorkbookInput, SiteQAInput
     if args.cmd == "import-data":
@@ -252,159 +237,9 @@ def cmd_snapshot(args):
     history = History(args.workspace)
     if args.cmd == "check":
         source = history.show(args.run)["directory"]
-        return execute(args, tools.CHECK, SnapshotInput(source, args.check))
+        return execute(args, tools.CHECK, SnapshotInput(source, args.check, source_run_id=args.run))
     before, after = (history.show(r)["directory"] for r in (args.before, args.after))
-    return execute(args, tools.COMPARE, CompareInput(before, after))
-
-
-def cmd_google(args):
-    from seo_analysis.connectors.google import GoogleConnection
-
-    connection = GoogleConnection(args.workspace, args.project, args.service)
-    if args.operation == "connect":
-        def choose(properties):
-            if not properties:
-                raise ValueError("Google returned no accessible properties for this account.")
-            if args.property_id is not None:
-                return args.property_id
-            if not sys.stdin.isatty():
-                raise ValueError("Pass --property ID when connecting from a noninteractive terminal.")
-            choices = sorted(properties)
-            for index, property_id in enumerate(choices, 1):
-                print(f"{index}. {properties[property_id]} ({property_id})")
-            answer = input("Property number: ").strip()
-            if not answer.isdecimal() or not 1 <= int(answer) <= len(choices):
-                raise ValueError("Choose one of the listed property numbers.")
-            return choices[int(answer) - 1]
-        if args.service != "sheets" and args.property_id is None and not sys.stdin.isatty():
-            raise ValueError("Pass --property ID when connecting from a noninteractive terminal.")
-        if args.service == "sheets" and args.property_id is not None:
-            raise ValueError("Sheets authorization does not accept a property ID.")
-        selected = connection.connect(args.client_file, choose)
-    elif args.operation == "disconnect":
-        connection.disconnect(revoke=args.revoke)
-        selected = None
-    else:
-        selected = connection.selected()
-    print(json.dumps({"service": args.service, "project": args.project, "selected": selected}, ensure_ascii=False))
-    return 0
-
-
-def cmd_search_console(args):
-    from seo_analysis.connectors.search_console import InspectionInput, SearchAnalyticsInput
-
-    if args.operation == "inspect-url":
-        return execute(args, tools.URL_INSPECTION, InspectionInput(args.url))
-    request = SearchAnalyticsInput(args.start, args.end, tuple(args.dimensions),
-                                   args.search_type, args.data_state, args.max_rows)
-    return execute(args, tools.SEARCH_ANALYTICS, request)
-
-
-def cmd_ga4(args):
-    from seo_analysis.connectors.ga4 import LandingPagesInput
-
-    request = LandingPagesInput(args.start, args.end, args.origin, args.stream_id, args.channel, args.max_rows)
-    return execute(args, tools.GA4_LANDING_PAGES, request)
-
-
-def cmd_performance_key(args):
-    from getpass import getpass
-    from seo_analysis.connectors.performance import performance_key, validate_key
-
-    if args.action == "set":
-        if not sys.stdin.isatty():
-            raise ValueError("Use an interactive terminal to save a performance API key.")
-        value = validate_key(getpass("Google performance API key: ").strip())
-        performance_key(args.workspace, "set", value)
-        print("Google performance API key saved to the OS credential store.")
-    else:
-        performance_key(args.workspace, "delete")
-        print("Google performance API key removed locally.")
-    return 0
-
-
-def cmd_performance(args):
-    from seo_analysis.connectors.performance import CruxInput, LighthouseInput, PageSpeedInput
-
-    if args.cmd == "lighthouse-report":
-        return execute(args, tools.LIGHTHOUSE, LighthouseInput(args.report))
-    if args.operation == "pagespeed":
-        return execute(args, tools.PAGESPEED, PageSpeedInput(args.url, args.strategy, args.use_key))
-    return execute(args, tools.CRUX, CruxInput(args.url, args.scope, args.form_factor))
-
-
-def cmd_dataset_export(args):
-    from seo_analysis.reporting.dataset_export import DatasetExportInput
-
-    return execute(args, tools.DATASET_EXPORT,
-                   DatasetExportInput(args.dataset, tuple(args.column), args.title, args.max_rows))
-
-
-def cmd_sheets_publish(args):
-    from seo_analysis.connectors.sheets import SheetsPublishInput
-
-    return execute(args, tools.SHEETS_PUBLISH, SheetsPublishInput(args.export, args.confirm))
-
-
-def cmd_live_research(args):
-    from seo_analysis.research.sources import BraveSearchInput, FeedInput, brave_key
-
-    if args.cmd == "research-feed":
-        return execute(args, tools.PUBLIC_FEED, FeedInput(args.url, args.max_items))
-    if args.cmd == "research-search":
-        return execute(args, tools.BRAVE_SEARCH,
-                       BraveSearchInput(args.query, args.country, args.language, args.count, args.allow_storage))
-    if args.action == "delete":
-        brave_key(args.workspace, delete=True)
-        print("Brave Search API key removed locally.")
-    else:
-        from getpass import getpass
-        import re
-
-        if not sys.stdin.isatty():
-            raise ValueError("Use an interactive terminal to save the Brave Search key.")
-        token = getpass("Brave Search API key: ").strip()
-        if not re.fullmatch(r"[A-Za-z0-9_-]{20,256}", token):
-            raise ValueError("Enter a valid Brave Search API key.")
-        brave_key(args.workspace, token)
-        print("Brave Search API key saved to the OS credential store.")
-    return 0
-
-
-def cmd_wordpress(args):
-    from seo_analysis.connectors.wordpress import InventoryInput, credentials, site_root
-
-    if args.operation == "inventory":
-        return execute(args, tools.WORDPRESS, InventoryInput(args.site, args.resource, args.max_items, args.authenticated))
-    if args.operation == "forget":
-        credentials(args.workspace, args.project, args.site, delete=True)
-        print("WordPress Application Password removed locally.")
-        return 0
-
-    from getpass import getpass
-
-    site_root(args.site)
-    if not sys.stdin.isatty():
-        raise ValueError("Use an interactive terminal to save a WordPress Application Password.")
-    account = input("Dedicated WordPress username: ").strip()
-    password = getpass("WordPress Application Password: ").strip()
-    credentials(args.workspace, args.project, args.site, account=account, password=password)
-    print("WordPress credentials saved to the OS credential store.")
-    return 0
-
-
-def cmd_browser_qa(args):
-    from seo_analysis.analysis.browserqa import BrowserQAInput
-
-    return execute(args, tools.BROWSER_QA, BrowserQAInput(args.directory, args.page, args.width, args.height,
-                                                           args.axe_script, args.baseline, args.chromium))
-
-
-def cmd_local_lighthouse(args):
-    from seo_analysis.analysis.local_lighthouse import LocalLighthouseInput
-
-    return execute(args, tools.LOCAL_LIGHTHOUSE,
-                   LocalLighthouseInput(args.directory, args.lighthouse_cli, args.chromium, args.page, args.device))
+    return execute(args, tools.COMPARE, CompareInput(before, after, args.before, args.after))
 
 
 def build_parser():
@@ -413,138 +248,7 @@ def build_parser():
     p.add_argument("--config-file", type=Path, help="application workspace settings (TOML)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    google = sub.add_parser("google", help="manage Google connections and run Google integrations")
-    google_actions = google.add_subparsers(dest="operation", required=True)
-    connect = google_actions.add_parser("connect", help="authorize a Google service on this computer")
-    connect.add_argument("--client-file", type=Path, required=True, help="OAuth client JSON for a Desktop app")
-    connect.add_argument("--property", dest="property_id", help="select this property ID without a numbered prompt")
-    status = google_actions.add_parser("status", help="show the local Google connection")
-    disconnect = google_actions.add_parser("disconnect", help="remove local Google credentials and property selection")
-    disconnect.add_argument("--revoke", action="store_true", help="also revoke the grant with Google")
-    for command in (connect, status, disconnect):
-        command.add_argument("service", choices=("gsc", "ga4", "sheets"))
-        command.add_argument("--project", help="scope the connection to an existing project")
-        command.set_defaults(func=cmd_google)
-
-
-    from seo_analysis.connectors.search_console import DIMENSIONS, MAX_ROWS, SEARCH_TYPES
-
-    search = google_actions.add_parser("search-analytics", help=tools.SEARCH_ANALYTICS.summary)
-    search.add_argument("--start", required=True, help="First date, YYYY-MM-DD")
-    search.add_argument("--end", required=True, help="Last date, YYYY-MM-DD")
-    search.add_argument("--dimensions", choices=DIMENSIONS, nargs="+", default=("query", "page"))
-    search.add_argument("--search-type", choices=SEARCH_TYPES, default="web")
-    search.add_argument("--data-state", choices=("final", "all"), default="final")
-    search.add_argument("--max-rows", type=int, default=MAX_ROWS)
-    inspection = google_actions.add_parser("inspect-url", help=tools.URL_INSPECTION.summary)
-    inspection.add_argument("url", help="URL in the selected Search Console property")
-    for command in (search, inspection):
-        command.add_argument("--project", help="use this project's Search Console connection")
-        command.add_argument("--json", action="store_true")
-        command.set_defaults(func=cmd_search_console)
-
-    from seo_analysis.connectors.ga4 import MAX_ROWS as GA4_MAX_ROWS
-
-    landing = google_actions.add_parser("landing-pages", help=tools.GA4_LANDING_PAGES.summary)
-    landing.add_argument("--start", required=True, help="First date, YYYY-MM-DD")
-    landing.add_argument("--end", required=True, help="Last date, YYYY-MM-DD")
-    landing.add_argument("--origin", default="", help="web origin to assign to reported paths for crawl matching")
-    landing.add_argument("--stream-id", default="", help="filter to a numeric GA4 web stream ID")
-    landing.add_argument("--channel", default="", help="session default channel group, such as Organic Search")
-    landing.add_argument("--max-rows", type=int, default=GA4_MAX_ROWS)
-    landing.add_argument("--project", help="use this project's GA4 connection")
-    landing.add_argument("--json", action="store_true")
-    landing.set_defaults(func=cmd_ga4)
-
-    from seo_analysis.connectors.performance import FORM_FACTORS
-
-    performance_key = google_actions.add_parser("performance-key", help="manage the optional performance API key")
-    performance_key.add_argument("action", choices=("set", "delete"))
-    performance_key.set_defaults(func=cmd_performance_key)
-    pagespeed = google_actions.add_parser("pagespeed", help=tools.PAGESPEED.summary)
-    pagespeed.add_argument("url", help="public page URL sent to PageSpeed Insights")
-    pagespeed.add_argument("--strategy", choices=("mobile", "desktop"), default="mobile")
-    pagespeed.add_argument("--use-key", action="store_true", help="use the saved Google performance API key")
-    crux = google_actions.add_parser("crux", help=tools.CRUX.summary)
-    crux.add_argument("url", metavar="target", help="public URL or origin sent to CrUX")
-    crux.add_argument("--scope", choices=("url", "origin"), default="url")
-    crux.add_argument("--form-factor", choices=FORM_FACTORS, default="ALL_FORM_FACTORS")
-    lighthouse = sub.add_parser("lighthouse-report", help=tools.LIGHTHOUSE.summary)
-    lighthouse.add_argument("report", help="path to a locally generated Lighthouse JSON report")
-    for command in (pagespeed, crux, lighthouse):
-        command.add_argument("--project")
-        command.add_argument("--json", action="store_true")
-        command.set_defaults(func=cmd_performance)
-
-    from seo_analysis.reporting.dataset_export import MAX_ROWS as EXPORT_MAX_ROWS
-
-    export = sub.add_parser("export-dataset", help=tools.DATASET_EXPORT.summary)
-    export.add_argument("--dataset", required=True, help="normalized dataset run ID")
-    export.add_argument("--column", action="append", required=True, help="column to include, repeat in output order")
-    export.add_argument("--title", required=True, help="title for the spreadsheet if published")
-    export.add_argument("--max-rows", type=int, default=EXPORT_MAX_ROWS)
-    export.set_defaults(func=cmd_dataset_export)
-    sheets = google_actions.add_parser("publish-sheets", help=tools.SHEETS_PUBLISH.summary)
-    sheets.add_argument("export", help="reviewed export run ID")
-    sheets.add_argument("--confirm", required=True, help="SHA-256 shown in the export.json preview")
-    sheets.set_defaults(func=cmd_sheets_publish)
-    for command in (export, sheets):
-        command.add_argument("--project")
-        command.add_argument("--json", action="store_true")
-
-    feed = sub.add_parser("research-feed", help=tools.PUBLIC_FEED.summary)
-    feed.add_argument("url")
-    feed.add_argument("--max-items", type=int, default=100)
-    search_web = sub.add_parser("research-search", help=tools.BRAVE_SEARCH.summary)
-    search_web.add_argument("query")
-    search_web.add_argument("--country", default="us")
-    search_web.add_argument("--language", default="en")
-    search_web.add_argument("--count", type=int, default=10)
-    search_web.add_argument("--allow-storage", action="store_true", help="confirm your Brave plan permits storage")
-    for command in (feed, search_web):
-        command.add_argument("--project")
-        command.add_argument("--json", action="store_true")
-        command.set_defaults(func=cmd_live_research)
-    research_key = sub.add_parser("research-key", help="manage the Brave Search API key")
-    research_key.add_argument("action", choices=("set", "delete"))
-    research_key.set_defaults(func=cmd_live_research)
-
-    wordpress = sub.add_parser("wordpress", help="inspect a WordPress installation")
-    wp_actions = wordpress.add_subparsers(dest="operation", required=True)
-    wp_inventory = wp_actions.add_parser("inventory", help=tools.WORDPRESS.summary)
-    wp_inventory.add_argument("--resource", default="posts",
-                              help="posts, pages, media, types, or a registered custom post type slug")
-    wp_inventory.add_argument("--max-items", type=int, default=100)
-    wp_inventory.add_argument("--authenticated", action="store_true", help="use the saved Application Password")
-    wp_inventory.add_argument("--json", action="store_true")
-    wp_connect = wp_actions.add_parser("connect", help="save credentials for this installation")
-    wp_forget = wp_actions.add_parser("forget", help="remove local credentials for this installation")
-    for command in (wp_inventory, wp_connect, wp_forget):
-        command.add_argument("site", help="HTTPS installation base URL")
-        command.add_argument("--project")
-        command.set_defaults(func=cmd_wordpress)
-
-    browser_qa = sub.add_parser("browser-qa", help=tools.BROWSER_QA.summary)
-    browser_qa.add_argument("directory", help="trusted local build directory")
-    browser_qa.add_argument("--page", default="/", help="local page path, such as /docs/")
-    browser_qa.add_argument("--width", type=int, default=1365)
-    browser_qa.add_argument("--height", type=int, default=768)
-    browser_qa.add_argument("--axe-script", default="", help="trusted local axe-core JavaScript file")
-    browser_qa.add_argument("--baseline", default="", help="approved PNG baseline with matching dimensions")
-    browser_qa.add_argument("--chromium", default="", help="use an installed Chromium executable")
-    browser_qa.add_argument("--project")
-    browser_qa.add_argument("--json", action="store_true")
-    browser_qa.set_defaults(func=cmd_browser_qa)
-
-    local_lighthouse = sub.add_parser("lighthouse-run", help=tools.LOCAL_LIGHTHOUSE.summary)
-    local_lighthouse.add_argument("directory", help="trusted local build directory")
-    local_lighthouse.add_argument("--page", default="/")
-    local_lighthouse.add_argument("--device", choices=("desktop", "mobile"), default="mobile")
-    local_lighthouse.add_argument("--lighthouse-cli", required=True, help="installed Lighthouse cli/index.js")
-    local_lighthouse.add_argument("--chromium", required=True, help="installed Chrome or Chromium executable")
-    local_lighthouse.add_argument("--project")
-    local_lighthouse.add_argument("--json", action="store_true")
-    local_lighthouse.set_defaults(func=cmd_local_lighthouse)
+    add_integration_commands(sub)
 
     mcp = sub.add_parser("mcp", help="serve selected local run evidence over stdio")
     mcp.add_argument("--allow-run", required=True, action="append")
@@ -635,6 +339,16 @@ def build_parser():
         command.add_argument("--json", action="store_true")
         command.set_defaults(func=cmd_history)
 
+    workflow = sub.add_parser("workflow", help="list and run saved audit workflows").add_subparsers(dest="operation", required=True)
+    workflow_list = workflow.add_parser("list", help="show saved workflow IDs")
+    workflow_list.add_argument("--project")
+    workflow_run = workflow.add_parser("run", help="run a saved audit noninteractively")
+    workflow_run.add_argument("workflow_id")
+    workflow_run.add_argument("--allow-local", action="store_true", help="allow private-network access for this run")
+    for command in (workflow_list, workflow_run):
+        command.add_argument("--json", action="store_true")
+        command.set_defaults(func=cmd_workflow)
+
     audit = sub.add_parser(tools.AUDIT.command, help=tools.AUDIT.summary)
     audit.add_argument("url", nargs="?")
     audit.add_argument("--target", help="explicitly select a saved target within --project")
@@ -685,15 +399,19 @@ def build_parser():
     a.add_argument("--normalizer", choices=["basic", "hazm"], default="basic")
     a.add_argument("--stem", action="store_true", help="Hazm stemming for the topic signal only (needs hazm)")
     a.add_argument("--include-noindex", action="store_true"); a.add_argument("--yes", action="store_true")
+    a.add_argument("--sample-per-stratum", type=int, default=0, help="random sample size for each of flagged and unflagged pairs")
+    a.add_argument("--sample-seed", type=int, default=0, help="random seed for the calibration sample")
     a.set_defaults(func=cmd_analyze)
 
     r = sub.add_parser(tools.REVIEW.command, help=tools.REVIEW.summary)
     r.add_argument("--in-dir", required=True); r.add_argument("--decisions")
     r.add_argument("--min-evidence", type=int, default=1); r.add_argument("--limit", type=int, default=0)
+    r.add_argument("--sample", action="store_true", help="review the saved stratified calibration sample")
     r.set_defaults(func=cmd_review)
 
     k = sub.add_parser(tools.CALIBRATE.command, help=tools.CALIBRATE.summary)
     k.add_argument("--in-dir", required=True); k.add_argument("--decisions")
+    k.add_argument("--sample", action="store_true", help="calibrate against the saved stratified sample")
     k.set_defaults(func=cmd_calibrate)
 
     for command in (c, a, k, r, v):

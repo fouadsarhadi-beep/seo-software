@@ -5,8 +5,8 @@
 **Date:** 2026-11-21  
 **Starting code:** `samatoos-seo-audit.zip`, containing the existing `seo_audit/` Python package and `tests/`; these are functional unreleased tools, not a previously deployed application  
 **Verified starting baseline (2026-11-21):** Six CLI commands (`crawl`, `variants`, `analyze`, `review`, `calibrate`, `gsc-pull`); offline suite: **75 passed, 1 skipped** (optional Hazm). This result applies to the supplied archive, not necessarily a later working checkout  
-**Package and CLI:** `seo_analysis` / `seo-analysis` on CPython 3.12. The maintained source is in `src/seo_analysis/`. The original ZIP records the assessment baseline.
-**Implementation checkpoint:** Version 0.3.0 implements Stages A–D and local workflows from Stages E–J. Website audits, offline research and Excel reporting share one run history. Account authorization, live provider acquisition and remote publishing are later milestones. [Verified scope and outstanding work](docs/IMPLEMENTATION_STATE.md) · [Implementation log](docs/IMPLEMENTATION_LOG.md)
+**Package and CLI:** `seo_analysis` / `seo-analysis` on CPython 3.12 or 3.13. Maintained source is in `src/seo_analysis/`.
+**Current scope and verification:** See the [roadmap](docs/ROADMAP.md), [implementation state](docs/IMPLEMENTATION_STATE.md) and [manual audit log](docs/MANUAL_AUDIT_LOG.md).
 
 
 This document consolidates the complete architecture and tool catalogue with the critical review corrections. **It replaces both the earlier architecture draft and its review addendum for implementation purposes.** No separate addendum or predecessor specification is required. If the repository reveals facts that conflict with this document, verify them and record the decision in the living architecture and implementation record.
@@ -1795,7 +1795,7 @@ The local foundation and first usable audit require no connected service. Keep C
 1. Profile network wait, CPU, memory, SQLite and frontend work using representative real workflows.
 2. Optimize Python, I/O, caching, parsing, graph/sparse-vector computations, SQL and UI pagination before language migration.
 3. Prototype Rust for a measured CPU hotspot and compare end-to-end gains with integration/maintenance costs. Use a stable narrow Python/JSONL interface.
-4. Consider Windows executable packaging after the Python application operates reliably.
+4. Package the local workbench as a single Windows executable. Reuse the same loopback web app, workspace and SQLite migrations. Verify the bundled workbench outside the checkout and offer a writable copy when workspace permissions block startup.
 
 **Working checkpoint:** Any native component or packaging change has a measured or user-visible benefit.
 

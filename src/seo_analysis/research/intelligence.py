@@ -70,7 +70,7 @@ def build_research(ctx, request):
         directory = Path(path)
         data = json.loads((directory / "dataset.json").read_text(encoding="utf-8"))
         source = data["source"]
-        sources[directory.name] = source
+        sources[directory.name] = source | {"sample_rows": len(data["rows"])}
         for row in data["rows"]:
             ref = {"run_id": directory.name, "row": row["row"]}
             query = " ".join(tokenize(row.get("query", "")))

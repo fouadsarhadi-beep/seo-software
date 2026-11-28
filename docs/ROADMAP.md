@@ -1,6 +1,26 @@
 # SEO Software Roadmap
 
-**Current checkpoint:** Stage F has public feed and Brave Search adapters. Stage G now includes keyword clusters, content planning and saved page comparisons. Stage H now includes read-only WordPress inventory and local Chromium and axe checks. Stage I now exposes scoped offline analysis and reporting links through MCP. **Current release checkpoint:** Stage J profiling and Python wheel distribution. Stage H can also generate local Lighthouse reports. Live Google verification remains open.
+The local audit, evidence, project and history workflows are in use. The Windows test on Samatoos observed 100 URLs and confirmed Persian article extraction. PR #4 added run archiving and clearer results and downloads. Technical checks, comparisons, local reporting, research and build QA already have CLI entry points. The next milestone brings the most useful of those workflows into the browser workbench.
+
+## Next milestone — Audit, compare and review in the workbench
+
+| Order | From the original plan | Change | Ready when |
+| --- | --- | --- | --- |
+| 1 | C3, D2–D4 — Technical checks and results | **Implemented and fixture-tested.** Run checks on a saved audit, search and filter results, and open the original evidence. | The workbench and CLI produce matching check reports without making HTTP requests. Unobserved destinations show as unknown, and checks affected by missing markup report partial coverage. Retest on the saved Samatoos run in the Windows workspace. |
+| 2 | C4, D2 — Snapshot comparisons | **Implemented.** Select two same-site runs from History and compare observed pages, findings and coverage. | See the manual audit log. |
+| 3 | C4, G2 — Content review | **Implemented.** Open page pairs side by side, see their match signals, and save decisions that carry across audits. | See the manual audit log. |
+| 4 | D, E2–E5 — Local reporting | **Implemented.** Import or reuse Search Console and GA4 exports, preview how their rows match a saved audit, and download the Excel workbook from the browser. | See the local reporting checkpoint in the manual audit log. |
+| 5 | D, F1, G1–G4 — Research from imported data | **Implemented.** Use **Tools** to import or select research exports and inspect keywords, competitor gaps, SERP overlap, rank samples, clusters and content briefs. | See the local research checkpoint in the manual audit log. |
+
+Collect pending Windows checks by checkpoint in the [manual audit log](MANUAL_AUDIT_LOG.md). Keep source URLs, page identity, evidence IDs and existing archive state readable across upgrades.
+
+## Follow-on work after the local milestone
+
+| Order | From the original plan | Deliverable and dependency |
+| --- | --- | --- |
+| 6 | E1–E5, I3 — Live Google and reporting | The workbook picker now accepts saved Search Console and GA4 API datasets. The manual audit log records live checks for Search Console, GA4, PageSpeed, CrUX and Sheets. These remain pending authorized access. |
+| 7 | F2–F4, G1, G3–G5 — Broader research sources | The workbench can sample public RSS and Atom feeds and reuse saved Brave samples. Live feed and Brave benchmarking, provider export checks, and access-dependent Ads Keyword Planner and Trends work remain open. |
+| 8 | H, I, J — Site QA and operational expansion | **Tools** supports local build QA, Chromium captures and comparison with a saved baseline. Projects can save audit workflows for manual or scheduler-triggered runs. Validate Windows capture and scheduling, and verify read-only WordPress with an authorized installation. Consider hosted reporting, an installer or native optimization when there is a demonstrated need. |
 
 ## Foundation and audit workbench
 
@@ -29,7 +49,7 @@ E1–E5 have automated coverage. Live verification still needs authorized Google
 | --- | --- | --- |
 | F — Research sources | Local imports, bounded public RSS and Atom retrieval, and Brave Search samples with source and row references. | Verify a live feed from the deployment environment, benchmark Brave with an eligible key and assess authorized browser exports. |
 | G — Keyword and competitor analysis | Keyword maps, SERP clusters, editorial briefs, Search Console refresh candidates, saved page comparisons, sampled rank history and backlink grouping. | Extend discovery beyond selected datasets as sources become available. |
-| H — CMS and site quality | Read-only WordPress inventory for published posts, pages and registered custom types, plus media metadata, static build checks, local Chromium screenshots and axe checks, baseline comparison, access-log summaries, and Lighthouse lab runs and axe checks and imports. | Verify a live WordPress installation. |
+| H — CMS and site quality | Read-only WordPress inventory, static build checks, local Chromium screenshots, axe checks, visual comparisons, access-log summaries and Lighthouse lab reports. | Verify a live WordPress installation. |
 | I — Agents and reporting | Scoped MCP analysis, snapshot comparisons, editorial decision reads, and links to selected Looker Studio and Sheets reports. | Consider hosted connectors and scheduling where useful. |
 | J — Performance and distribution | Profiled the 300-page audit fixture, replayed saved real pages, reduced extraction overhead and built the 0.4.0 wheel. Windows and Ubuntu CI verify clean wheel installation. | Measure a larger live owner site. Consider native code or a standalone executable if justified. |
 

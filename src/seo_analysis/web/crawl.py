@@ -76,6 +76,16 @@ class RobotsUnavailable(RuntimeError):
 def load_robots(fetcher, sitemap_url, cfg, input_fn=None):
     p = urlsplit(sitemap_url)
     res = fetcher.get(f"{p.scheme}://{p.netloc}/robots.txt")
+    if res.redirect_note.startswith("blocked_external:"):
+        origin = res.external_redirect_origin
+        if origin is not None:
+            message = (f"robots.txt redirects to {origin}, outside the selected origin. "
+                       f"If this is the site you intended to audit, start a new run at {origin}/.")
+        else:
+            message = "robots.txt returned an invalid redirect URL. Check the site address and its robots.txt."
+        if cfg.robots == "ignore":
+            return RobotsPolicy.allow_all(available=False), message + " Continuing because --robots ignore was chosen."
+        raise RobotsUnavailable(message)
     if res.final_status == 200 and not res.truncated:
         return RobotsPolicy.parse(res.text), "robots.txt read"
     if 400 <= res.final_status < 500 and res.final_status != 429:
@@ -85,7 +95,7 @@ def load_robots(fetcher, sitemap_url, cfg, input_fn=None):
         return RobotsPolicy.allow_all(available=False), msg + " Continuing because --robots ignore was chosen."
     if input_fn and input_fn(msg + " Continue anyway and treat everything as allowed? [y/N] ").strip().lower() == "y":
         return RobotsPolicy.allow_all(available=False), msg + " You chose to continue."
-    raise RobotsUnavailable(msg + " Nothing was crawled. Re-run with --robots ignore to continue.")
+    raise RobotsUnavailable(msg + " Nothing was crawled. Check the site address and whether robots.txt is reachable.")
 
 
 def fetch_state(res, is_html: bool) -> str:
@@ -160,7 +170,7 @@ def run_crawl(cfg: CrawlConfig, input_fn=None, log=print, fetcher=None, *, cance
         f"limits {cfg.limit} pages, depth {cfg.max_depth}, {cfg.max_requests} requests, "
         f"{cfg.max_seconds}s, {cfg.max_bytes} bytes/response | output {out}")
     discovery = Discovery(cfg, fetcher)
-    records = []
+    records: list[dict] = []
     journal = out / "observations"
     journal.mkdir(exist_ok=False)
     status = "succeeded"
@@ -224,7 +234,7 @@ def run_crawl(cfg: CrawlConfig, input_fn=None, log=print, fetcher=None, *, cance
             stream.write(json.dumps(row, ensure_ascii=False) + "\n")
     info = canon.analyze(records)
     write_csv(out / "inventory.csv", INVENTORY_HEADER, [inventory_row(r, info[r["url"]]) for r in records], cfg.csv_guard)
-    counts = {"sitemap_files": len(discovery.files), "urls": len(records),
+    counts: dict[str, int | dict[str, int]] = {"sitemap_files": len(discovery.files), "urls": len(records),
               "ok": sum(1 for r in records if r["fetch_state"].startswith("ok")),
               "robots_disallowed": sum(1 for r in records if r["fetch_state"] == "robots_disallowed"),
               "redirecting": sum(1 for r in records if len(r["chain"]) > 1),

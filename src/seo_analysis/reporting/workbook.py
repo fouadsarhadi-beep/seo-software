@@ -88,13 +88,14 @@ def build_workbook(ctx, request):
             for r in records
         ),
     )
-    counts, sources = Counter(), []
+    counts, sources, preview = Counter(), [], []
     for seq, (run_id, dataset) in enumerate(datasets, 1):
         s = dataset["source"]
         sources.append({"run_id": run_id, **s})
         extra = [field for field in ("date", "device", "country", "ctr") if
                  field in s.get("dimensions", ()) or (field == "ctr" and s.get("retrieval") == "Search Analytics API")]
         rows = []
+        matches, examples = Counter(), defaultdict(list)
         for r in dataset["rows"]:
             raw = r.get("url", "")
             if s["kind"] == "ga4":
@@ -120,6 +121,12 @@ def build_workbook(ctx, request):
                     key = url_key(full)
                     state = "outside crawl origin"
             counts[state] += 1
+            matches[state] += 1
+            if len(examples[state]) < 3:
+                examples[state].append({"row": r["row"], "url": raw[:600], "query": (r.get("query") or "")[:300],
+                                        "evidence": evidence[:3], "clicks": r.get("clicks"),
+                                        "impressions": r.get("impressions"), "sessions": r.get("sessions"),
+                                        "conversions": r.get("conversions")})
             rows.append(
                 [
                     r["row"],
@@ -132,6 +139,7 @@ def build_workbook(ctx, request):
                     *[r.get(k) for k in extra],
                 ]
             )
+        preview.append({"run_id": run_id, "matches": dict(matches), "examples": dict(examples)})
         table(
             f"{s['kind'].upper()} {seq}",
             [
@@ -193,6 +201,7 @@ def build_workbook(ctx, request):
             "crawl_source": crawl_source,
             "sources": sources,
             "matches": counts,
+            "preview": preview,
             "looker_studio_url": request.report_url,
             "workbook": dest.name,
         },

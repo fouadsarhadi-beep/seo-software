@@ -16,7 +16,7 @@ ZWNJ = "\u200c"
 STOPWORDS_VERSION = "fa-stopwords-v1"
 NORMALIZER_VERSION = "basic-v1"
 
-_TRANSLATE = {
+_TRANSLATE: dict[int, str | None] = {
     0x064A: "\u06cc",  # Arabic yeh -> Persian yeh
     0x0649: "\u06cc",  # alef maksura -> Persian yeh
     0x0643: "\u06a9",  # Arabic kaf -> Persian kaf

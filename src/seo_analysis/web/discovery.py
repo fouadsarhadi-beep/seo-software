@@ -99,4 +99,9 @@ class Discovery:
                 self.follow_links = True
                 self.add(SitemapEntry(cfg.sitemap, "", "website seed"), 0)
             else:
+                destination = self.fetcher.get(cfg.sitemap).external_redirect_origin
+                if destination:
+                    self.warnings.append(f"The selected page redirects outside its origin to {destination}. "
+                                         f"If this is the intended site, start a new run at {destination}/.")
+                    return
                 self.warnings.append("No usable sitemap. Select --link-crawl to follow bounded internal links.")

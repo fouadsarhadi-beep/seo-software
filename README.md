@@ -4,17 +4,40 @@ A local SEO workbench. Enter a website URL to crawl its pages and flag issues su
 
 You can also compare saved audits, turn Search Console and GA4 exports into an Excel report, or check a local site build before publishing. A basic audit needs access to the site, with no API keys or accounts.
 
-## Quick start
+## Open the workbench on Windows
 
-Open a terminal in the downloaded repository folder with Python 3.12 installed.
+If you've already installed the project, double-click **Start SEO Workbench.cmd** in the project folder. It checks for `.venv` in the project folder and then in its parent. For a first-time installation, follow the Windows setup under [Run from Python](#run-from-python).
 
-On Windows, use CMD or PowerShell.
+The launcher opens the workbench in your default browser. Use **Open Workbench** to reopen the tab and **Exit** to stop the app. It starts with your usual workspace in `%LOCALAPPDATA%\SEOAnalysisSoftware`. If Windows prevents writes, the launcher offers to copy your projects, history and saved files to a writable workspace. It reopens the copy on later launches. You may need to reconnect external accounts after switching to a copy. To open a custom workspace, pass `--config-file "C:\path\to\config.toml"` to the launcher.
+
+### Optional standalone Windows app
+
+If you need a copy with Python included, download **SEO-Workbench-Windows-x64** from a successful build. Extract the ZIP and double-click **SEO-Workbench.exe**. Optional browser captures use Playwright's Chromium when installed and can use Microsoft Edge on Windows. External providers require their own credentials and setup. [Windows desktop builds](https://github.com/fouadsarhadi-beep/seo-software/actions/workflows/windows-desktop.yml)
+
+### Build the executable on Windows
+
+From the repository folder with uv installed, run these commands.
+
+```powershell
+uv sync --locked --python 3.12 --all-extras --group desktop-build
+uv run --no-sync pyinstaller --noconfirm packaging/SEO-Workbench.spec
+uv run --no-sync python packaging/smoke_desktop.py dist/SEO-Workbench.exe
+```
+
+The executable is in `dist\SEO-Workbench.exe`. GitHub Actions runs the same build for version tags or on demand and checks that the executable can open the workbench from a folder with spaces and Persian characters.
+
+## Run from Python
+
+Open a terminal in the downloaded repository folder with Python 3.12 or 3.13 installed. The examples use 3.12. Use 3.13 in those commands if that is your installed version.
+
+On Windows, install the project once in CMD or PowerShell.
 
 ```bat
 py -3.12 -m venv .venv
 .venv\Scripts\python -m pip install -e .
-.venv\Scripts\seo-analysis serve
 ```
+
+Double-click **Start SEO Workbench.cmd** to open the installed project.
 
 On macOS or Linux, use these commands.
 
@@ -24,9 +47,13 @@ python3.12 -m venv .venv
 .venv/bin/seo-analysis serve
 ```
 
-Open [http://127.0.0.1:8765](http://127.0.0.1:8765), enter your website URL, and click **Run audit**. Under **Crawl options**, enable **Follow internal links if no sitemap is available** if your site has no sitemap. When the audit finishes, check the crawl coverage, open a finding to see its evidence, and download the report. On later visits, run only the `serve` command to reopen the app. Press Ctrl+C in the terminal to stop it.
+When using `seo-analysis serve` from a terminal, open [http://127.0.0.1:8765](http://127.0.0.1:8765). Press Ctrl+C to stop that server.
+
+Enter your website URL and click **Run audit**. Under **Crawl options**, enable **Follow internal links if no sitemap is available** if your site has no sitemap. When the audit finishes, check the crawl coverage, open a finding to see its evidence, and download the report.
 
 For a reproducible development environment with uv, run `uv sync --locked` then `uv run --locked pytest`.
+
+The quality job checks Ruff error rules, mypy, Bandit medium and high findings, and advisories in the locked runtime dependencies. Install its tools locally with `uv sync --locked --group quality`.
 
 To install a built wheel, download the `seo-analysis-wheel` artifact from a successful Foundation checks run and extract it. In the virtual environment, replace the editable install above with `.venv\Scripts\python -m pip install path\to\seo_analysis-0.4.0-py3-none-any.whl`. The Python wheel contains the CLI, workbench templates and Persian stopwords.
 
@@ -44,6 +71,8 @@ For a website, the crawler checks robots declarations and conventional sitemap p
 
 `audit --help` lists page, depth, request, duration, retry, response-size, pacing and per-path query-variant controls. Scope is one exact origin. The transport connects to validated numeric addresses and retains the origin hostname for HTTPS verification. Robots, sitemap requests, redirects and retries share the request budget.
 
+If discovery reports a redirect to another origin, check the destination and start a new audit there if it is the intended site. Use the final HTTPS or `www` address where applicable.
+
 The result includes a run ID and directory. Read `issues.txt` for findings, or use `findings.json` / `findings.csv` and look up each evidence ID under `observations/`. `requests.json` records attempted destinations and HTTP responses when received. `run.json` contains the tool version, inputs, outcome, timestamps, coverage, warnings and file references. A response cap or request limit can produce a partial result. Exit codes are 0 for success, 3 for partial, 130 for cancellation and 2 for a failed or empty audit or invalid input.
 
 ## Replay and review
@@ -57,11 +86,36 @@ seo-analysis calibrate --in-dir "<analysis directory>"
 
 Each execution receives its own run directory. Use the analysis directory printed by `analyze` for review and calibration. Decisions are saved alongside the selected pair set. The review and calibration runs retain copies of their outputs. Existing Search Console CSVs can enrich an offline replay. The `crawl --sitemap` command runs acquisition on its own.
 
+To estimate how many useful pairs the thresholds miss, review a sample from both flagged and unflagged pairs in the saved crawl.
+
+```sh
+seo-analysis analyze --in-dir "<crawl directory>" --sample-per-stratum 25 --sample-seed 2026
+seo-analysis review --in-dir "<analysis directory>" --sample
+seo-analysis calibrate --in-dir "<analysis directory>" --sample
+```
+
+The sample inherits the crawl's coverage. Calibration reports weighted estimates after all selected pairs have decisions. Small samples remain provisional. Calibrating flagged pairs alone reports precision within the reviewed set and leaves recall unavailable.
+
 ## Local workbench and snapshot checks
 
 **Projects** lists saved projects. Open **Create project** to enter a name and optionally save a website. Open a project to view its targets or add another. In **History**, use **Archive** to hide a run from the history and recent-runs lists. You can open or restore it under **View archived runs**. Its evidence and files remain available.
 
+Use **Create audit workflow** inside a project to save a target, page cap and link-crawl fallback. Run or edit it from the project. Each run records the workflow name and its settings. For a trusted local or staging site, enable private-network access on the individual run.
+
+### Run a saved workflow from a scheduler
+
+```text
+seo-analysis workflow list --project "My project"
+seo-analysis workflow run <workflow-id> --json
+```
+
+Use the saved ID to run an audit without prompts. For Windows Task Scheduler, use the installed `seo-analysis.exe` as the program and `workflow run <workflow-id> --json` as the arguments. Run the task as the user whose workbench owns the workflow, with the same workspace configuration. If you use a custom configuration, put `--config-file "C:\path\to\config.toml"` before `workflow` in the arguments. Set the trigger and use **Do not start a new instance** for overlapping task runs. The app also prevents the same workflow from running concurrently from the CLI and workbench. Runs appear in the usual History. Exit code `3` means the audit saved partial results.
+
 Audit results show the sampled coverage and link to the findings CSV, page inventory CSV and text report under **Downloads**. Expand **Technical files** for the raw data and request log. The local or private-network crawl option applies to one audit of a trusted local site, internal staging site or test server on a nonstandard port.
+
+Open a saved audit from **History**, select **All checks** or an individual check, and click **Run technical checks**. The report uses the saved snapshot and appears as a separate run with a CSV and links to the original page evidence. Search and filters narrow the visible findings, observations and crawled URLs. The downloads contain the full reports.
+
+From **History → Compare saved audits**, select an earlier and later run from the same site. The report links to both runs and shows observed page changes, coverage and differences between the saved findings. From an audit with similar-page data, choose **Review similar pages** to see the matching signals and record a decision. The workbench saves decisions in `decisions.jsonl` in the workspace data directory. Pass that file to the CLI with `--decisions` to reuse them for review or calibration.
 
 Use **Cancel audit** to stop a crawl in progress. Completed observations stay available in the cancelled run. Cancellation interrupts pacing and retry waits. An active network read may take until its timeout to return.
 
@@ -76,6 +130,10 @@ seo-analysis compare --before <older-crawl-id> --after <newer-crawl-id>
 Omit `--check` to run all eight checks. A broken-link result requires an observed HTTP error at the target. A link to an uncrawled page has unknown status. Older snapshots can lack the new markup inventory. To continue editorial review across crawls, pass the same `--decisions path/to/decisions.jsonl` to successive review and calibration commands. Changed page content reopens its pair for review.
 
 ## Research and reports from local exports
+
+For a report in the browser, open a saved audit and choose **Create Excel report**. Import or select Search Console and GA4 exports, or select datasets from previous API pulls. Choose **Preview matches** to see example rows and links to their crawl evidence. The Excel download contains each dataset row and its match status.
+
+For keyword and competitor research in the browser, open **Tools → Keyword and competitor research**. Import an export or select saved datasets, enter the owned hostname, and run the report. Open a query to see its observations and source rows. Use the same provider, locale and device for comparable rank samples.
 
 Import an export with its source and observation date. Use `--period-start` for an aggregated measurement and `--locale` and `--device` for search results. Each import prints a dataset run ID. CSV, TSV and the active worksheet in XLSX are supported. Community imports also accept local RSS or Atom feeds. Map custom column headers with `--columns`, a JSON object from normalized field names to original headers.
 
@@ -116,6 +174,8 @@ seo-analysis history reindex
 History includes ad hoc runs. `history show` resolves artifact paths and page evidence within a run. `history reindex` rebuilds index entries from manifests, skips active writers and recovers completed observations from a process that exited before finalization. The recovered run shows incomplete coverage. Saved targets use website input by default. Specify `--kind sitemap` to save a sitemap URL.
 
 ## Collect live research samples
+
+In the workbench, open **Tools → Keyword and competitor research** and choose **Sample a public RSS or Atom feed**. Enter a public feed URL and the maximum number of entries to save. Open the dataset to inspect its source rows or download the request log. Brave samples captured with the CLI also appear in **Saved datasets**.
 
 Brave Search is an optional source for keyword and competitor research. It samples which pages rank for a query in Brave's web results. Saved samples can help compare competing sites, group queries with overlapping results, or track observed ranking changes across comparable dates. The website audit runs independently, and Google rankings require a separate source.
 
@@ -223,6 +283,10 @@ Use the same `--project NAME` for preparing, connecting and publishing when work
 If a cell upload fails, rerun publication with the same export and checksum to write to the recorded spreadsheet. A completed publication returns the existing receipt. If Google fails to return the spreadsheet ID during creation, the run reports an unknown outcome. Check Drive for the preview title before preparing a fresh export.
 
 ## Capture browser QA for a local build
+
+In the workbench, open **Tools → Local build QA** and enter the full path to a local HTML build folder. You can also select existing Lighthouse and axe reports, an access log or two screenshots by their full paths. The result summarizes those files and offers CSV and JSON downloads.
+
+After installing Chromium through Playwright, select **Capture browser screenshot** on that page. Open a completed capture and choose **Use this capture as a baseline** to reuse its page path and viewport. The comparison links the two captures and shows a changed-pixel mask when pixels differ. Capture only trusted local builds.
 
 ```sh
 python -m pip install -e '.[browser]'

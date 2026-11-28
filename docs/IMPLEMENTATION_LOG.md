@@ -75,7 +75,21 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 
 - Stage J, Steps 1–2 — Profiled a 300-page audit fixture and replayed ten saved real pages on 2026-11-22. Consolidated default HTML exclusions into one traversal. The fixture's median audit time moved from 2.10 seconds to 1.77 seconds and real-page extraction results matched exactly.
 - Stage J, Step 4 — Built the 0.4.0 Python wheel and extended the cross-platform CI smoke test to run static site QA outside the checkout on 2026-11-22.
+- Stage J, Step 4 follow-up — Added a single-file Windows workbench launcher, a writable workspace copy option and a Windows executable build workflow on 2026-11-28.
+- Stage J, Step 4 follow-up — Added a double-click Windows script that reuses the project's Python environment and limited executable builds to version tags and manual runs on 2026-11-28.
 
 - Stage H, Step 3 follow-up — Added the local Lighthouse runner on 2026-11-22. Lighthouse 13.6 and Chromium 156 produced six lab measurements from a local fixture. The HTTP fixture verified that external requests and paths outside the build are refused.
+
+- Stage C, Step 3 and Stage D, Steps 2–4 follow-up — Added offline technical checks and searchable results to the browser workbench on 2026-11-24. Verified that browser and CLI checks produce matching reports, preserve source evidence and make no requests to the audited site. Saved snapshots with missing markup fields report partial coverage for affected checks.
+- Stage C, Step 4, Stage D, Step 2 and Stage G, Step 2 follow-up — Added comparison of saved same-site runs and a browser queue for reviewing similar pages on 2026-11-24. Comparisons preserve source evidence and coverage. Review decisions use the shared CLI format and reopen when a still-flagged pair changes.
+- Stage D and Stage E, Steps 2–5 follow-up — Added local Search Console and GA4 imports, match previews and Excel downloads to the workbench on 2026-11-24. Moved pending Windows checks into the [manual audit log](MANUAL_AUDIT_LOG.md).
+- Stage D, Stage F, Step 1 and Stage G, Steps 1–4 follow-up — Added browser research from user-selected exports on 2026-11-24. Results link to source rows and show capture context and sample coverage. Added the research checkpoint to the manual audit log.
+- Stage D, Stage E, Steps 2–3 and Stage H, Steps 2–4 follow-up — Added saved Google API datasets to the workbook picker and local build QA to the Tools page on 2026-11-24. The QA results display static findings and selected Lighthouse, axe, screenshot and log summaries. Added both checkpoints to the manual audit log.
+- Stage F, Steps 2–3 and 5 follow-up — Added public feed sampling and saved Brave datasets to browser research on 2026-11-24. Added a dataset view with source rows, downloads and request logs where available. Live provider checks are in the manual audit log.
+- Stage I, Step 4 follow-up — Added reusable project audit workflows on 2026-11-24. Workflows store a target and crawl options. Runs record the workflow name and settings used. Added a Windows checkpoint to the manual audit log.
+- Stage I, Step 4 follow-up — Added a noninteractive CLI for saved audit workflows on 2026-11-24. The CLI and workbench share execution and a per-workflow lock. Documented Windows Task Scheduler setup and added a manual checkpoint.
+- Stage H, Step 3 follow-up — Added Chromium captures and explicit saved baselines to the workbench on 2026-11-24. The results show the screenshot, local navigation timings, baseline link and changed-pixel mask. Added Windows verification to the manual audit log.
+
+- Stages A–C review follow-up — Improved cross-origin redirect guidance and sitemap parsing, added Python 3.13 and CI quality checks, updated FileLock, separated integration CLI commands, and added stratified calibration sampling on 2026-11-28.
 
 [Current scope and remaining work](ROADMAP.md)

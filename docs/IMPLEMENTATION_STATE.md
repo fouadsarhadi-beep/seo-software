@@ -11,22 +11,24 @@
 - [x] C1. Route audit, crawl, offline analysis, variants, review and calibration through typed requests and a shared tool runner.
 - [x] C2. Support ad hoc runs, optional projects and saved targets, transactional SQLite migrations, run history, artifact and evidence indexes and interrupted-run recovery.
 
-## Local workbench checklist for 0.3.0
+## Workbench capabilities in 0.4.0
 
 | Stage | Verified workflow | Follow-on work |
 | --- | --- | --- |
-| C3–C5 | Run eight technical checks on captured observations, compare same-origin snapshots, reopen changed review pairs and invoke offline tools by workspace run ID. | JSON-LD covers syntax and observed types. Rich-result eligibility requires additional rules. |
-| D | Run and monitor a website audit through a loopback browser UI, cancel acquisition and inspect completed observations, review history, drill into evidence, download files and manage projects and targets. | Research, build QA and reporting are launched from the CLI. Their results appear in history. |
+| C3–C5 | Run eight technical checks on captured observations, compare same-origin snapshots and reopen changed review pairs. CLI calibration can sample both flagged and unflagged pairs. | Real review labels are needed to calibrate a site. JSON-LD supports syntax and observed types. |
+| D | Run and cancel audits, read evidence, archive runs and manage projects. Start saved-snapshot checks, comparisons, review, reporting, research and build QA in the workbench. | Verify the combined workflow on Windows using the manual audit log. |
 | E | Import Search Console and GA4 exports and produce a local Excel report. Every row carries a match status. Ambiguous URLs, unattributed queries and unmatched rows remain visible. | Live verification of Google consent and data retrieval, keyed performance API checks and live Sheets publication. |
 | F | Normalize local CSV, TSV, XLSX, RSS and Atom. Keep source hash, column mapping, date, locale, device, import limits and row references. | Public feed and Brave Search adapters have fixture coverage. Live provider benchmarking and browser account export exchange remain open. |
 | G | Normalize keywords, compare sampled competitor coverage, find shared search results, follow rank across comparable captures, collect community topics and group imported backlinks by referring host. Content plans include sample-based clusters, editorial briefs, refresh candidates and optional paired crawl evidence. | Discovery beyond selected samples and optional Ads/Trends access. |
 | H | Inspect static HTML and local asset paths, import Lighthouse and axe reports, count status codes by path in common/combined access logs and compare two explicitly selected PNGs. | Read-only WordPress posts, pages, media and registered custom types are fixture-tested. Local Chromium capture, axe checks and visual comparisons are verified. Lighthouse 13.6 generated a lab report from a loopback-served build. Live WordPress authorization remains open. |
-| I | An MCP stdio client can analyze or compare selected crawls, inspect derived evidence and read saved editorial decisions and reporting links. | Optional hosted reporting connectors, scheduled jobs and agent-assisted editorial proposals. |
-| J | Profile and optimize content comparison in Python. Build an installable wheel with bundled UI and language resources. | Live audits on larger owner-provided sites and any standalone executable. |
+| I | An MCP stdio client can analyze or compare selected crawls and save derived local runs. It can read selected evidence, editorial decisions and reporting links. The saved workflow CLI can be invoked from Windows Task Scheduler. | Manual Windows scheduling verification and optional hosted reporting. |
+| J | Profile and optimize content comparison in Python. Bundle the UI and language resources in the wheel and single-file Windows launcher. | Live audits on larger owner-provided sites and manual acceptance on Windows. |
 
 ## Verification
 
-On Linux with CPython 3.12.14, the checkout and an isolated installation of the 0.3.0 wheel each passed 108 tests. Each run skipped the optional Hazm test and reported a Starlette test-client deprecation warning. The isolated CLI also completed dataset import, keyword research and static build inspection outside the checkout. The Stage D cancellation follow-up passed 109 tests on Linux with the same optional skip and deprecation warning. A regression test interrupts a 30-second retry wait and opens the completed observation from the cancelled run. Chromium again passed the normal audit, evidence and export flow. The subsequent Windows and Ubuntu jobs passed installation and CLI execution outside the checkout. [GitHub Actions run](https://github.com/fouadsarhadi-beep/seo-software/actions/runs/45041975051)
+The latest published workbench checkpoint, `45ec331`, passed Foundation checks on Windows and Ubuntu. The review follow-up adds Python 3.13 to the matrix alongside 3.12 and runs Ruff error checks, mypy, Bandit and a locked dependency audit. Test skips are printed by reason. Hazm stays optional. [GitHub Actions run for the published checkpoint](https://github.com/fouadsarhadi-beep/seo-software/actions/runs/45386868511)
+
+On 2026-11-28, the review changes passed 153 tests on Linux under both Python 3.12 and 3.13. Both runs skipped Hazm and reported the Starlette test-client deprecation warning. The built wheel installed into a clean Python 3.13 environment and the workflow CLI ran outside the checkout. Ruff, mypy and Bandit passed at their configured scopes. The locked dependency audit found no known advisories after the FileLock update to 4.3.2.
 
 The offline tests use local HTTP fixtures for redirects, robots, sitemap discovery, incomplete crawls and Persian content. They also cover concurrent schema creation, recovery from interrupted runs, snapshot replay, content-aware review and history reconstruction. The workbench tests exercise an actual audit through the HTTP interface, follow a page evidence link and download a CSV. A separate Chromium run exercised the same form and download. An MCP integration test starts the installed package in a subprocess, initializes a stdio session, reads allowed evidence, rejects an unselected run and reads the results of a derived check.
 
@@ -49,7 +51,7 @@ Reproduce the larger audit with `python benchmarks/audit.py --pages 300`. It ser
 
 Values are medians of three runs per version on this Linux machine. The fixture contains 300 pages and makes 302 requests including sitemap and robots discovery. The profile showed repeated HTML scans for default exclusions. The updated extractor removes those elements with one traversal and retains the existing order for custom exclusions. All ten saved Samatoos HTML responses produced identical extraction results before and after the update. Their loopback audit replay processed nine pages for comparison because one had `noindex`. Live network conditions and larger owner-site workloads remain outside these measurements.
 
-The 0.4.0 Python wheel is the distribution checkpoint. The CI workflow installs it in a clean environment with spaces and Persian characters in its path and runs QA against a local HTML file. Rust and a standalone Windows executable remain optional.
+The Python wheel and `SEO-Workbench.exe` are the distribution checkpoints. CI installs the wheel and runs QA against a local HTML file. The Windows desktop workflow checks the executable with a workspace path containing spaces and Persian characters before uploading it. A Windows x64 build was smoke-tested under Wine for startup, project creation and shutdown. Recovery from a read-only database preserved the original database, the project and a saved report. The [manual audit log](MANUAL_AUDIT_LOG.md#windows-desktop-checkpoint--stage-j-step-4) covers acceptance on the operator's Windows computer.
 
 ## Stage E handoff
 
@@ -58,6 +60,8 @@ Stage E1 implements read-only consent for Search Console and GA4 separately, pro
 ## Coverage and inputs
 
 A live sample from samatoos.ir confirmed that a theme can place an empty `main` before the actual article. The extractor now tries usable matches in other containers after removing excluded elements, and records the selector attempts. The reported article recovered 43 words from `.entry-content`. The direct crawler connection failed from the cloud environment. Verification used ten raw HTTP responses retrieved separately and replayed through a local HTTP server. The original run's local artifacts were unavailable.
+
+A later Windows workbench run of Samatoos reached its 100-page cap. The operator reported text extracted on all 100 HTML pages, 99 eligible for comparison and one Persian CRM article with 1,213 extracted words. This verifies the capped live run. Site-wide coverage and connected-provider checks remain open. [Manual audit log](MANUAL_AUDIT_LOG.md)
 
 
 Each audit records the HTTP requests attempted and the pages actually observed. A page seen in only one snapshot can reflect a crawl limit. When older snapshots lack markup, applicable checks report partial coverage. SERP overlap uses observations with the same provider, capture date, locale and device. Rank history uses the best imported position per host and capture date, with changes between observed samples. Aggregated competitor counts describe the combined selected sample. For a single market or device, select the corresponding datasets.

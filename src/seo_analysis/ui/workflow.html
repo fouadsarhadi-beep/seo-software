@@ -1,0 +1,21 @@
+<h1>{{'Edit audit workflow' if workflow_id else 'Create audit workflow'}}</h1>
+<p><a href="/projects?project={{project|urlencode}}">Back to {{project}}</a></p>
+{% if error %}<p role="alert"><strong>{{error}}</strong></p>{% endif %}
+{% if targets %}
+<section>
+<form method="post" action="{{('/workflows/' ~ workflow_id ~ '/edit') if workflow_id else '/workflows'}}">
+{{csrf()}}
+{% if not workflow_id %}<input type="hidden" name="project" value="{{project}}">{% endif %}
+<label for="workflow-name">Workflow name</label>
+<input id="workflow-name" name="name" required value="{{values.get('name', '')}}">
+<label for="workflow-target">Saved target</label>
+<select id="workflow-target" name="target" required style="max-width:100%">
+{% for target in targets %}<option value="{{target.name}}"{% if values.get('target') == target.name %} selected{% endif %}>{{target.name}} · {{target.url}}</option>{% endfor %}
+</select>
+<label for="workflow-pages">Maximum pages</label>
+<input id="workflow-pages" name="page_limit" type="number" min="1" max="500" required value="{{values.get('page_limit', 100)}}">
+<label><input type="checkbox" name="links"{% if values.get('link_crawl') %} checked{% endif %}> Follow internal links if no sitemap is available</label>
+<button>Save workflow</button>
+</form>
+</section>
+{% else %}<p>Add a target to this project before creating a workflow.</p>{% endif %}

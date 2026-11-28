@@ -8,7 +8,9 @@
 """
 from __future__ import annotations
 
+from bisect import bisect_right
 import math
+from random import Random
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 
@@ -119,7 +121,7 @@ def _explain(corpus: Corpus, a: Doc, b: Doc):
     scored = sorted(((w * big[t], t) for t, w in small.items() if t in big), reverse=True)[:8]
     terms = [t for _, t in scored]
     inter = a.shingles & b.shingles
-    phrases = sorted(inter, key=lambda s: (corpus.shingle_df.get(s, 0), -len(s)))[:3]
+    phrases = sorted(inter, key=lambda s: (corpus.shingle_df.get(s, 0), -len(s), s))[:3]
     return terms, [p if len(p) <= 70 else p[:67] + "..." for p in phrases]
 
 
@@ -147,42 +149,76 @@ def candidate_rows(corpus):
         yield sorted(other for other in candidates if other > index)
 
 
+def score_pair(corpus: Corpus, a: Doc, b: Doc, *, include_unflagged=False) -> PairResult | None:
+    s = corpus.settings
+    inter = len(a.shingles & b.shingles)
+    smallest = min(len(a.shingles), len(b.shingles))
+    dup = inter / (len(a.shingles) + len(b.shingles) - inter) if inter else 0.0
+    contain = inter / smallest if inter and smallest else 0.0
+    va, vb = (a.vec, b.vec) if len(a.vec) <= len(b.vec) else (b.vec, a.vec)
+    topic = sum(w * vb.get(t, 0.0) for t, w in va.items())
+    tsim = _jaccard(a.title_tokens, b.title_tokens)
+    same_h1 = bool(a.h1_key) and a.h1_key == b.h1_key
+    trig = []
+    if dup >= s.thr_dup:
+        trig.append("near-duplicate")
+    if contain >= s.thr_contain:
+        trig.append("containment")
+    if topic >= s.thr_topic:
+        trig.append("topic overlap")
+    if tsim >= s.thr_title:
+        trig.append("title")
+    if same_h1:
+        trig.append("same H1")
+    if not trig and not include_unflagged:
+        return None
+    fam = (1 if ("near-duplicate" in trig or "containment" in trig) else 0) \
+        + (1 if "topic overlap" in trig else 0) + (1 if ("title" in trig or "same H1" in trig) else 0)
+    terms, phrases = _explain(corpus, a, b)
+    return PairResult(a.url, b.url, round(tsim, 3), round(dup, 3), round(contain, 3), round(topic, 3),
+                          same_h1, terms, phrases, trig, fam, a.page_type, b.page_type,
+                          a.words, b.words, min(a.words, b.words) < s.min_words)
+
+
 def compare(corpus: Corpus, progress=None) -> list[PairResult]:
-    s, docs = corpus.settings, corpus.docs
+    docs = corpus.docs
     out = []
     n = len(docs)
     for i, candidates in enumerate(candidate_rows(corpus)):
         if progress and i % 50 == 0:
             progress(i, n)
-        a = docs[i]
         for j in candidates:
-            b = docs[j]
-            inter = len(a.shingles & b.shingles)
-            smallest = min(len(a.shingles), len(b.shingles))
-            dup = inter / (len(a.shingles) + len(b.shingles) - inter) if inter else 0.0
-            contain = inter / smallest if inter and smallest else 0.0
-            va, vb = (a.vec, b.vec) if len(a.vec) <= len(b.vec) else (b.vec, a.vec)
-            topic = sum(w * vb.get(t, 0.0) for t, w in va.items())
-            tsim = _jaccard(a.title_tokens, b.title_tokens)
-            same_h1 = bool(a.h1_key) and a.h1_key == b.h1_key
-            trig = []
-            if dup >= s.thr_dup:
-                trig.append("near-duplicate")
-            if contain >= s.thr_contain:
-                trig.append("containment")
-            if topic >= s.thr_topic:
-                trig.append("topic overlap")
-            if tsim >= s.thr_title:
-                trig.append("title")
-            if same_h1:
-                trig.append("same H1")
-            if not trig:
-                continue
-            fam = (1 if ("near-duplicate" in trig or "containment" in trig) else 0) \
-                + (1 if "topic overlap" in trig else 0) + (1 if ("title" in trig or "same H1" in trig) else 0)
-            terms, phrases = _explain(corpus, a, b)
-            out.append(PairResult(a.url, b.url, round(tsim, 3), round(dup, 3), round(contain, 3), round(topic, 3),
-                                  same_h1, terms, phrases, trig, fam, a.page_type, b.page_type,
-                                  a.words, b.words, min(a.words, b.words) < s.min_words))
+            result = score_pair(corpus, docs[i], docs[j])
+            if result is not None:
+                out.append(result)
     out.sort(key=lambda p: (-p.evidence, -p.dup, -p.containment, -p.topic))
     return out
+
+
+
+def calibration_sample(corpus: Corpus, flagged: list[PairResult], per_stratum: int, seed: int):
+    """Sample uniformly within each stratum, including pairs discarded by the candidate index."""
+    docs = corpus.docs
+    n = len(docs)
+    starts = [i * (2 * n - i - 1) // 2 for i in range(n)]
+    total = n * (n - 1) // 2
+    positions = {doc.url: i for i, doc in enumerate(docs)}
+    excluded = sorted(starts[positions[pair.url_a]] + positions[pair.url_b] - positions[pair.url_a] - 1
+                      for pair in flagged)
+    population = {"flagged": len(flagged), "unflagged": total - len(flagged)}
+    rng = Random(seed)
+    sample = [("flagged", p) for p in rng.sample(flagged, min(per_stratum, len(flagged)))]
+
+    # The k-th unflagged pair is k plus the flagged pairs preceding it.
+    offset = 0
+    for k in sorted(rng.sample(range(population["unflagged"]), min(per_stratum, population["unflagged"]))):
+        while offset < len(excluded) and excluded[offset] <= k + offset:
+            offset += 1
+        rank = k + offset
+        i = bisect_right(starts, rank) - 1
+        j = i + 1 + rank - starts[i]
+        result = score_pair(corpus, docs[i], docs[j], include_unflagged=True)
+        if result is not None:
+            sample.append(("unflagged", result))
+    rng.shuffle(sample)
+    return population, sample

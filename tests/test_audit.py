@@ -37,6 +37,26 @@ def test_request_limit_includes_discovery(site, tmp_path, capsys):
     assert sum(site.hits.values()) == 1
 
 
+def test_audit_explains_redirect_to_another_origin(site, tmp_path, capsys):
+    site.redirect("/robots.txt", "https://www.example.org/robots.txt?token=private")
+    code, result = run_cli(tmp_path, capsys, site.base, "--link-crawl", "--allow-local")
+    assert code == 2 and result["status"] == "failed"
+    warning = result["warnings"][0]
+    assert "robots.txt redirects to https://www.example.org" in warning
+    assert "start a new run at https://www.example.org/" in warning
+    assert "--robots" not in warning and "token=private" not in warning
+    assert dict(site.hits) == {"/robots.txt": 1}
+
+
+def test_audit_checks_selected_page_for_origin_redirect_when_no_sitemap_exists(site, tmp_path, capsys):
+    site.add("/robots.txt", "User-agent: *\nAllow: /")
+    site.redirect("/", "https://www.example.org/")
+    code, result = run_cli(tmp_path, capsys, site.base, "--allow-local")
+    assert code == 2 and result["status"] == "no_pages_found"
+    assert any("selected page redirects outside its origin to https://www.example.org" in w for w in result["warnings"])
+    assert site.hits["/"] == 1
+
+
 def test_public_dns_policy(monkeypatch):
     # Fake resolver provides a different answer on successive resolutions.
     from seo_analysis.web import transport

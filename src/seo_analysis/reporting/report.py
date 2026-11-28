@@ -2,11 +2,9 @@
 from __future__ import annotations
 
 import csv
-import json
 import platform
 import sys
 from datetime import datetime, timezone
-from pathlib import Path
 
 from seo_analysis.core.artifacts import atomic_text, write_json
 from seo_analysis import SCHEMA_VERSION, __version__

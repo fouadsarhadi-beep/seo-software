@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from collections import deque
 import re
-import xml.etree.ElementTree as ET
 import zlib
 from dataclasses import dataclass
+
+from defusedxml import ElementTree as ET
+from defusedxml.common import DefusedXmlException
 
 from seo_analysis.core.urls import url_key
 
@@ -44,9 +46,10 @@ def parse_sitemap(data: bytes, cap: int = 50_000_000):
         data = gunzip_capped(data, cap)
     if len(data) > cap:
         raise ValueError("sitemap is larger than the size cap")
-    if b"<!ENTITY" in data[:4096] or b"<!DOCTYPE" in data[:200] and b"[" in data[:4096]:
-        raise ValueError("sitemaps with DTD/entity declarations are refused")
-    root = ET.fromstring(data)
+    try:
+        root = ET.fromstring(data, forbid_dtd=True)
+    except DefusedXmlException as exc:
+        raise ValueError("sitemaps with DTD/entity declarations are refused") from exc
     name = _ln(root.tag)
     items = []
     if name == "sitemapindex":
@@ -84,7 +87,11 @@ def collect(fetcher, sitemap_url: str, skip_re: str = "", cap: int = 50_000_000,
         seen_maps.add(key)
         res = fetcher.get(smap)
         if res.final_status != 200 or not res.raw:
-            warnings.append(f"cannot read sitemap {smap} (status {res.final_status or res.error})")
+            reason = f"status {res.final_status or res.error}"
+            if res.redirect_note.startswith("blocked_external:"):
+                destination = res.external_redirect_origin
+                reason = f"redirects outside the selected origin to {destination}" if destination else "invalid redirect URL"
+            warnings.append(f"cannot read sitemap {smap} ({reason})")
             continue
         try:
             kind, items = parse_sitemap(res.raw, cap)

@@ -1,0 +1,61 @@
+{% if view == 'review' %}
+<h1>Review similar pages</h1>
+<p><a href="/runs/{{rid}}">Back to audit results</a></p>
+<div class="links">
+<a href="?queue=pending"{% if waiting %} aria-current="page"{% endif %}>Needs review ({{pending}})</a>
+<a href="?queue=reviewed"{% if not waiting %} aria-current="page"{% endif %}>Reviewed ({{reviewed}})</a>
+</div>
+{% if entries %}
+<div class="table"><table>
+<tr><th>Page A</th><th>Page B</th><th>Signals</th><th>Action</th></tr>
+{% for row in entries %}
+{% set pair = row.pair %}
+<tr><td>{{pair.title_a or pair.url_a}}</td><td>{{pair.title_b or pair.url_b}}</td><td>{{pair.triggers|join(', ')}}</td>
+<td><a href="?pair={{row.index}}">Open pair</a>{% if row.pending and row.decision %}<br>Content changed{% endif %}</td></tr>
+{% endfor %}
+</table></div>
+<div class="links">
+{% set queue = 'pending' if waiting else 'reviewed' %}
+{% if page > 1 %}<a href="?queue={{queue}}&amp;page={{page - 1}}">Previous</a>{% endif %}
+{% if more %}<a href="?queue={{queue}}&amp;page={{page + 1}}">Next</a>{% endif %}
+</div>
+{% else %}<p>{{'No pairs need review.' if waiting else 'No pairs have a current decision.'}}</p>{% endif %}
+{% else %}
+{% set pair = selected.pair %}
+<h1>Review page pair</h1>
+<div class="links"><a href="/runs/{{rid}}/review">Back to queue</a>{% if not selected.pending %}<a href="/runs/{{rid}}/review?queue=reviewed">Reviewed pairs</a>{% endif %}</div>
+<p><strong>Why it was flagged</strong> {{pair.triggers|join(', ')}}. A match is a prompt to review the pages.</p>
+<div class="line metrics">
+{% for key, label in [('title_sim', 'title similarity'), ('dup', 'near-duplicate'), ('containment', 'containment'), ('topic', 'topic overlap')] %}
+{% if pair[key] is defined %}<span><strong>{{(pair[key] * 100)|round|int}}%</strong> {{label}}</span>{% endif %}
+{% endfor %}
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px">
+{% for page in pair_pages %}
+<section>
+<h2>Page {{'A' if loop.first else 'B'}}</h2>
+<p><strong dir="auto">{{page.title or page.url}}</strong></p>
+<p>{{page.url}}</p>
+{% if page.words is not none %}<p>{{page.words}} extracted words</p>{% endif %}
+{% if page.excerpt %}<p dir="auto">{{page.excerpt}}</p>{% endif %}
+{% if page.evidence %}<a href="/runs/{{rid}}/evidence/{{page.evidence}}">Open full page evidence</a>{% endif %}
+</section>
+{% endfor %}
+</div>
+{% if selected.decision %}
+<p><strong>{{'Previous decision · content changed' if selected.pending else 'Saved decision'}}</strong> {{decision_labels.get(selected.decision.decision, selected.decision.decision)}}.</p>
+{% if selected.decision.note %}<p dir="auto">{{selected.decision.note}}</p>{% endif %}
+{% endif %}
+<h2>{{'Record a decision' if selected.pending else 'Update decision'}}</h2>
+<form method="post" action="/runs/{{rid}}/review/{{selected.index}}">
+{{csrf()}}
+<label for="decision">Decision</label>
+<select id="decision" name="decision" required>
+<option value="">Choose a decision</option>
+{% for value, label in decision_labels.items() %}<option value="{{value}}"{% if not selected.pending and selected.decision.decision == value %} selected{% endif %}>{{label}}</option>{% endfor %}
+</select>
+<label for="note">Note (optional)</label>
+<textarea id="note" name="note" rows="3" maxlength="500" dir="auto" style="width:min(100%,540px);font:inherit">{{selected.decision.note if not selected.pending else ''}}</textarea>
+<p><button>Save decision locally</button></p>
+</form>
+{% endif %}

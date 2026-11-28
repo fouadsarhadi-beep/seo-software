@@ -26,6 +26,7 @@ class ExportInput:
     device: str = ""
     period_start: str = ""
     mapping: dict = field(default_factory=dict)
+    source_filename: str = ""
 
 
 ALIASES = {
@@ -191,7 +192,7 @@ def import_export(ctx, request):
         locale=request.locale,
         device=request.device,
         period_start=request.period_start,
-        filename=path.name,
+        filename=request.source_filename or path.name,
         mapping=mapping,
         sha256=sha256(raw).hexdigest(),
         retrieval="local import",

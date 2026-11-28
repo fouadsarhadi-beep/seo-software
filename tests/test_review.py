@@ -1,6 +1,7 @@
 import json
 
 from seo_analysis.analysis import review
+from seo_analysis.analysis import similarity
 
 
 def pair(a, b, **kw):
@@ -58,3 +59,28 @@ def test_reviews_reopen_after_content_changes(tmp_path):
     changed = dict(current, content_revisions={"a":"3", "b":"2"})
     assert "Calibration from 0 decisions" in review.calibrate([changed],path)
     assert review.review_loop([changed],path,input_fn=feeder(["d"])) == 1
+
+
+def test_calibration_samples_pairs_outside_similarity_index_and_weights_strata(tmp_path):
+    items = [dict(url=f"https://example.org/{i}", title=f"term{i}", h1="", text=f"term{i}") for i in range(40)]
+    items[1].update(title="term0", text="term0")
+    corpus = similarity.prepare(items, similarity.Settings())
+    flagged = similarity.compare(corpus)
+    population, samples = similarity.calibration_sample(corpus, flagged, 2, seed=2026)
+    assert population == {"flagged": 1, "unflagged": 779}
+    assert (population, samples) == similarity.calibration_sample(corpus, flagged, 2, seed=2026)
+    assert len(samples) == 3 and sum(stratum == "unflagged" and not result.triggers for stratum, result in samples) == 2
+
+    rows = [pair(result.url_a, result.url_b, stratum=stratum, title_sim=result.title_sim,
+                 evidence=result.evidence, triggers=result.triggers) for stratum, result in samples]
+    path = tmp_path / "decisions.jsonl"
+    review.save_decision(path, rows[0], "differentiate", "")
+    assert "Review the full sample" in review.calibrate(rows, path, population=population)
+    negative = next(row for row in rows if row["stratum"] == "unflagged")
+    for row in rows:
+        review.save_decision(path, row, "ignore" if row is negative else "differentiate", "")
+    report = review.calibrate(rows, path, population=population)
+    assert "weighted estimates" in report
+    title_threshold = report.split("title similarity", 1)[1].splitlines()[2].split()
+    assert title_threshold == ["0.20", "1", "1.000", "0.003"]
+    assert "Recall is unavailable" in review.calibrate(rows, path)

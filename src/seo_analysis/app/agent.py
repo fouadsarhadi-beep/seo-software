@@ -24,9 +24,9 @@ def run_snapshot_tool(workspace, tool_id, run_id, *, previous=None, check="all")
         return str(path)
     current = snapshot(run_id)
     if tool_id == tools.CHECK.id and previous is None and check in (*CHECKS, "all"):
-        spec, request = tools.CHECK, SnapshotInput(current, check)
+        spec, request = tools.CHECK, SnapshotInput(current, check, source_run_id=run_id)
     elif tool_id == tools.COMPARE.id and previous and check == "all":
-        spec, request = tools.COMPARE, CompareInput(snapshot(previous), current)
+        spec, request = tools.COMPARE, CompareInput(snapshot(previous), current, previous, run_id)
     elif tool_id == tools.ANALYZE.id and previous is None and check == "all":
         spec, request = tools.ANALYZE, AnalysisInput(current)
     else:
