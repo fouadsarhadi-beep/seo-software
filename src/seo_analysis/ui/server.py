@@ -16,6 +16,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from filelock import Timeout
 from jinja2 import Environment, PackageLoader, select_autoescape
+from secrets import token_hex
+from threading import Event, Thread
+
 from starlette.concurrency import run_in_threadpool
 
 from seo_analysis.analysis import review
@@ -166,6 +169,7 @@ def create_app(workspace, port=8765):
     templates.policies["json.dumps_kwargs"] = {"sort_keys": True, "ensure_ascii": False}
     pool = ThreadPoolExecutor(max_workers=1)
     jobs = {}
+    google_jobs = {}
     guard = Lock()
 
     @asynccontextmanager
@@ -305,7 +309,7 @@ def create_app(workspace, port=8765):
             {"project": project, "error": error, "fetched": fetched}), 303)
 
     @app.get("/tools/search-traffic")
-    def search_traffic(project: str = "", error: str = "", fetched: str = ""):
+    def search_traffic(project: str = "", error: str = "", fetched: str = "", connect: str = ""):
         projects = history.projects()
         selected = next((item for item in projects if item["name"] == project), None)
         if selected is None and projects:
@@ -314,7 +318,60 @@ def create_app(workspace, port=8765):
         datasets = list(saved_datasets(REPORT_PROVIDERS, CONNECTED_REPORT_TOOLS))
         audits = history.list_runs(name, limit=5, archived=False) if name else []
         return render("search_traffic", selected=selected, projects=projects, state=google_state(name),
-                      datasets=datasets, audits=audits, error=error, fetched=fetched, providers=REPORT_PROVIDERS)
+                      datasets=datasets, audits=audits, error=error, fetched=fetched, providers=REPORT_PROVIDERS,
+                      connect_job=google_jobs.get(connect))
+
+    @app.post("/tools/search-traffic/connect/{service}")
+    async def google_connect(service: str, request: Request):
+        if service not in ("gsc", "ga4", "sheets"):
+            raise HTTPException(404)
+        fields = await form(request)
+        project = fields.get("project", "")
+        client_file = (fields.get("client_file") or "").strip()
+        if not client_file:
+            return traffic_back(project, error="Choose the desktop client JSON file you downloaded from Google Cloud.")
+        jid = token_hex(8)
+        job = {"id": jid, "service": service, "project": project, "state": "starting", "message": "",
+               "available": {}, "choice": "", "event": Event()}
+        google_jobs[jid] = job
+        while len(google_jobs) > 8:
+            google_jobs.pop(next(iter(google_jobs)))
+
+        def run():
+            try:
+                connection = GoogleConnection(workspace, known_project(project), service)
+
+                def choose(available):
+                    job["available"] = dict(available)
+                    job["state"] = "choosing"
+                    if not job["event"].wait(300):
+                        raise ValueError("No property was selected within five minutes.")
+                    return job["choice"]
+
+                connection.connect(client_file, choose)
+                job["state"] = "done"
+            except (ValueError, RuntimeError, OSError) as exc:
+                job["state"] = "failed"
+                job["message"] = str(exc)
+
+        Thread(target=run, name="google-connect", daemon=True).start()
+        return RedirectResponse("/tools/search-traffic?" + urlencode({"project": project, "connect": jid}), 303)
+
+    @app.post("/tools/search-traffic/connect/{service}/choose")
+    async def google_choose(service: str, request: Request):
+        if service not in ("gsc", "ga4", "sheets"):
+            raise HTTPException(404)
+        fields = await form(request)
+        job = google_jobs.get(fields.get("job", ""))
+        if job is None or job["service"] != service:
+            return traffic_back(fields.get("project", ""),
+                                error="That connection attempt has expired. Start it again.")
+        if fields.get("property_id") not in job["available"]:
+            return traffic_back(job["project"], error="Select one of the properties listed for this account.")
+        job["choice"] = fields["property_id"]
+        job["event"].set()
+        return RedirectResponse("/tools/search-traffic?" + urlencode(
+            {"project": job["project"], "connect": job["id"]}), 303)
 
     @app.post("/tools/search-traffic/disconnect/{service}")
     async def google_disconnect(service: str, request: Request):

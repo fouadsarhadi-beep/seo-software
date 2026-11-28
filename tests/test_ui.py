@@ -565,3 +565,60 @@ def test_ui_report_picker_warns_when_a_measurement_is_out_of_scope(tmp_path):
         assert "Check the measurement scope before joining." in page
         assert "measured before the audit, which ran on 2026-11-20" in page
         assert f'value="{pull}"' in page
+
+
+def test_ui_connect_asks_for_consent_then_a_property(tmp_path, monkeypatch):
+    origin = "http://127.0.0.1:8972"
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    History(ws).add_project("Acme")
+    seen = {}
+
+    def fake_connect(self, client_file, choose):
+        seen["client_file"] = client_file
+        property_id = choose({"sc-domain:example.org": "example.org"})
+        self.history.set_google_connection(self.project, self.service, property_id, "example.org")
+        return {"property_id": property_id, "property_name": "example.org"}
+
+    monkeypatch.setattr(google_connector.GoogleConnection, "connect", fake_connect)
+
+    def wait_for(client, url, needle):
+        text = ""
+        for _ in range(150):
+            text = client.get(url).text
+            if needle in text:
+                return text
+            time.sleep(.02)
+        return text
+
+    with TestClient(create_app(ws, 8972), base_url=origin) as client:
+        page = client.get("/tools/search-traffic", params={"project": "Acme"}).text
+        token = BeautifulSoup(page, "html.parser").select_one("input[name=token]")["value"]
+        headers = {"Origin": origin}
+        started = client.post("/tools/search-traffic/connect/gsc", headers=headers,
+                              data={"token": token, "project": "Acme", "client_file": "C:/client.json"})
+        assert started.status_code == 200
+        waiting = wait_for(client, started.url, "Choose the property to use.")
+        form = BeautifulSoup(waiting, "html.parser").select_one(
+            'form[action="/tools/search-traffic/connect/gsc/choose"]')
+        assert form is not None and "example.org" in form.get_text()
+        job = form.select_one('input[name="job"]')["value"]
+        chosen = client.post(form["action"], headers=headers,
+                             data={"token": token, "job": job, "property_id": "sc-domain:example.org"})
+        assert chosen.status_code == 200
+        assert "Connected." in wait_for(client, chosen.url, "Connected.")
+        assert seen["client_file"] == "C:/client.json"
+        assert History(ws).google_connection("Acme", "gsc")["property_id"] == "sc-domain:example.org"
+
+
+def test_ui_search_traffic_scopes_the_connection_to_the_selected_project(tmp_path):
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    history = History(ws)
+    history.add_project("Alpha")
+    history.add_project("Beta")
+    history.set_google_connection("Alpha", "gsc", "sc-domain:alpha.test", "alpha.test")
+    history.set_google_connection("Beta", "gsc", "sc-domain:beta.test", "beta.test")
+    with TestClient(create_app(ws, 8972), base_url="http://127.0.0.1:8972") as client:
+        alpha = client.get("/tools/search-traffic", params={"project": "Alpha"}).text
+        beta = client.get("/tools/search-traffic", params={"project": "Beta"}).text
+        assert "alpha.test" in alpha and "beta.test" not in alpha
+        assert "beta.test" in beta and "alpha.test" not in beta

@@ -259,6 +259,27 @@ p{overflow-wrap:anywhere}
 </div></div>
 {% if error %}<p role="alert"><strong>{{ error }}</strong></p>{% endif %}
 {% if fetched %}<p role="status">{{ fetched }}</p>{% endif %}
+{% if connect_job %}
+<section class="notice">
+{% if connect_job.state == 'starting' %}
+<p><strong>Waiting for Google consent.</strong> Finish the sign-in in the browser window that opened, then <a href="?project={{ connect_job.project|urlencode }}&amp;connect={{ connect_job.id }}">refresh this page</a>.</p>
+<meta http-equiv="refresh" content="3">
+{% elif connect_job.state == 'choosing' %}
+<p><strong>Choose the property to use.</strong> These are the properties this account can read.</p>
+<form method="post" action="/tools/search-traffic/connect/{{ connect_job.service }}/choose">
+{{ csrf() }}<input type="hidden" name="job" value="{{ connect_job.id }}">
+{% for key, value in connect_job.available.items() %}
+<label><input type="radio" name="property_id" value="{{ key }}" required> {{ value }} <code>{{ key }}</code></label>
+{% endfor %}
+<button>Use this property</button>
+</form>
+{% elif connect_job.state == 'done' %}
+<p role="status"><strong>Connected.</strong> {{ connect_job.service|upper }} is now authorized for this project.</p>
+{% else %}
+<p role="alert"><strong>The connection did not complete.</strong> {{ connect_job.message }}</p>
+{% endif %}
+</section>
+{% endif %}
 <div class="grid">
 {% for service, label in [('gsc','Search Console'), ('ga4','Google Analytics 4')] %}
 <div class="card">
@@ -274,9 +295,12 @@ p{overflow-wrap:anywhere}
 <p><small>Removes the credential saved for this project only; other projects keep their own connection.</small></p>
 {% else %}
 <p><span class="badge">Not connected</span> No Google property is authorized for this project yet.</p>
-<p>Connecting opens a consent window in a browser on this computer, so it is started once from a terminal:</p>
-<p><code>seo-analysis google connect {{ service }} --client-file &lt;desktop client json&gt;</code></p>
-<p><small>The workbench picks the connection up as soon as it exists, and reports an expired or rejected credential rather than guessing.</small></p>
+<form class="line" method="post" action="/tools/search-traffic/connect/{{ service }}">
+{{ csrf() }}<input type="hidden" name="project" value="{{ selected.name if selected else '' }}">
+<label>Desktop client JSON <input name="client_file" placeholder="C:\path\to\client.json" required></label>
+<button class="ghost">Connect {{ label }}</button>
+</form>
+<p><small>A browser window opens for Google consent, then you pick the property here. The same connection can be made from a terminal with <code>seo-analysis google connect {{ service }}</code>.</small></p>
 {% endif %}
 </div>
 {% endfor %}

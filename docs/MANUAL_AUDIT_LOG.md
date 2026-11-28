@@ -101,7 +101,7 @@ Use authorized properties and the documented [Google connection and CLI commands
 ## Workbench stage 5 checkpoint — Search and traffic (pending owner check)
 
 - [ ] **Not connected is honest.** Open **Search and traffic** with no Google connection. Both providers should say **Not connected**, show the exact consent command, and offer no fetch form. No control should look like it works when it cannot.
-- [ ] **Connect once in a terminal.** Run the shown `seo-analysis google connect gsc --client-file <path>` command, then reload the screen. The property name and identifier should appear and the fetch form should become available, without restarting the workbench.
+- [ ] **Connect from the screen.** In **Search and traffic**, give the path to a Desktop OAuth client JSON and press Connect. A browser consent window should open, the page should say it is waiting, and after consent it should list the properties to choose from. Picking one should show the connected property and reveal the fetch form. The terminal command `seo-analysis google connect gsc` remains available and must produce the same state.
 - [ ] **Fetch a small date range.** Pull one week with query and page dimensions. The run should appear in History and as a saved measurement with its period and row count, and its Excel-style dataset should be selectable from an audit's **Create Excel report**.
 - [ ] **A failure is not empty data.** Disconnect, then try to fetch again. The screen should report the credential problem explicitly rather than showing zero rows.
 - [ ] **Disconnect scope.** Disconnect Search Console on one project and confirm another project's connection is untouched.
