@@ -103,4 +103,12 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 - Workbench Stage 1, Step 4 — Added a feed failure view with the reason, the attempted source, **Edit source**, an advertised feed link and no empty downloads on 2026-11-28. URL credentials and sensitive parameters are hidden from the diagnostic copy.
 - Workbench Stage 1, Step 5 — Added coverage for the launcher dispatch fallback, every feed classification, credential redaction and the workbench recovery flow on 2026-11-28. The suite passed 167 tests with Hazm and Chromium skipped.
 
+## Workbench stage 2 — project-centered navigation
+
+- Workbench Stage 2, Step 1 — Inventoried the GET screens and POST actions by task and gave each a visible parent in the shared shell on 2026-11-28. Existing run, evidence, archive, deletion, download and bookmark URLs are unchanged.
+- Workbench Stage 2, Step 2 — Made the project overview the home screen on 2026-11-28. It offers project creation on an empty workspace, and for a selected project shows targets, the latest audit with coverage, saved workflows and recent project work, with one-off audits listed separately.
+- Workbench Stage 2, Step 3 — Added one layout: a persistent rail with the project switcher, task navigation (Overview, Website audit, Keyword and competitor research, Search and traffic, Site QA), History and Manage saved data, plus a breadcrumb and primary action on every screen. The shell uses system fonts only, so no external resource is requested, and collapses to a single column at 900px.
+- Workbench Stage 2, Step 4 — Added a dedicated Start an audit screen that explains the page cap and the local-network permission beside their fields, separated importing a source from analyzing saved sources, and replaced internal tool identifiers with task names in results, history and deletion screens.
+- Workbench Stage 2, Step 5 — Added a Search and traffic landing screen that states which entries are import-ready and which need a connected property. Added coverage for the empty workspace, the selected project, two projects, an ad hoc run, task navigation and active state. The suite passed 169 tests with Hazm and Chromium skipped.
+
 [Current scope and remaining work](ROADMAP.md)

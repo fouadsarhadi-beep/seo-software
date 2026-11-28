@@ -69,6 +69,21 @@ RESEARCH_SECTIONS = {"keywords": "Keywords", "competitors": "Competitor gaps", "
                      "rank_history": "Rank samples", "keyword_clusters": "Keyword clusters",
                      "content_briefs": "Content briefs", "backlinks": "Backlinks",
                      "questions": "Community topics"}
+# Task names replace internal tool identifiers wherever an operator reads a run.
+TOOL_LABELS = {
+    "seo.audit": "Website audit", "web.crawl": "Crawl", "seo.check": "Technical checks",
+    "seo.compare": "Audit comparison", "seo.analyze-snapshot": "Content analysis",
+    "content.review-pairs": "Content review", "content.calibrate": "Calibration",
+    "content.spelling-variants": "Spelling variants", "research.import": "Data import",
+    "research.opportunities": "Research report", "research.feed": "Feed import",
+    "research.brave-search": "Brave search sample", "report.workbook": "Excel report",
+    "report.export-dataset": "Dataset export", "quality.build": "Site QA",
+    "quality.browser": "Browser QA", "performance.lighthouse": "Lighthouse report",
+    "performance.lighthouse-run": "Lighthouse run", "google.search-analytics": "Search Console pull",
+    "google.inspect-url": "URL inspection", "google.pagespeed": "PageSpeed test",
+    "google.crux": "CrUX report", "google.publish-sheets": "Sheets publication",
+    "cms.wordpress-inventory": "WordPress inventory", "system.doctor": "System check",
+}
 
 
 def matches_query(term, *values):
@@ -134,9 +149,16 @@ def create_app(workspace, port=8765):
         verify_token(fields.pop("token", [""])[0])
         return {name: values if name in repeated else values[0] for name, values in fields.items()}
 
+    def nav_projects():
+        try:
+            return history.projects()
+        except (sqlite3.Error, OSError):
+            return []
+
     def render(view, *, status_code=200, **fields):
-        return HTMLResponse(templates.get_template("workbench.html").render(view=view, token=token, **fields),
-                            status_code=status_code)
+        return HTMLResponse(templates.get_template("workbench.html").render(
+            view=view, token=token, nav_projects=nav_projects(), tool_labels=TOOL_LABELS, **fields),
+            status_code=status_code)
 
     async def storage_error(request: Request, exc: Exception):
         LOG.error("Workspace storage error for %s %s", request.method, request.url.path, exc_info=exc)
@@ -185,8 +207,35 @@ def create_app(workspace, port=8765):
         return json.loads(path.read_text(encoding="utf-8"))
 
     @app.get("/")
-    def home():
-        return render("home", runs=history.list_runs(limit=12, archived=False), projects=history.projects())
+    def home(project: str = ""):
+        projects = history.projects()
+        selected = next((item for item in projects if item["name"] == project), None)
+        if selected is None and projects:
+            selected = projects[0]
+        recent = history.list_runs(limit=12, archived=False)
+        project_runs = [item for item in recent if selected and item["project"] == selected["name"]][:5]
+        ad_hoc_runs = [item for item in recent if not item["project"]][:5]
+        latest = None
+        if project_runs:
+            try:
+                latest = detail(project_runs[0]["id"])["manifest"]
+            except (HTTPException, OSError, ValueError):
+                latest = None
+        return render("overview", projects=projects, selected=selected,
+                      targets=history.targets(selected["name"]) if selected else [],
+                      workflows=history.audit_workflows(selected["name"]) if selected else [],
+                      project_runs=project_runs, ad_hoc_runs=ad_hoc_runs, latest=latest)
+
+    @app.get("/audit/new")
+    def audit_new(project: str = ""):
+        projects = history.projects()
+        chosen = next((item["name"] for item in projects if item["name"] == project), "")
+        selected = next((item for item in projects if item["name"] == chosen), None)
+        return render("audit_new", projects=projects, chosen=chosen, selected=selected)
+
+    @app.get("/tools/search-traffic")
+    def search_traffic():
+        return render("search_traffic")
 
     @app.get("/history")
     def runs(page: int = 1, archived: bool = False):

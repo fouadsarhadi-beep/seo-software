@@ -1,10 +1,121 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 {% if view=="job" and job.status in ("queued","running") %}<meta http-equiv="refresh" content="2">{% endif %}
 <title>SEO Analysis · Workbench</title><style>
-*{box-sizing:border-box}body{margin:0;background:#f5f5ef;color:#20291f;font:16px/1.5 "Inter",system-ui,sans-serif}header{background:#1c3229;color:#fff;padding:18px max(5vw,20px);display:flex;align-items:center;gap:38px}header strong{letter-spacing:-.04em;font-size:22px}nav{display:flex;gap:22px}header a{color:#f0f4df;text-decoration:none}main{max-width:1060px;margin:44px auto;padding:0 24px 70px}h1,h2{letter-spacing:-.045em;line-height:1.1}h1{font-size:clamp(38px,6vw,64px);margin:0 0 30px}h2{font-size:26px;margin:32px 0 16px}section{padding:24px;background:white;border:1px solid #d8ddd0;border-radius:12px}label{display:block;font-weight:600;margin-bottom:5px}input,select,button{font:inherit;border-radius:5px;padding:10px;border:1px solid #acb7aa}input[type=url]{width:min(100%,570px)}input[type=number]{width:94px}button{background:#285339;color:white;border:0;cursor:pointer;padding:11px 20px;font-weight:650}form>*{margin:4px 0}details{margin:14px 0}summary{cursor:pointer}.line,.links{display:flex;gap:12px;flex-wrap:wrap;align-items:center}.table{overflow:auto}table{border-collapse:collapse;width:100%;font-size:14px}td,th{padding:12px 8px;border-bottom:1px solid #d8ddd0;text-align:left;vertical-align:top}th{font-size:12px;color:#576754}a{color:#215a39;text-underline-offset:3px}small{color:#536553}code,pre{font:13px/1.4 ui-monospace,monospace}pre{white-space:pre-wrap;overflow-wrap:anywhere}.count{font-size:24px}.links{margin-top:16px}p{overflow-wrap:anywhere}@media(max-width:600px){header{gap:14px;flex-wrap:wrap}nav{gap:12px}main{padding:0 14px}section{padding:15px}}
-
-form.compact{margin:0}button.secondary{background:#edf1ea;color:#254832;border:1px solid #acb7aa;padding:5px 10px}button.danger{background:#963b2c}.help{display:block;margin:0 0 12px 25px}.metrics{display:flex;gap:10px 24px;flex-wrap:wrap;margin:16px 0}.metrics strong{font-size:20px}.downloads{margin:20px 0 32px}.project-list li{margin:10px 0}
-</style></head><body><header><strong>SEO Analysis</strong><nav style="flex-wrap:wrap"><a href="/">Workbench</a><a href="/history">History</a><a href="/projects">Projects</a><a href="/tools">Tools</a></nav></header><main>
+:root{--paper:#f1f0e6;--card:#fffef9;--ink:#121b16;--ink-soft:#55645a;--line:#dcdece;--line-strong:#b4bca7;--pine:#122a1e;--pine-soft:#1c3a29;--pine-line:#2b4a37;--accent:#cdf36b;--accent-ink:#1a2a0f;--warn:#9c3f27;--radius:10px;--display:"Bahnschrift","DIN Alternate","Franklin Gothic Medium","Segoe UI Variable Display",system-ui,sans-serif;--body:"Segoe UI Variable Text","Segoe UI","Noto Sans",system-ui,sans-serif;--mono:ui-monospace,"Cascadia Mono",Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;color:var(--ink);font:15px/1.55 var(--body);background:radial-gradient(1200px 520px at 12% -12%,#e8ead6 0,transparent 60%),radial-gradient(900px 420px at 105% 0%,#edefe0 0,transparent 55%),var(--paper);-webkit-font-smoothing:antialiased}
+a{color:#1d5136;text-underline-offset:3px}
+:focus-visible{outline:2px solid #2f6b46;outline-offset:2px}
+.rail :focus-visible{outline-color:var(--accent)}
+.app{display:grid;grid-template-columns:238px minmax(0,1fr);min-height:100vh}
+.rail{position:sticky;top:0;align-self:start;height:100vh;display:flex;flex-direction:column;gap:22px;padding:22px 18px;background:var(--pine);color:#e6efdf;overflow:auto}
+.brand{display:block;text-decoration:none;color:#fff;font-family:var(--display);font-size:19px;letter-spacing:.01em;line-height:1.15}
+.brand span{display:block;margin-top:5px;font-family:var(--body);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#8fae98}
+.switcher{display:grid;gap:6px}
+.switcher label{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#8fae98;font-weight:600;margin:0}
+.switcher select{width:100%;padding:7px 8px;border-radius:6px;border:1px solid var(--pine-line);background:#0e2117;color:#e6efdf;font:inherit;font-size:13px}
+.switcher button{margin-top:2px;padding:7px 10px;border:1px solid var(--pine-line);background:transparent;color:#cfe0d3;border-radius:6px;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+.switcher button:hover{background:var(--pine-soft);color:#fff}
+.switcher p{margin:0;font-size:12px;color:#8fae98}
+.rail-link{display:block;margin-top:-10px;font-size:12px;color:#9db8a6;text-decoration:none}
+.rail-link:hover{color:#fff}
+.tasks{display:flex;flex-direction:column;gap:2px}
+.tasks .nav-label{margin:14px 0 4px 10px;font-family:var(--display);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#6f8f7a}
+.tasks a{display:block;padding:7px 10px;border-radius:7px;color:#c9d9cc;text-decoration:none;font-size:13.5px;border-left:2px solid transparent}
+.tasks a:hover{background:var(--pine-soft);color:#fff}
+.tasks a[aria-current="page"]{background:var(--accent);border-left-color:var(--accent);color:var(--accent-ink);font-weight:650}
+.rail-foot{margin:auto 0 0;font-size:11.5px;line-height:1.5;color:#7d9a86}
+.stage{min-width:0;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;gap:16px;justify-content:space-between;flex-wrap:wrap;padding:14px 30px;border-bottom:1px solid var(--line);background:rgba(255,254,249,.72)}
+.crumbs{margin:0;font-family:var(--display);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-soft)}
+.button{display:inline-block;padding:9px 16px;border-radius:7px;text-decoration:none;font-weight:650;font-size:13.5px;border:1px solid transparent;cursor:pointer}
+.button.primary{background:var(--pine);color:#fff}
+.button.primary:hover{background:#1b3d2b}
+.button.ghost{background:transparent;border-color:var(--line-strong);color:var(--ink)}
+main{width:100%;max-width:1180px;padding:28px 30px 90px;margin:0 auto}
+h1,h2,h3{font-family:var(--display);font-weight:600}
+h1{font-size:clamp(27px,3.2vw,38px);letter-spacing:-.015em;line-height:1.05;margin:0 0 8px}
+h2{font-size:18px;margin:30px 0 12px;letter-spacing:.01em}
+h3{font-size:15px;margin:0 0 6px}
+.lede{margin:0 0 24px;color:var(--ink-soft);max-width:66ch}
+.page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:24px}
+.page-head .crumbs{margin-bottom:8px}
+.page-actions{display:flex;gap:10px;flex-wrap:wrap;padding-top:6px}
+section,.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));margin-bottom:8px}
+.card{display:flex;flex-direction:column}
+.card h2{margin:0 0 8px;font-size:16px}
+.card p{margin:0 0 12px;color:var(--ink-soft);font-size:13.5px}
+.card .button,.card button{align-self:flex-start}
+label{display:block;font-weight:600;margin-bottom:5px;font-size:13.5px}
+input,select,textarea,button{font:inherit;border-radius:6px;padding:9px 10px;border:1px solid var(--line-strong);background:#fff;color:var(--ink)}
+input[type=checkbox]{width:auto;padding:0}
+input[type=url]{width:min(100%,570px)}
+input[type=number]{width:94px}
+input[type=search]{min-width:220px}
+button{background:var(--pine);color:#fff;border:0;cursor:pointer;padding:10px 18px;font-weight:650}
+button:hover{background:#1b3d2b}
+button.secondary{background:#eef0e3;color:#254832;border:1px solid var(--line-strong);padding:5px 10px;font-weight:600}
+button.danger{background:var(--warn)}
+form>*{margin:4px 0}
+details{margin:12px 0}
+summary{cursor:pointer;font-weight:600}
+.line,.links{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.table{overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+td,th{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+tr:last-child td{border-bottom:0}
+tbody tr:hover{background:#f7f8ee}
+th{font-family:var(--display);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);background:#f6f7ec}
+.metrics{display:flex;gap:26px;flex-wrap:wrap;margin:14px 0 4px}
+.metrics span{display:flex;flex-direction:column;gap:2px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
+.metrics strong{font-family:var(--display);font-size:30px;line-height:1.05;color:var(--ink);font-variant-numeric:tabular-nums}
+.count{font-family:var(--display);font-size:24px}
+.downloads{margin:18px 0 28px}
+small,.help{color:var(--ink-soft)}
+.help{display:block;margin:0 0 12px 25px;font-size:12.5px}
+code,pre{font-family:var(--mono);font-size:12.5px}
+pre{white-space:pre-wrap;overflow-wrap:anywhere}
+p{overflow-wrap:anywhere}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#eef0e3;color:#35513c;font-size:11.5px;font-weight:650}
+.notice{border-left:3px solid var(--accent);background:#f8f9ec}
+.project-list{list-style:none;margin:0;padding:0}
+.project-list li{margin:10px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+@media(max-width:900px){.app{grid-template-columns:1fr}.rail{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:flex-start;gap:16px}.rail-foot{display:none}.switcher{min-width:180px}.tasks{flex-direction:row;flex-wrap:wrap}.tasks .nav-label{display:none}.topbar{padding:12px 18px}main{padding:22px 18px 70px}}
+</style></head><body>
+{% set area = 'overview' if view == 'overview' else
+   'audit' if view in ('audit_new','job','result','compare','comparison','review','review_pair','workflow_form','projects','project') else
+   'research' if view in ('tools','research_form','research_result','dataset','dataset_row','feed_failed','report_form','report_preview') else
+   'traffic' if view == 'search_traffic' else
+   'qa' if view in ('site_qa_form','site_qa_result','browser_qa_form','browser_qa_result') else
+   'workspace' %}
+<div class="app">
+<aside class="rail">
+<a class="brand" href="/">SEO Analysis<span>Local search workbench</span></a>
+<form class="switcher" method="get" action="/">
+<label for="nav-project">Project</label>
+{% if nav_projects %}<select id="nav-project" name="project">{% for p in nav_projects %}<option value="{{p.name}}"{% if selected is defined and selected and selected.name == p.name %} selected{% endif %}>{{p.name}}</option>{% endfor %}</select><button type="submit">Switch project</button>{% else %}<p>No projects yet.</p>{% endif %}
+</form>
+<a class="rail-link" href="/projects">All projects</a>
+<nav class="tasks" aria-label="Tasks">
+<span class="nav-label">Analyze</span>
+<a href="/"{% if area == 'overview' %} aria-current="page"{% endif %}>Overview</a>
+<a href="/audit/new"{% if area == 'audit' %} aria-current="page"{% endif %}>Website audit</a>
+<a href="/tools/research"{% if area == 'research' %} aria-current="page"{% endif %}>Keyword and competitor research</a>
+<a href="/tools/search-traffic"{% if area == 'traffic' %} aria-current="page"{% endif %}>Search and traffic</a>
+<a href="/tools/site-qa"{% if area == 'qa' %} aria-current="page"{% endif %}>Site QA</a>
+<span class="nav-label">Workspace</span>
+<a href="/history"{% if view == 'history' %} aria-current="page"{% endif %}>History</a>
+<a href="/history/data">Manage saved data</a>
+</nav>
+<p class="rail-foot">Local only. Pages are fetched, measured and stored on this computer.</p>
+</aside>
+<div class="stage">
+<header class="topbar">
+<p class="crumbs">{{ {'overview':'Overview','audit':'Website audit','research':'Research','traffic':'Search and traffic','qa':'Site QA','workspace':'Workspace'}[area] }}</p>
+<a class="button primary" href="/audit/new{% if selected is defined and selected %}?project={{selected.name|urlencode}}{% endif %}">Start audit</a>
+</header>
+<main>
 {% macro csrf() %}<input type="hidden" name="token" value="{{ token }}">{% endmacro %}
 {% macro pages() %}
 <div class="links">
@@ -33,7 +144,7 @@ form.compact{margin:0}button.secondary{background:#edf1ea;color:#254832;border:1
 <tr><th>Tool</th><th>Status</th><th>Project</th><th>Started (UTC)</th>{% if actions %}<th>Action</th>{% endif %}</tr>
 {% for r in rows %}
 <tr>
-<td><a href="/runs/{{r.id}}">{{r.tool}}</a></td>
+<td><a href="/runs/{{r.id}}">{{tool_labels.get(r.tool, r.tool)}}</a></td>
 <td>{{r.status}}</td><td>{{r.project or 'Ad hoc'}}</td><td>{{r.started[:19]|replace('T',' ')}}</td>
 {% if actions %}
 <td><div class="line"><form class="compact" method="post" action="/runs/{{r.id}}/archive">
@@ -45,19 +156,103 @@ form.compact{margin:0}button.secondary{background:#edf1ea;color:#254832;border:1
 </table></div>
 {% else %}<p>{{'No archived runs.' if archived else 'No runs to show.'}}</p>{% endif %}
 {% endmacro %}
-{% if view=="home" %}
-<h1>Website audit</h1>
-<section><form method="post" action="/audit">
+{% if view=="overview" %}
+<div class="page-head"><div>
+<p class="crumbs">{{ 'Project' if selected else 'Workspace' }}</p>
+<h1>{{ selected.name if selected else 'Your workbench' }}</h1>
+<p class="lede">{% if selected %}Targets, the latest audit and recent work for this project.{% else %}Start with a project for the site you are working on, or run a single audit without saving one.{% endif %}</p>
+</div>
+<div class="page-actions">
+<a class="button primary" href="/audit/new{% if selected %}?project={{selected.name|urlencode}}{% endif %}">Start audit</a>
+<a class="button ghost" href="/projects">All projects</a>
+</div>
+</div>
+{% if not projects %}
+<section class="notice">
+<h2>Create your first project</h2>
+<p>A project keeps one site's targets, audits and decisions together. You can also run a one-off audit without creating one.</p>
+<form method="post" action="/projects">
+{{csrf()}}
+<div class="line"><label>Project name <input name="name" required placeholder="My site"></label>
+<label>Website URL (optional) <input name="url" type="url" placeholder="https://example.org"></label>
+<button>Create project</button></div>
+</form>
+<p><a href="/audit/new">Run a one-off audit instead</a></p>
+</section>
+{% else %}
+<div class="grid">
+<div class="card">
+<h2>Targets</h2>
+{% if targets %}
+<ul class="project-list">{% for t in targets %}<li><strong>{{t.name}}</strong> <span class="badge">{{t.url}}</span>
+<form class="compact" method="post" action="/audit">{{csrf()}}<input type="hidden" name="target" value="{{t.name}}"><input type="hidden" name="project" value="{{selected.name}}"><button class="secondary">Audit</button></form></li>{% endfor %}</ul>
+{% else %}<p>No saved targets yet. A target is a named URL this project audits repeatedly.</p>{% endif %}
+<details><summary>Add target</summary>
+<form method="post" action="/targets">{{csrf()}}<input type="hidden" name="project" value="{{selected.name}}">
+<label>Target name <input name="name" required></label>
+<label>Website URL <input name="url" type="url" required></label>
+<button>Save target</button></form>
+</details>
+</div>
+<div class="card">
+<h2>Latest audit</h2>
+{% if latest %}
+<p><span class="badge">{{ latest.status|replace('_',' ') }}</span> {{ latest.started_at[:19]|replace('T',' ') }} UTC</p>
+<div class="metrics">
+{% for key, label in {'observed':'URLs observed','findings':'findings','errors':'fetch errors'}.items() if key in latest.counts %}<span><strong>{{latest.counts[key]}}</strong>{{label}}</span>{% endfor %}
+</div>
+<p><a href="/runs/{{latest.run_id}}">Open results</a>{% if latest.parameters.source or latest.parameters.sitemap %} · {{latest.parameters.source or latest.parameters.sitemap}}{% endif %}</p>
+{% else %}<p>No audits for this project yet.</p>{% endif %}
+</div>
+<div class="card">
+<h2>Saved workflows</h2>
+{% if workflows %}
+<p>{{ workflows|length }} saved {{'workflow' if workflows|length == 1 else 'workflows'}} ready to rerun with the same settings.</p>
+{% else %}
+<p>Save a target and crawl settings to rerun the same audit later.</p>
+{% endif %}
+<p><a href="/projects?project={{selected.name|urlencode}}">Manage targets and workflows</a></p>
+</div>
+</div>
+<h2>Recent work in this project</h2>
+{{table(project_runs)}}
+{% endif %}
+{% if ad_hoc_runs %}<h2>One-off audits</h2>{{table(ad_hoc_runs)}}{% endif %}
+{% elif view=="audit_new" %}
+<div class="page-head"><div>
+<p class="crumbs">Website audit</p>
+<h1>Start an audit</h1>
+<p class="lede">Crawl one site and get findings linked to the pages they came from. The audit only reads pages; nothing is changed on your site.</p>
+</div></div>
+<section>
+<form method="post" action="/audit">
 {{csrf()}}<label for="url">Website URL</label>
 <div class="line"><input id="url" name="url" type="url" required placeholder="https://example.org"><button>Run audit</button></div>
-<details><summary>Crawl options</summary>
+<details><summary>Audit settings</summary>
 <p><label>Maximum pages <input type="number" name="pages" min="1" max="500" value="100"></label></p>
+<small class="help" style="margin-left:0">The page cap bounds one crawl. Pages beyond the cap stay unassessed rather than counting as clean.</small>
 <label><input type="checkbox" name="links"> Follow internal links if no sitemap is available</label>
 <label><input type="checkbox" name="local" aria-describedby="local-help"> Allow local or private-network access for this audit</label>
-<small id="local-help" class="help">Use for a trusted site on your computer or private network, or a test server on a nonstandard port. Leave off for public sites on standard ports.</small>
-<label>Project <select name="project"><option value="">Ad hoc</option>{% for p in projects %}<option>{{p.name}}</option>{% endfor %}</select></label>
-</details></form></section>
-<h2>Recent runs</h2>{{table(runs)}}
+<small id="local-help" class="help">Use for a trusted site on this computer or a private network, or a test server on a nonstandard port. Leave off for public sites on standard ports.</small>
+<label>Project <select name="project"><option value="">One-off audit</option>{% for p in projects %}<option{% if chosen == p.name %} selected{% endif %}>{{p.name}}</option>{% endfor %}</select></label>
+</details></form>
+</section>
+{% elif view=="search_traffic" %}
+<div class="page-head"><div>
+<p class="crumbs">Search and traffic</p>
+<h1>Search and traffic</h1>
+<p class="lede">Join Search Console and GA4 measurements to the pages this workbench has observed. File imports work today; live accounts are not connected in this build.</p>
+</div></div>
+<div class="grid">
+<div class="card"><h2>Search Console</h2><p>Which queries and pages appeared in Google Search, with clicks and impressions. Import an export, then open a saved audit's Excel report to match rows to observed pages.</p><span class="badge">Import ready</span></div>
+<div class="card"><h2>GA4 landing pages</h2><p>Which landing pages brought sessions and key events. Import an export through the same report, which keeps sessions separate from clicks.</p><span class="badge">Import ready</span></div>
+<div class="card"><h2>URL Inspection</h2><p>What Google recorded about one URL, including its selected canonical. This needs a connected Google property, which this build does not request yet.</p><span class="badge">Not available</span></div>
+</div>
+<h2>Bring data in today</h2>
+<section>
+<p>Open a saved audit and choose <strong>Create Excel report</strong>, then add the Search Console or GA4 export for that site. The report keeps every source row and its match status, including unmatched and ambiguous pages.</p>
+<div class="links"><a class="button ghost" href="/history">Choose a saved audit</a><a class="button ghost" href="/tools/research">Keyword and competitor research</a></div>
+</section>
 {% elif view=="history" %}
 <h1>{{'Archived runs' if archived else 'Run history'}}</h1>
 <div class="links"><a href="/compare">Compare saved audits</a><a href="{{'/history' if archived else '/history?archived=true'}}">{{'Back to run history' if archived else 'View archived runs'}}</a><a href="/history/data">Manage saved data</a></div>
@@ -76,7 +271,7 @@ form.compact{margin:0}button.secondary{background:#edf1ea;color:#254832;border:1
 {% elif view=="confirm_delete" %}
 <h1>{{title}}</h1>
 <section>
-{% if run %}<p>{{run.tool_id}} · {{run.project or 'Ad hoc'}} · {{run.started_at[:19]|replace('T',' ')}} UTC</p>
+{% if run %}<p>{{tool_labels.get(run.tool_id, run.tool_id)}} · {{run.project or 'Ad hoc'}} · {{run.started_at[:19]|replace('T',' ')}} UTC</p>
 <p><code>{{run.run_id}}</code></p>{% endif %}
 <p>{{message}}</p>
 {% if path %}<p>Current workspace <code>{{path}}</code></p>{% endif %}
@@ -106,7 +301,7 @@ form.compact{margin:0}button.secondary{background:#edf1ea;color:#254832;border:1
 </details>
 {% elif view=="project" %}
 <h1>{{project}}</h1>
-<p><a href="/projects">All projects</a></p>
+<p><a href="/projects">All projects</a> · <a href="/?project={{project|urlencode}}">Project overview</a></p>
 <section>
 <h2>Saved targets</h2>
 {% for t in targets %}
@@ -149,7 +344,7 @@ form.compact{margin:0}button.secondary{background:#edf1ea;color:#254832;border:1
 {% set labels = {'ok': 'Successful HTML fetches', 'html_pages': 'HTML pages', 'pages_extracted': 'Pages with usable text', 'pages_compared': 'Pages eligible for comparison', 'pairs_flagged': 'Pairs flagged', 'noindex_excluded': 'Noindex pages excluded'} %}
 {% set page_limited = run.counts.skipped is defined and run.counts.skipped.get('page_limit') and run.parameters.limit is defined %}
 <section>
-<strong>{{'Technical checks' if checks_view else 'Website audit' if audit else run.tool_id}} · {{run.status|replace('_',' ')}}</strong>
+<strong>{{'Technical checks' if checks_view else 'Website audit' if audit else tool_labels.get(run.tool_id, run.tool_id)}} · {{run.status|replace('_',' ')}}</strong>
 {% if checks_view %}
 {% if source %}
 <p><a href="/runs/{{source.manifest.run_id}}">Source audit or crawl</a>
@@ -267,4 +462,7 @@ form.compact{margin:0}button.secondary{background:#edf1ea;color:#254832;border:1
 </dl>
 {% if observation.extraction is defined and observation.extraction.javascript_notice %}<p>The received HTML contains a notice about JavaScript. The audit examines the HTTP response.</p>{% endif %}
 {% if observation.text %}<details><summary>Extracted text</summary><p dir="auto">{{observation.text}}</p></details>{% endif %}
-<details><summary>Raw evidence</summary><pre>{{observation|tojson(indent=2)}}</pre></details></section>{% endif %}</main></body></html>
+<details><summary>Raw evidence</summary><pre>{{observation|tojson(indent=2)}}</pre></details></section>{% endif %}</main>
+</div>
+</div>
+</body></html>

@@ -1,6 +1,6 @@
 # Workbench implementation checklist
 
-**Status on 2026-11-28:** stage 1 is implemented with automated coverage; the owner walkthrough is pending. Continue at **2.1**. These numbers expand the six stages in the [product plan](WORKBENCH_PRODUCT_PLAN.md). Stage 7 expands its research follow-up. The first release target is stages 1–4: launch, crawl, investigate, share. The second is stages 5–7: explain performance, track decisions, explore opportunities.
+**Status on 2026-11-28:** stages 1 and 2 are implemented with automated coverage; the owner walkthrough is pending. Continue at **3.1**. These numbers expand the six stages in the [product plan](WORKBENCH_PRODUCT_PLAN.md). Stage 7 expands its research follow-up. The first release target is stages 1–4: launch, crawl, investigate, share. The second is stages 5–7: explain performance, track decisions, explore opportunities.
 
 ## How to pick up the work
 
@@ -32,11 +32,11 @@ Entry points: `desktop.py`, `research/sources.py:read_feed`, `ui/server.py` at `
 
 Depends on the stage 1 entry points. Start in `ui/server.py`, `ui/workbench.html`, `ui/research.html`, `ui/workbook.html` and `app/workflows.py`.
 
-- [ ] **2.1 Map existing routes to tasks.** Inventory GET pages and POST actions for projects, targets, workflows, audit jobs, results, research, workbook, QA and history. Assign each one a visible parent and a return destination. Keep `POST /audit`, job progress and saved run URLs working.
-- [ ] **2.2 Build the project overview.** On first launch offer Create project and Run a one-off audit. With projects present, show a project list or explicit selection. The selected project shows target, Start audit, latest audit coverage and recent project work. Pass the selected project with links and validate on submission. A one-off run stays ad hoc.
-- [ ] **2.3 Establish the layout once.** Use a consistent project selector, task navigation, page title, primary action and breadcrumb. Website Audit, Research, Search & Traffic and Site QA each get a landing screen. Keep History and Manage saved data reachable. Preserve keyboard focus, native links and readable mixed Persian/Latin URLs at narrow widths.
-- [ ] **2.4 Clarify inputs and empty states.** Put project creation fields behind Create project, targets under their project, audit settings under Start audit. Explain the page cap and local/staging permission beside their fields. Separate Import a source from Analyze saved sources. Give an empty tool one example and one usable next action.
-- [ ] **2.5 Verify together.** Exercise empty workspace, two projects with different runs, ad hoc run, archived run link and direct bookmark. Owner: choose the right tool for a crawl, an article feed and a traffic import using only the labels. At this stage, link the traffic import to the existing audit workbook flow. Step 5.2 adds the project-level import screen.
+- [x] **2.1 Map existing routes to tasks.** Inventory GET pages and POST actions for projects, targets, workflows, audit jobs, results, research, workbook, QA and history. Assign each one a visible parent and a return destination. Keep `POST /audit`, job progress and saved run URLs working.
+- [x] **2.2 Build the project overview.** On first launch offer Create project and Run a one-off audit. With projects present, show a project list or explicit selection. The selected project shows target, Start audit, latest audit coverage and recent project work. Pass the selected project with links and validate on submission. A one-off run stays ad hoc.
+- [x] **2.3 Establish the layout once.** Use a consistent project selector, task navigation, page title, primary action and breadcrumb. Website Audit, Research, Search & Traffic and Site QA each get a landing screen. Keep History and Manage saved data reachable. Preserve keyboard focus, native links and readable mixed Persian/Latin URLs at narrow widths.
+- [x] **2.4 Clarify inputs and empty states.** Put project creation fields behind Create project, targets under their project, audit settings under Start audit. Explain the page cap and local/staging permission beside their fields. Separate Import a source from Analyze saved sources. Give an empty tool one example and one usable next action.
+- [x] **2.5 Verify together.** Exercise empty workspace, two projects with different runs, ad hoc run, archived run link and direct bookmark. Owner: choose the right tool for a crawl, an article feed and a traffic import using only the labels. At this stage, link the traffic import to the existing audit workbook flow. Step 5.2 adds the project-level import screen.
 
 ## Stage 3 — Explore an audit from a finding down to a page
 

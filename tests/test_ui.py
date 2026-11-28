@@ -309,3 +309,67 @@ def test_ui_feed_failure_explains_the_source_and_offers_recovery(site, tmp_path,
         reopened = client.get(edit["href"])
         assert reopened.status_code == 200
         assert f'value="{site.base}/page"' in reopened.text
+
+
+def test_ui_overview_and_task_navigation_guide_a_first_session(tmp_path):
+    origin = "http://127.0.0.1:8972"
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    with TestClient(create_app(ws, 8972), base_url=origin) as client:
+        home = BeautifulSoup(client.get("/").text, "html.parser")
+        assert home.h1.text == "Your workbench"
+        assert home.select_one('form[action="/projects"]')
+        assert home.select_one('a[href="/audit/new"]')
+        tasks = {link.get_text(strip=True): link["href"] for link in home.select("nav.tasks a")}
+        assert tasks == {"Overview": "/", "Website audit": "/audit/new",
+                         "Keyword and competitor research": "/tools/research",
+                         "Search and traffic": "/tools/search-traffic", "Site QA": "/tools/site-qa",
+                         "History": "/history", "Manage saved data": "/history/data"}
+        assert home.select_one('nav.tasks a[aria-current="page"]').get_text(strip=True) == "Overview"
+
+        start = BeautifulSoup(client.get("/audit/new").text, "html.parser")
+        assert start.h1.text == "Start an audit"
+        assert "page cap" in start.text and start.select_one('select[name="project"]')
+        assert start.select_one('nav.tasks a[aria-current="page"]').get_text(strip=True) == "Website audit"
+
+        traffic = BeautifulSoup(client.get("/tools/search-traffic").text, "html.parser")
+        assert traffic.h1.text == "Search and traffic"
+        assert "Import ready" in traffic.text and "Not available" in traffic.text
+        assert traffic.select_one('nav.tasks a[aria-current="page"]').get_text(strip=True) == "Search and traffic"
+
+
+def test_ui_overview_centers_the_selected_project(site, tmp_path):
+    origin = "http://127.0.0.1:8972"
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    site.add("/robots.txt", f"User-agent: *\nSitemap: {site.base}/map")
+    site.add("/map", f"<urlset><url><loc>{site.base}/</loc></url></urlset>")
+    site.add("/", "<html><main>نمونه متن</main></html>")
+    with TestClient(create_app(ws, 8972), base_url=origin) as client:
+        token = BeautifulSoup(client.get("/audit/new").text, "html.parser").select_one("input[name=token]")["value"]
+        headers = {"Origin": origin}
+        client.post("/projects", headers=headers, data={"token": token, "name": "Acme", "url": site.base})
+        client.post("/targets", headers=headers, data={"token": token, "project": "Acme",
+                                                       "name": "Blog", "url": site.base})
+        reply = client.post("/audit", headers=headers, data={"url": site.base, "token": token, "local": "on",
+                                                             "project": "Acme", "pages": "5"})
+        for _ in range(200):
+            reply = client.get(reply.url)
+            if "/runs/" in str(reply.url):
+                break
+            time.sleep(.05)
+        run_path = reply.url.path
+        overview = BeautifulSoup(client.get("/").text, "html.parser")
+        assert overview.h1.text == "Acme"
+        assert overview.select_one('select[name="project"] option[selected]').get_text(strip=True) == "Acme"
+        assert overview.find("h2", string="Targets") and "Blog" in overview.text
+        latest = overview.find("h2", string="Latest audit").find_next("a", href=run_path)
+        assert latest is not None
+        assert overview.find("h2", string="Recent work in this project")
+        assert overview.select_one(f'a[href="{run_path}"]')
+        assert "Website audit" in overview.text and "seo.audit" not in overview.text
+        client.post("/projects", headers=headers, data={"token": token, "name": "Beta"})
+        beta = BeautifulSoup(client.get("/?project=Beta").text, "html.parser")
+        assert beta.h1.text == "Beta"
+        assert "No audits for this project yet." in beta.text
+        assert beta.select_one(f'a[href="{run_path}"]') is None
+        assert BeautifulSoup(client.get("/?project=Acme").text, "html.parser").select_one(f'a[href="{run_path}"]')
+        assert overview.select_one('form.switcher[action="/"]')

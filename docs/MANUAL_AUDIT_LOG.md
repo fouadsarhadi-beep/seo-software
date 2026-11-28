@@ -71,3 +71,13 @@ Use authorized properties and the documented [Google connection and CLI commands
 - [ ] **Open Workbench and Copy address.** Start the workbench from `Start SEO Workbench.cmd`. Click **Open Workbench** twice, close the browser tab and reopen it from the launcher window. If the browser does not appear, use **Copy address**, paste the address manually and confirm the address stays selectable.
 - [ ] **Feed failure reasons.** Open **Tools → Keyword and competitor research → Import articles from RSS or Atom** and try a site homepage, an empty address, a malformed XML endpoint and a real feed. Each failure should name what was returned and offer **Edit source**. A homepage that advertises a feed should offer that link.
 - [ ] **No empty downloads.** Confirm a failed import keeps no CSV or JSON downloads and that the failed run is still listed in **History**.
+
+## Workbench stage 2 checkpoint — project-centered navigation (pending owner check)
+
+- [ ] **Empty workspace.** Open the workbench with no projects. The home screen should offer **Create your first project** and a one-off audit path, with the rail showing the five task areas.
+- [ ] **Selected project.** Create a project, add a target and run one audit. The overview should show the target, the latest audit with its coverage counts and a link to the results, recent work for this project, and the project selector set to that project.
+- [ ] **Two projects and one-off runs.** Add a second project. Switching between them should change the overview, a project without audits should say so, and one-off audits should appear in their own list.
+- [ ] **Task navigation and layout.** Move through Overview, Website audit, Keyword and competitor research, Search and traffic and Site QA. Each should mark itself as current, keep **History** and **Manage saved data** reachable, and use task names rather than internal tool IDs.
+- [ ] **Start an audit.** Confirm the page-cap and local-network explanations sit beside their fields, and that choosing a project pre-selects it.
+- [ ] **Search and traffic.** Confirm the screen explains what each entry answers and which are import-ready versus unavailable, without claiming a live connection.
+- [ ] **Keyboard and narrow window.** Tab through the rail and the primary action with a visible focus ring. Narrow the window below 900px and confirm the rail becomes a horizontal bar and mixed Persian/Latin text stays readable.
