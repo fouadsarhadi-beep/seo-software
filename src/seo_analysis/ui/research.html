@@ -18,12 +18,13 @@
 {% if datasets %}
 <section><form method="post" action="/tools/research">
 {{csrf()}}
+<input type="hidden" name="project" value="{{ selected.name if selected else '' }}">
 <label>Owned hostname <input name="host" required value="{{host}}" placeholder="example.org"></label>
 <fieldset>
 <legend>Saved datasets</legend>
 <p>Select two search-result samples with the same provider, locale and device to compare an owned site with a competitor. The report states which queries were shared and which appeared only in the competitor's sample; a query absent from a sample is not proof that a site never ranks for it.</p>
 {% for item in datasets %}
-<div><label><input type="checkbox" name="dataset" value="{{item.id}}"{% if item.id in selected %} checked{% endif %}>
+<div><label><input type="checkbox" name="dataset" value="{{item.id}}"{% if item.id in picked %} checked{% endif %}>
 {{dataset_labels[item.kind]}} · {{item.name}} · {{source_context(item)}} · {{item.rows}} rows{% if item.status == 'partial' %} · partial coverage{% endif %}</label>
 {% if capabilities.get(item.kind) %}<small>{{capabilities[item.kind]}}</small>{% endif %}
 <a href="/runs/{{item.id}}">Open dataset</a></div>
@@ -37,6 +38,7 @@
 <form method="post" action="/tools/research/feed">
 {{csrf()}}
 <input type="hidden" name="host" value="{{host}}">
+<input type="hidden" name="project" value="{{ selected.name if selected else '' }}">
 <p>Enter a public RSS or Atom feed address. The app requests the feed and its robots.txt, then saves entry titles, links and publication dates.</p>
 <label>Public feed URL <input type="url" name="url" required value="{{feed_url or ''}}"></label>
 <label>Maximum entries <input type="number" name="max_items" min="1" max="500" value="25"></label>
@@ -48,6 +50,7 @@
 <form method="post" action="/tools/research/import" enctype="multipart/form-data">
 {{csrf()}}
 <input type="hidden" name="host" value="{{host}}">
+<input type="hidden" name="project" value="{{ selected.name if selected else '' }}">
 <label>Source type <select name="kind">{% for kind, label in dataset_labels.items() %}<option value="{{kind}}">{{label}}</option>{% endfor %}</select></label>
 <label>Export file <input name="file" type="file" accept=".csv,.tsv,.xlsx,.rss,.atom,.xml" required></label>
 <label>Provider <input name="provider" placeholder="Provider or account export" required></label>

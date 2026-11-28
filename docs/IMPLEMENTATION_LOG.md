@@ -180,4 +180,12 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 - Batch 1 — Review standing now asks the database for the latest audit of the project **and the target that review belongs to**, so 25 intervening imports and a newer audit for a second target leave the verdict untouched. A page fingerprint includes the final URL, so a changed redirect destination reopens the review.
 - Batch 1 — Focused regression: 36 tests across comparison, the read model and the workbench, replacing the old test that asserted the false resolution. Full locked CI (Ruff, mypy, Bandit, matrix) is deferred to batch 7 as the plan requires.
 
+## DS delivery plan — batch 2: project context from click through storage
+
+- Batch 2 — The rail now carries the selected project into every task link (audit, research, traffic, Site QA, review queue, brief), so opening a tool from Beta keeps Beta selected instead of silently reverting to the first project.
+- Batch 2 — Research imports, feed samples and research runs accept the submitted project and record it on the run, so their datasets and reports belong to that project. A dataset owned by another project is refused before any work starts.
+- Batch 2 — The content brief validates its destination instead of writing under an unknown name, and the question explorer collects into the project it was opened from rather than the workspace's first project. An unknown project now produces a recoverable 400 rather than a silent workspace-level record; the Google fetch, inspect and disconnect routes use the same check.
+- Batch 2 — Acceptance test drives the Beta journey end to end: rail links carry Beta, the research screen posts Beta, a brief item lands only in Beta, an unknown project is rejected, a research run is recorded under Beta, and a dataset owned by Alpha is refused. Ad-hoc auditing is unchanged.
+- Batch 2 — Not covered in this pass: pickers still list workspace-wide datasets (compatibility is enforced on submit, the list is not scoped), shared dataset rows do not yet label their owning project, and collecting a one-off run into a project still defaults rather than asking explicitly.
+
 [Current scope and remaining work](ROADMAP.md)

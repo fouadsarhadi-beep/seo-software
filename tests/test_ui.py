@@ -797,6 +797,61 @@ def _target_audit(ws, project, target, rid, started, title):
                 "findings.json": json.dumps({"schema_version": 1, "findings": findings})})
 
 
+def test_ui_project_context_survives_each_tool(tmp_path):
+    origin = "http://127.0.0.1:8972"
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    history = History(ws)
+    history.add_project("Alpha")
+    history.add_project("Beta")
+
+    def dataset(project, query):
+        rid = uuid4().hex
+        _saved_run(ws, {"run_id": rid, "tool_id": "research.import", "status": "succeeded",
+                        "project": project, "saved_target": None, "started_at": "2026-11-20T00:00:00Z",
+                        "finished_at": "2026-11-20T00:00:05Z",
+                        "parameters": {"kind": "serp", "provider": "Export", "observed": "2026-11-20",
+                                       "locale": "en-US", "device": "desktop"},
+                        "counts": {"rows": 1}, "warnings": [], "artifacts": ["dataset.json"]},
+                   {"dataset.json": json.dumps({"schema_version": 1, "source": {
+                       "kind": "serp", "provider": "Export", "observed": "2026-11-20",
+                       "locale": "en-US", "device": "desktop", "skipped": 0, "capped": False},
+                       "rows": [{"row": 1, "query": query, "url": "https://mine.test/a", "rank": 1}]})})
+        return rid
+
+    with TestClient(create_app(ws, 8972), base_url=origin) as client:
+        headers = {"Origin": origin}
+        home = BeautifulSoup(client.get("/", params={"project": "Beta"}).text, "html.parser")
+        hrefs = {link["href"].split("?")[0] for link in home.select('nav.tasks a[href*="project=Beta"]')}
+        assert {"/audit/new", "/tools/research", "/tools/search-traffic", "/tools/site-qa",
+                "/review-queue", "/brief"} <= hrefs
+
+        research = client.get("/tools/research", params={"project": "Beta"}).text
+        assert 'name="project" value="Beta"' in research
+        token = BeautifulSoup(research, "html.parser").select_one("input[name=token]")["value"]
+
+        client.post("/brief/add", headers=headers,
+                    data={"token": token, "project": "Beta", "query": "beta query"})
+        assert [item["query"] for item in History(ws).brief_items("Beta")] == ["beta query"]
+        assert History(ws).brief_items("Alpha") == []
+
+        bad = client.post("/brief/add", headers=headers,
+                          data={"token": token, "project": "Ghost", "query": "lost"})
+        assert bad.status_code == 400
+        assert History(ws).brief_items("Ghost") == []
+
+        mine = dataset("Beta", "beta keyword")
+        run = client.post("/tools/research", headers=headers,
+                          data={"token": token, "project": "Beta", "host": "mine.test", "dataset": mine})
+        assert run.status_code == 200
+        created = run.url.path.rsplit("/", 1)[-1]
+        assert json.loads((ws.runs_dir / created / "run.json").read_text(encoding="utf-8"))["project"] == "Beta"
+
+        foreign = dataset("Alpha", "alpha keyword")
+        rejected = client.post("/tools/research", headers=headers,
+                               data={"token": token, "project": "Beta", "host": "mine.test", "dataset": foreign})
+        assert rejected.status_code == 400
+
+
 def test_ui_review_queue_ignores_unrelated_runs_and_other_targets(tmp_path):
     origin = "http://127.0.0.1:8972"
     ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")

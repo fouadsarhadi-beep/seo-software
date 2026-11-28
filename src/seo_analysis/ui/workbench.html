@@ -113,15 +113,17 @@ p{overflow-wrap:anywhere}
 <a class="rail-link" href="/projects">All projects</a>
 <nav class="tasks" aria-label="Tasks">
 <span class="nav-label">Analyze</span>
+{% set nav_project = selected.name if (selected is defined and selected and selected.name is defined) else '' %}
+{% set nav_query = '?project=' ~ (nav_project|urlencode) if nav_project else '' %}
 <a href="/"{% if area == 'overview' %} aria-current="page"{% endif %}>Overview</a>
-<a href="/audit/new"{% if area == 'audit' %} aria-current="page"{% endif %}>Website audit</a>
-<a href="/tools/research"{% if area == 'research' %} aria-current="page"{% endif %}>Keyword and competitor research</a>
-<a href="/tools/search-traffic"{% if area == 'traffic' %} aria-current="page"{% endif %}>Search and traffic</a>
-<a href="/tools/site-qa"{% if area == 'qa' %} aria-current="page"{% endif %}>Site QA</a>
+<a href="/audit/new{{ nav_query }}"{% if area == 'audit' %} aria-current="page"{% endif %}>Website audit</a>
+<a href="/tools/research{{ nav_query }}"{% if area == 'research' %} aria-current="page"{% endif %}>Keyword and competitor research</a>
+<a href="/tools/search-traffic{{ nav_query }}"{% if area == 'traffic' %} aria-current="page"{% endif %}>Search and traffic</a>
+<a href="/tools/site-qa{{ nav_query }}"{% if area == 'qa' %} aria-current="page"{% endif %}>Site QA</a>
 <span class="nav-label">Workspace</span>
 <a href="/history"{% if view == 'history' %} aria-current="page"{% endif %}>History</a>
-<a href="/review-queue"{% if view == 'review_queue' %} aria-current="page"{% endif %}>Review queue</a>
-<a href="/brief"{% if view == 'brief' %} aria-current="page"{% endif %}>Content brief</a>
+<a href="/review-queue{{ nav_query }}"{% if view == 'review_queue' %} aria-current="page"{% endif %}>Review queue</a>
+<a href="/brief{{ nav_query }}"{% if view == 'brief' %} aria-current="page"{% endif %}>Content brief</a>
 <a href="/history/data">Manage saved data</a>
 </nav>
 <p class="rail-foot">Local only. Pages are fetched, measured and stored on this computer.</p>

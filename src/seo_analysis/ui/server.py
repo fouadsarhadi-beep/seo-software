@@ -317,13 +317,24 @@ def create_app(workspace, port=8765):
     def known_project(value):
         return value if value and any(item["name"] == value for item in history.projects()) else None
 
+    def require_project(value):
+        """Reject a submitted project that no longer exists instead of silently dropping it."""
+        if not value:
+            return None
+        if not any(item["name"] == value for item in history.projects()):
+            raise HTTPException(400, "That project no longer exists. Reload the workbench and choose a project.")
+        return value
+
+    def project_named(value):
+        return next((item for item in history.projects() if item["name"] == value), None)
+
     def traffic_back(project="", error="", fetched=""):
         return RedirectResponse("/tools/search-traffic?" + urlencode(
             {"project": project, "error": error, "fetched": fetched}), 303)
 
     @app.get("/tools/research/questions")
     def question_explorer(dataset: str = "", seed: str = "", limit: int = 10, export: int = 0,
-                          compare: str = ""):
+                          compare: str = "", project: str = ""):
         if not dataset:
             raise HTTPException(400, "Choose a question-relationship dataset.")
         data = detail(dataset)
@@ -352,11 +363,13 @@ def create_app(workspace, port=8765):
             return PlainTextResponse(buffer.getvalue(), media_type="text/csv",
                                      headers={"Content-Disposition":
                                               f'attachment; filename="questions-{dataset[:8]}.csv"'})
-        projects = history.projects()
+        chosen = project_named(require_project(project))
+        if chosen is None and history.projects():
+            chosen = project_named(history.projects()[0]["name"])
         return render("question_tree", dataset_id=dataset, dataset=payload.get("source") or {},
                       seeds=question_seeds(rows), seed=seed, tree=tree, limit=limit, total=len(rows),
                       others=others, compare=compare, changes=changes,
-                      brief_project=projects[0]["name"] if projects else "")
+                      brief_project=chosen["name"] if chosen else "", selected=chosen)
 
     @app.get("/tools/search-traffic")
     def search_traffic(project: str = "", error: str = "", fetched: str = "", connect: str = ""):
@@ -389,7 +402,7 @@ def create_app(workspace, port=8765):
 
         def run():
             try:
-                connection = GoogleConnection(workspace, known_project(project), service)
+                connection = GoogleConnection(workspace, require_project(project), service)
 
                 def choose(available):
                     job["available"] = dict(available)
@@ -430,7 +443,7 @@ def create_app(workspace, port=8765):
         fields = await form(request)
         project = fields.get("project", "")
         try:
-            GoogleConnection(workspace, known_project(project), service).disconnect(revoke=bool(fields.get("revoke")))
+            GoogleConnection(workspace, require_project(project), service).disconnect(revoke=bool(fields.get("revoke")))
         except (ValueError, RuntimeError) as exc:
             return traffic_back(project, error=str(exc))
         return traffic_back(project, fetched=f"Disconnected {REPORT_PROVIDERS.get(service, service)} for this project.")
@@ -445,7 +458,7 @@ def create_app(workspace, port=8765):
         result = await run_in_threadpool(
             ToolRunner(workspace).run, tools.SEARCH_ANALYTICS,
             SearchAnalyticsInput(fields.get("start", ""), fields.get("end", ""), dimensions, max_rows=rows),
-            project=known_project(project), log=lambda _: None)
+            project=require_project(project), log=lambda _: None)
         if result.status == "failed":
             return traffic_back(project, error=result.warnings[0] if result.warnings
                                 else "The Search Console fetch failed.")
@@ -459,7 +472,7 @@ def create_app(workspace, port=8765):
             ToolRunner(workspace).run, tools.GA4_LANDING_PAGES,
             LandingPagesInput(fields.get("start", ""), fields.get("end", ""), origin=fields.get("origin", ""),
                               channel=fields.get("channel", ""), max_rows=_row_limit(fields.get("max_rows"))),
-            project=known_project(project), log=lambda _: None)
+            project=require_project(project), log=lambda _: None)
         if result.status == "failed":
             return traffic_back(project, error=result.warnings[0] if result.warnings else "The GA4 fetch failed.")
         return RedirectResponse("/runs/" + result.run_id, 303)
@@ -470,7 +483,7 @@ def create_app(workspace, port=8765):
         project = fields.get("project", "")
         result = await run_in_threadpool(
             ToolRunner(workspace).run, tools.URL_INSPECTION, InspectionInput(fields.get("url", "")),
-            project=known_project(project), log=lambda _: None)
+            project=require_project(project), log=lambda _: None)
         if result.status == "failed":
             return traffic_back(project, error=result.warnings[0] if result.warnings else "The inspection failed.")
         return RedirectResponse("/runs/" + result.run_id, 303)
@@ -608,7 +621,7 @@ def create_app(workspace, port=8765):
     @app.post("/brief/add")
     async def brief_add(request: Request):
         fields = await form(request)
-        project = fields.get("project", "")
+        project = require_project(fields.get("project", ""))
         query = (fields.get("query") or "").strip()
         if not project or not query:
             raise HTTPException(400, "Choose a project and a query.")
@@ -972,66 +985,81 @@ def create_app(workspace, port=8765):
                                                         baseline=baseline, baseline_run_id=baseline_id), log=lambda _: None)
         return RedirectResponse("/runs/" + result.run_id, 303)
 
-    def research_form(*, selected=(), host="", error="", feed_url=""):
+    def research_form(*, picked=(), host="", error="", feed_url="", project=None):
         datasets = [item for item in saved_datasets(RESEARCH_DATASETS, RESEARCH_SOURCE_TOOLS) if item["rows"]]
         return render("research_form", datasets=datasets, dataset_labels=RESEARCH_DATASETS,
-                      selected=selected, host=host, error=error, feed_url=feed_url,
-                      capabilities=RESEARCH_CAPABILITIES)
+                      picked=picked, host=host, error=error, feed_url=feed_url,
+                      capabilities=RESEARCH_CAPABILITIES, selected=project)
 
     @app.get("/tools/research")
-    def research_options(added: str = "", host: str = "", url: str = ""):
-        return research_form(selected=(added,), host=host, feed_url=url)
+    def research_options(added: str = "", host: str = "", url: str = "", project: str = ""):
+        return research_form(picked=(added,), host=host, feed_url=url,
+                             project=require_project(project) and project_named(project))
 
     @app.post("/tools/research/import")
     async def research_import(request: Request):
         async with export_form(request) as fields:
             verify_token(fields.get("token"))
             kind, host = fields.get("kind"), fields.get("host", "")
+            project = require_project(fields.get("project", ""))
             if not isinstance(kind, str) or kind not in RESEARCH_DATASETS or not isinstance(host, str):
                 raise HTTPException(400, "Choose a supported source type.")
             try:
                 spec = export_input(fields, kind)
-                imported = await run_in_threadpool(import_upload, workspace, fields.get("file"), spec)
+                imported = await run_in_threadpool(import_upload, workspace, fields.get("file"), spec,
+                                                   project=project)
             except ValueError as exc:
-                return research_form(host=host, error=str(exc))
+                return research_form(host=host, error=str(exc), project=project_named(project))
         if "dataset.json" not in imported.artifacts:
-            return research_form(host=host, error=imported.warnings[0] if imported.warnings else "The import did not complete.")
-        return RedirectResponse("/tools/research?" + urlencode({"added": imported.run_id, "host": host}), 303)
+            return research_form(host=host, project=project_named(project),
+                                 error=imported.warnings[0] if imported.warnings else "The import did not complete.")
+        return RedirectResponse("/tools/research?" + urlencode(
+            {"added": imported.run_id, "host": host, "project": project or ""}), 303)
 
     @app.post("/tools/research")
     async def run_research(request: Request):
         fields = await form(request, repeated=("dataset",))
         host = fields.get("host", "")
+        project = require_project(fields.get("project", ""))
         ids = list(dict.fromkeys(fields.get("dataset", ())))
         if not ids:
-            return research_form(host=host, error="Choose at least one saved dataset.")
+            return research_form(host=host, error="Choose at least one saved dataset.",
+                                 project=project_named(project))
         datasets = []
         for dataset_id in ids:
             data = detail(dataset_id)
             manifest = data["manifest"]
             if dataset_kind(manifest, RESEARCH_SOURCE_TOOLS) not in RESEARCH_DATASETS:
                 raise HTTPException(400, "Choose supported saved research datasets.")
+            if project and manifest.get("project") and manifest["project"] != project:
+                raise HTTPException(400, "That dataset belongs to another project.")
             datasets.append(str(artifact_path(data, "dataset.json").parent))
-        result = await run_in_threadpool(ToolRunner(workspace).run, tools.RESEARCH, ResearchInput(tuple(datasets), host), log=lambda _: None)
+        result = await run_in_threadpool(ToolRunner(workspace).run, tools.RESEARCH,
+                                         ResearchInput(tuple(datasets), host), project=project,
+                                         log=lambda _: None)
         return RedirectResponse("/runs/" + result.run_id, 303)
 
     @app.post("/tools/research/feed")
     async def sample_feed(request: Request):
         fields = await form(request)
         url, host = fields.get("url", ""), fields.get("host", "")
+        project = require_project(fields.get("project", ""))
         try:
             limit = int(fields.get("max_items", "25"))
             if not 1 <= limit <= 500:
                 raise ValueError
         except ValueError:
-            return research_form(host=host, error="Choose between 1 and 500 feed items.")
-        result = await run_in_threadpool(ToolRunner(workspace).run, tools.PUBLIC_FEED, FeedInput(url, limit), log=lambda _: None)
+            return research_form(host=host, error="Choose between 1 and 500 feed items.",
+                                 project=project_named(project))
+        result = await run_in_threadpool(ToolRunner(workspace).run, tools.PUBLIC_FEED,
+                                         FeedInput(url, limit), project=project, log=lambda _: None)
         if result.status == "failed":
-            query = urlencode({"host": host}) if host else ""
+            query = urlencode({"host": host, "project": project or ""}) if host else ""
             return RedirectResponse("/runs/" + result.run_id + (("?" + query) if query else ""), 303)
         if not result.counts.get("rows"):
             return RedirectResponse("/runs/" + result.run_id, 303)
-        return RedirectResponse("/tools/research?" + urlencode({"added": result.run_id, "host": host}), 303)
+        return RedirectResponse("/tools/research?" + urlencode(
+            {"added": result.run_id, "host": host, "project": project or ""}), 303)
 
     @app.get("/runs/{rid}/dataset/{row_id}")
     def dataset_row(rid: str, row_id: int):
@@ -1098,7 +1126,8 @@ def create_app(workspace, port=8765):
         return {"audit": audit, "rules": rules, "examples": examples, "counts": counts,
                 "page_limited": page_limited, "completion": completion}
 
-    def audit_result(rid, data, *, tab, page, q, url_q, category, status, redirect, indexability, rule, sort):
+    def audit_result(rid, data, *, tab, page, q, url_q, category, status, redirect, indexability, rule, sort,
+                     project=""):
         context = audit_context(rid, data)
         audit, rules = context["audit"], context["rules"]
         run = data["manifest"]
@@ -1138,19 +1167,21 @@ def create_app(workspace, port=8765):
                       check_labels=CHECK_LABELS, limit=run["parameters"].get("limit"),
                       page_limited=context["page_limited"], examples=context["examples"],
                       completion=context["completion"], has_pages=bool(audit.pages),
-                      export_href=export_href, page_reviews=page_reviews)
+                      export_href=export_href, page_reviews=page_reviews,
+                      selected=project_named(project) if project else None)
 
     @app.get("/runs/{rid}")
     def result(rid: str, page: int = 1, evidence_page: int = 1, q: str = "", category: str = "",
                url_q: str = "", host: str = "", tab: str = "", status: str = "", redirect: str = "",
-               indexability: str = "", rule: str = "", sort: str = "url"):
+               indexability: str = "", rule: str = "", sort: str = "url", project: str = ""):
         data = detail(rid)
         run = data["manifest"]
         if run["tool_id"] == tools.PUBLIC_FEED.id and run["status"] == "failed":
             return render("feed_failed", rid=rid, run=run, failure=feed_failure(data), host=host)
         if run["tool_id"] in (tools.AUDIT.id, tools.CRAWL.id):
             return audit_result(rid, data, tab=tab, page=page, q=q, url_q=url_q, category=category,
-                                status=status, redirect=redirect, indexability=indexability, rule=rule, sort=sort)
+                                status=status, redirect=redirect, indexability=indexability, rule=rule, sort=sort,
+                                project=project or (run.get("project") or ""))
         if run["tool_id"] == tools.COMPARE.id:
             return comparison_result(data, page, category)
         if run["tool_id"] == tools.RESEARCH.id:
