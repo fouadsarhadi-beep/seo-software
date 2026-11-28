@@ -25,6 +25,9 @@ from seo_analysis.analysis.siteqa import SiteQAInput
 from seo_analysis.app.agent import run_snapshot_tool
 from seo_analysis.app.runner import ToolRunner
 from seo_analysis.app.workflows import run_saved_audit
+from seo_analysis.connectors.google import GoogleConnection
+from seo_analysis.connectors.ga4 import LandingPagesInput
+from seo_analysis.connectors.search_console import InspectionInput, SearchAnalyticsInput
 from seo_analysis.core import tools
 from seo_analysis.core.network import HttpOrigin
 from seo_analysis.reporting.workbook import WorkbookInput
@@ -121,6 +124,14 @@ class Job:
     detail: str = ""
     run_id: str = ""
     cancel: Event = field(default_factory=Event)
+
+
+def _row_limit(value, default: int = 25000) -> int:
+    """Keep a requested row limit inside the range the connectors accept."""
+    try:
+        return max(1, min(int(value), 50000)) if value else default
+    except (TypeError, ValueError):
+        return default
 
 
 def create_app(workspace, port=8765):
@@ -254,9 +265,85 @@ def create_app(workspace, port=8765):
         selected = next((item for item in projects if item["name"] == chosen), None)
         return render("audit_new", projects=projects, chosen=chosen, selected=selected)
 
+    def google_state(project):
+        state = {}
+        for service in ("gsc", "ga4", "sheets"):
+            try:
+                state[service] = GoogleConnection(workspace, project, service).selected()
+            except (ValueError, RuntimeError, OSError):
+                state[service] = None
+        return state
+
+    def known_project(value):
+        return value if value and any(item["name"] == value for item in history.projects()) else None
+
+    def traffic_back(project="", error="", fetched=""):
+        return RedirectResponse("/tools/search-traffic?" + urlencode(
+            {"project": project, "error": error, "fetched": fetched}), 303)
+
     @app.get("/tools/search-traffic")
-    def search_traffic():
-        return render("search_traffic")
+    def search_traffic(project: str = "", error: str = "", fetched: str = ""):
+        projects = history.projects()
+        selected = next((item for item in projects if item["name"] == project), None)
+        if selected is None and projects:
+            selected = projects[0]
+        name = selected["name"] if selected else None
+        datasets = list(saved_datasets(REPORT_PROVIDERS, CONNECTED_REPORT_TOOLS))
+        audits = history.list_runs(name, limit=5, archived=False) if name else []
+        return render("search_traffic", selected=selected, projects=projects, state=google_state(name),
+                      datasets=datasets, audits=audits, error=error, fetched=fetched, providers=REPORT_PROVIDERS)
+
+    @app.post("/tools/search-traffic/disconnect/{service}")
+    async def google_disconnect(service: str, request: Request):
+        if service not in ("gsc", "ga4", "sheets"):
+            raise HTTPException(404)
+        fields = await form(request)
+        project = fields.get("project", "")
+        try:
+            GoogleConnection(workspace, known_project(project), service).disconnect(revoke=bool(fields.get("revoke")))
+        except (ValueError, RuntimeError) as exc:
+            return traffic_back(project, error=str(exc))
+        return traffic_back(project, fetched=f"Disconnected {REPORT_PROVIDERS.get(service, service)} for this project.")
+
+    @app.post("/tools/search-traffic/fetch/gsc")
+    async def google_fetch_gsc(request: Request):
+        fields = await form(request, repeated=("dimension",))
+        project = fields.get("project", "")
+        dimensions = tuple(item for item in fields.get("dimension", ())
+                           if item in ("query", "page", "date", "device", "country")) or ("query", "page")
+        rows = _row_limit(fields.get("max_rows"))
+        result = await run_in_threadpool(
+            ToolRunner(workspace).run, tools.SEARCH_ANALYTICS,
+            SearchAnalyticsInput(fields.get("start", ""), fields.get("end", ""), dimensions, max_rows=rows),
+            project=known_project(project), log=lambda _: None)
+        if result.status == "failed":
+            return traffic_back(project, error=result.warnings[0] if result.warnings
+                                else "The Search Console fetch failed.")
+        return RedirectResponse("/runs/" + result.run_id, 303)
+
+    @app.post("/tools/search-traffic/fetch/ga4")
+    async def google_fetch_ga4(request: Request):
+        fields = await form(request)
+        project = fields.get("project", "")
+        result = await run_in_threadpool(
+            ToolRunner(workspace).run, tools.GA4_LANDING_PAGES,
+            LandingPagesInput(fields.get("start", ""), fields.get("end", ""), origin=fields.get("origin", ""),
+                              channel=fields.get("channel", ""), max_rows=_row_limit(fields.get("max_rows"))),
+            project=known_project(project), log=lambda _: None)
+        if result.status == "failed":
+            return traffic_back(project, error=result.warnings[0] if result.warnings else "The GA4 fetch failed.")
+        return RedirectResponse("/runs/" + result.run_id, 303)
+
+    @app.post("/tools/search-traffic/inspect")
+    async def google_inspect(request: Request):
+        fields = await form(request)
+        project = fields.get("project", "")
+        result = await run_in_threadpool(
+            ToolRunner(workspace).run, tools.URL_INSPECTION, InspectionInput(fields.get("url", "")),
+            project=known_project(project), log=lambda _: None)
+        if result.status == "failed":
+            return traffic_back(project, error=result.warnings[0] if result.warnings else "The inspection failed.")
+        return RedirectResponse("/runs/" + result.run_id, 303)
 
     @app.get("/history")
     def runs(page: int = 1, archived: bool = False):

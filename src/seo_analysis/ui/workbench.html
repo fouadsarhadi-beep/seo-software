@@ -254,19 +254,96 @@ p{overflow-wrap:anywhere}
 {% elif view=="search_traffic" %}
 <div class="page-head"><div>
 <p class="crumbs">Search and traffic</p>
-<h1>Search and traffic</h1>
-<p class="lede">Join Search Console and GA4 measurements to the pages this workbench has observed. File imports work today; live accounts are not connected in this build.</p>
+<h1>Search and traffic{% if selected %} · {{ selected.name }}{% endif %}</h1>
+<p class="lede">Join Search Console and GA4 measurements to the pages this workbench observed. File imports work offline; fetching reads the property connected on this computer.</p>
 </div></div>
+{% if error %}<p role="alert"><strong>{{ error }}</strong></p>{% endif %}
+{% if fetched %}<p role="status">{{ fetched }}</p>{% endif %}
 <div class="grid">
-<div class="card"><h2>Search Console</h2><p>Which queries and pages appeared in Google Search, with clicks and impressions. Import an export, then open a saved audit's Excel report to match rows to observed pages.</p><span class="badge">Import ready</span></div>
-<div class="card"><h2>GA4 landing pages</h2><p>Which landing pages brought sessions and key events. Import an export through the same report, which keeps sessions separate from clicks.</p><span class="badge">Import ready</span></div>
-<div class="card"><h2>URL Inspection</h2><p>What Google recorded about one URL, including its selected canonical. This needs a connected Google property, which this build does not request yet.</p><span class="badge">Not available</span></div>
+{% for service, label in [('gsc','Search Console'), ('ga4','Google Analytics 4')] %}
+<div class="card">
+<h2>{{ label }}</h2>
+{% if state[service] %}
+<p><span class="badge">Connected</span> {{ state[service].property_name }}</p>
+<p><code>{{ state[service].property_id }}</code></p>
+<form method="post" action="/tools/search-traffic/disconnect/{{ service }}">
+{{ csrf() }}<input type="hidden" name="project" value="{{ selected.name if selected else '' }}">
+<label><input type="checkbox" name="revoke"> Also revoke the grant at Google</label>
+<button class="secondary">Disconnect</button>
+</form>
+<p><small>Removes the credential saved for this project only; other projects keep their own connection.</small></p>
+{% else %}
+<p><span class="badge">Not connected</span> No Google property is authorized for this project yet.</p>
+<p>Connecting opens a consent window in a browser on this computer, so it is started once from a terminal:</p>
+<p><code>seo-analysis google connect {{ service }} --client-file &lt;desktop client json&gt;</code></p>
+<p><small>The workbench picks the connection up as soon as it exists, and reports an expired or rejected credential rather than guessing.</small></p>
+{% endif %}
 </div>
-<h2>Bring data in today</h2>
-<section>
-<p>Open a saved audit and choose <strong>Create Excel report</strong>, then add the Search Console or GA4 export for that site. The report keeps every source row and its match status, including unmatched and ambiguous pages.</p>
-<div class="links"><a class="button ghost" href="/history">Choose a saved audit</a><a class="button ghost" href="/tools/research">Keyword and competitor research</a></div>
-</section>
+{% endfor %}
+</div>
+{% if state.gsc %}
+<h2>Fetch Search Console data</h2>
+<form class="filters" method="post" action="/tools/search-traffic/fetch/gsc">
+{{ csrf() }}<input type="hidden" name="project" value="{{ selected.name if selected else '' }}">
+<label>Start <input type="date" name="start" required></label>
+<label>End <input type="date" name="end" required></label>
+<label>Max rows <input type="number" name="max_rows" value="25000" min="1" max="50000"></label>
+<div><span>Dimensions</span>
+<label><input type="checkbox" name="dimension" value="query" checked> query</label>
+<label><input type="checkbox" name="dimension" value="page" checked> page</label>
+<label><input type="checkbox" name="dimension" value="date"> date</label>
+<label><input type="checkbox" name="dimension" value="device"> device</label>
+<label><input type="checkbox" name="dimension" value="country"> country</label>
+</div>
+<button>Fetch</button>
+</form>
+<p><small>Search Analytics uses Pacific Time dates. A pull that reaches its row limit is saved as a partial run.</small></p>
+<h2>Inspect one URL</h2>
+<form class="line" method="post" action="/tools/search-traffic/inspect">
+{{ csrf() }}<input type="hidden" name="project" value="{{ selected.name if selected else '' }}">
+<label>URL <input type="url" name="url" required placeholder="https://example.org/page/"></label>
+<button class="ghost">Inspect</button>
+</form>
+<p><small>Returns Google's recorded status for that URL within the selected property.</small></p>
+{% endif %}
+{% if state.ga4 %}
+<h2>Fetch GA4 landing pages</h2>
+<form class="filters" method="post" action="/tools/search-traffic/fetch/ga4">
+{{ csrf() }}<input type="hidden" name="project" value="{{ selected.name if selected else '' }}">
+<label>Start <input type="date" name="start" required></label>
+<label>End <input type="date" name="end" required></label>
+<label>Origin <input type="url" name="origin" placeholder="https://example.org"></label>
+<label>Channel <input name="channel" placeholder="Organic Search"></label>
+<label>Max rows <input type="number" name="max_rows" value="25000" min="1" max="50000"></label>
+<button>Fetch</button>
+</form>
+<p><small>Supply the origin only when the data belongs to that site; without it, landing paths stay unresolved in the workbook.</small></p>
+{% endif %}
+<h2>Saved measurements</h2>
+{% if datasets %}
+<div class="table"><table>
+<tr><th>Source</th><th>Provider</th><th>Period</th><th>Rows</th><th>Status</th></tr>
+{% for item in datasets %}
+<tr><td><a href="/runs/{{item.id}}">{{ item.name }}</a></td><td>{{ providers[item.kind] }}</td>
+<td>{% if item.get('period_start') %}{{ item.get('period_start') }} – {% endif %}{{ item.get('observed') or 'Unknown' }}</td>
+<td>{{ item.rows }}</td><td>{{ item.status }}</td></tr>
+{% endfor %}
+</table></div>
+{% else %}<p>No Search Console or GA4 measurements are saved yet. Fetch from a connected property, or import an export from an audit's report page.</p>{% endif %}
+<h2>Join measurements with an audit</h2>
+<p>Open a saved audit, choose <strong>Create Excel report</strong>, and select the measurements above. The workbook keeps every source row with its match status, including unmatched, ambiguous and query-only rows. The same page carries the file-import form for a downloaded export.</p>
+{% if audits %}
+<div class="table"><table>
+<tr><th>Audit</th><th>Status</th><th>Report</th></tr>
+{% for run in audits %}
+<tr><td>{{ run.started[:19]|replace('T',' ') }} UTC{% if run.target %} · {{ run.target }}{% endif %}</td>
+<td>{{ run.status }}</td>
+<td><a href="/runs/{{run.id}}/report">Create Excel report</a> · <a href="/runs/{{run.id}}">Open results</a></td></tr>
+{% endfor %}
+</table></div>
+{% else %}<p>Run an audit for this project first; its report is where measurements join observed pages.</p>{% endif %}
+<p><a class="button ghost" href="/audit/new{% if selected %}?project={{selected.name|urlencode}}{% endif %}">Start an audit</a>
+<a class="button ghost" href="/history">All saved runs</a></p>
 {% elif view=="history" %}
 <h1>{{'Archived runs' if archived else 'Run history'}}</h1>
 <div class="links"><a href="/compare">Compare saved audits</a><a href="{{'/history' if archived else '/history?archived=true'}}">{{'Back to run history' if archived else 'View archived runs'}}</a><a href="/history/data">Manage saved data</a></div>

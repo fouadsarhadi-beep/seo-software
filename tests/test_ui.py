@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from seo_analysis import cli
 from seo_analysis.app.runner import ToolRunner
+from seo_analysis.connectors import google as google_connector
 from seo_analysis.core import tools
 from seo_analysis.core.workspace import Workspace
 from seo_analysis.storage.history import History
@@ -351,8 +352,8 @@ def test_ui_overview_and_task_navigation_guide_a_first_session(tmp_path):
         assert start.select_one('nav.tasks a[aria-current="page"]').get_text(strip=True) == "Website audit"
 
         traffic = BeautifulSoup(client.get("/tools/search-traffic").text, "html.parser")
-        assert traffic.h1.text == "Search and traffic"
-        assert "Import ready" in traffic.text and "Not available" in traffic.text
+        assert traffic.h1.text.startswith("Search and traffic")
+        assert "Not connected" in traffic.text
         assert traffic.select_one('nav.tasks a[aria-current="page"]').get_text(strip=True) == "Search and traffic"
 
 
@@ -467,3 +468,77 @@ def test_ui_exports_hide_outputs_a_run_cannot_produce(tmp_path):
     with TestClient(create_app(ws, 8972), base_url="http://127.0.0.1:8972") as client:
         exports = client.get(f"/runs/{rid}", params={"tab": "exports"}).text
         assert "Not available" in exports and "no page snapshot" in exports
+
+
+def _vault(monkeypatch):
+    """A deterministic stand-in for the OS credential store."""
+    class Vault:
+        def get_password(self, *args, **kwargs):
+            return None
+
+        def set_password(self, *args, **kwargs):
+            return None
+
+        def delete_password(self, *args, **kwargs):
+            return None
+
+    monkeypatch.setattr(google_connector, "native_keyring", lambda extra="google": Vault())
+
+
+def _saved_run(ws, manifest, files):
+    folder = ws.runs_dir / manifest["run_id"]
+    folder.mkdir(parents=True)
+    for name, content in files.items():
+        (folder / name).write_text(content, encoding="utf-8")
+    (folder / "run.json").write_text(json.dumps(manifest), encoding="utf-8")
+    History(ws).index(folder)
+    return folder
+
+
+def test_ui_search_traffic_shows_connection_state_datasets_and_the_journey(tmp_path):
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    History(ws).add_project("Acme", website="https://example.org/")
+    pull = uuid4().hex
+    _saved_run(ws, {"run_id": pull, "tool_id": "google.search-analytics", "status": "succeeded", "project": "Acme",
+                    "saved_target": None, "started_at": "2026-11-20T00:00:00Z",
+                    "finished_at": "2026-11-20T00:00:05Z",
+                    "parameters": {"start": "2026-11-01", "end": "2026-11-20"}, "counts": {"rows": 7},
+                    "warnings": [], "artifacts": ["dataset.json"]},
+               {"dataset.json": json.dumps({"schema_version": 1, "source": {"kind": "gsc"}, "rows": [{"query": "x"}]})})
+    audit = uuid4().hex
+    _saved_run(ws, {"run_id": audit, "tool_id": "seo.audit", "status": "partial", "project": "Acme",
+                    "saved_target": None, "started_at": "2026-11-19T00:00:00Z",
+                    "finished_at": "2026-11-19T00:00:20Z", "parameters": {"source": "https://example.org/"},
+                    "counts": {"observed": 12, "findings": 3}, "warnings": [], "artifacts": []}, {})
+    with TestClient(create_app(ws, 8972), base_url="http://127.0.0.1:8972") as client:
+        page = client.get("/tools/search-traffic").text
+        assert "Not connected" in page
+        assert "seo-analysis google connect gsc" in page
+        assert "Search Console API · Acme" in page
+        assert "2026-11-01 – 2026-11-20" in page and ">7<" in page.replace(" ", "").replace("\n", "")
+        assert f'href="/runs/{audit}/report"' in page
+        assert "Create Excel report" in page
+
+
+def test_ui_search_traffic_fetches_only_with_a_working_credential(tmp_path, monkeypatch):
+    origin = "http://127.0.0.1:8972"
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    history = History(ws)
+    history.add_project("Acme")
+    history.set_google_connection("Acme", "gsc", "sc-domain:example.org", "example.org")
+    _vault(monkeypatch)
+    with TestClient(create_app(ws, 8972), base_url=origin) as client:
+        page = client.get("/tools/search-traffic", params={"project": "Acme"}).text
+        assert "Connected" in page and "example.org" in page
+        assert 'action="/tools/search-traffic/fetch/gsc"' in page
+        assert 'action="/tools/search-traffic/inspect"' in page
+        token = BeautifulSoup(page, "html.parser").select_one("input[name=token]")["value"]
+        headers = {"Origin": origin}
+        reply = client.post("/tools/search-traffic/fetch/gsc", headers=headers,
+                            data={"token": token, "project": "Acme", "start": "2026-11-01", "end": "2026-11-10"})
+        assert reply.status_code == 200 and 'role="alert"' in reply.text
+        assert "Reconnect gsc to restore its credentials." in reply.text
+        reply = client.post("/tools/search-traffic/disconnect/gsc", headers=headers,
+                            data={"token": token, "project": "Acme"})
+        assert "Disconnected Search Console for this project." in reply.text
+        assert History(ws).google_connection("Acme", "gsc") is None

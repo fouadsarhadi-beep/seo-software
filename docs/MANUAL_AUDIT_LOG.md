@@ -97,3 +97,11 @@ Use authorized properties and the documented [Google connection and CLI commands
 - [ ] **Check the spreadsheet.** Download the page CSV from a filtered table and open it in Excel. The first line should state the run, site, filters and counts; Persian titles should display correctly; header cells and page counts should match the table.
 - [ ] **Reconstruct a finding from the bundle alone.** Unzip the analysis bundle and use only `index.json` to go from a finding in `analysis/findings.json` to its page in `crawl/snapshot.jsonl`. With the workbench closed, confirm the index names every file, the join keys and what was skipped.
 - [ ] **Outputs that cannot exist.** Open a cancelled or failed run's Exports tab and confirm the report and spreadsheet are shown as unavailable with a reason, while the bundle still downloads.
+
+## Workbench stage 5 checkpoint — Search and traffic (pending owner check)
+
+- [ ] **Not connected is honest.** Open **Search and traffic** with no Google connection. Both providers should say **Not connected**, show the exact consent command, and offer no fetch form. No control should look like it works when it cannot.
+- [ ] **Connect once in a terminal.** Run the shown `seo-analysis google connect gsc --client-file <path>` command, then reload the screen. The property name and identifier should appear and the fetch form should become available, without restarting the workbench.
+- [ ] **Fetch a small date range.** Pull one week with query and page dimensions. The run should appear in History and as a saved measurement with its period and row count, and its Excel-style dataset should be selectable from an audit's **Create Excel report**.
+- [ ] **A failure is not empty data.** Disconnect, then try to fetch again. The screen should report the credential problem explicitly rather than showing zero rows.
+- [ ] **Disconnect scope.** Disconnect Search Console on one project and confirm another project's connection is untouched.

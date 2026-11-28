@@ -1,6 +1,6 @@
 # Workbench implementation checklist
 
-**Status on 2026-11-28:** stages 1–4 are implemented with automated coverage. Continue at **5.1**. These numbers expand the six stages in the [product plan](WORKBENCH_PRODUCT_PLAN.md). Stage 7 expands its research follow-up. The first release target is stages 1–4: launch, crawl, investigate, share. The second is stages 5–7: explain performance, track decisions, explore opportunities.
+**Status on 2026-11-28:** stages 1–4 are implemented with automated coverage. Stage 5 has 5.1 and 5.2 done; in-app consent and the alignment warnings remain before 5.3–5.5 can be closed. Stage 7 expands its research follow-up. The first release target is stages 1–4: launch, crawl, investigate, share. The second is stages 5–7: explain performance, track decisions, explore opportunities.
 
 ## How to pick up the work
 
@@ -63,8 +63,8 @@ Depends on 3.1–3.5. Start in `reporting/report.py`, `reporting/workbook.py`, `
 
 Depends on the project navigation and existing workbook flow. Start with `cli_integrations.py`, `connectors/{google,search_console,gsc,ga4}.py`, `ui/workbook.html` and `/runs/{rid}/report`.
 
-- [ ] **5.1 Map UI actions to existing operations.** Trace google status/connect/disconnect, search-analytics, inspect-url and landing-pages from CLI parsing to provider calls and stored datasets. Have the UI call the shared application operation. Make the existing credential scope explicit, especially where disconnect affects other projects.
-- [ ] **5.2 Ship the offline Search & Traffic screen.** Offer Search Console queries/pages for search visibility, GA4 landing pages for visits, and URL Inspection for one URL's recorded Google status. Show site/property, date range, source type and last import. Without a connection offer import wherever supported.
+- [x] **5.1 Map UI actions to existing operations.** Trace google status/connect/disconnect, search-analytics, inspect-url and landing-pages from CLI parsing to provider calls and stored datasets. Have the UI call the shared application operation. Make the existing credential scope explicit, especially where disconnect affects other projects.
+- [x] **5.2 Ship the offline Search & Traffic screen.** Offer Search Console queries/pages for search visibility, GA4 landing pages for visits, and URL Inspection for one URL's recorded Google status. Show site/property, date range, source type and last import. Without a connection offer import wherever supported.
 - [ ] **5.3 Wire the report journey.** Select a project audit, compatible saved datasets or a file, preview matching and unmatched rows, then open the existing workbook. Preserve query-only rows, GA4 path origin, missing versus zero, multiple match candidates and original source-row references. Warn when scope or dates do not align.
 - [ ] **5.4 Wire authenticated actions.** Reuse existing read-only consent and credential storage. Select property, dates and operation before fetching, show progress or recoverable failure, then persist the returned dataset through the same pipeline as the CLI. Present permission denied, expired consent, no rows and partial coverage separately. Keep publishing to Sheets an explicit later action.
 - [ ] **5.5 Verify together.** Use provider fixtures and existing Google, GA4 and workbook tests. Trace a landing page to sessions and a query to clicks. Switch projects and verify the selected property. Owner can complete the offline walkthrough immediately. Log live consent, property discovery, data retrieval and Sheets separately when credentials are available.
