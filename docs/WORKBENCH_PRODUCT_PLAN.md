@@ -6,6 +6,12 @@ Proposed 2026-11-28. All steps below are pending. Deliver one stage at a time an
 
 The first useful session should let someone choose a site, run an audit, understand its coverage, inspect an affected page and save a report. Returning users should be able to see what changed. Build this journey on the existing run history, evidence, imports and analysis routines. Keep older run links working.
 
+## What completion means
+
+The delivery target is a single-operator, local-first SEO workbench. An owner can install it, audit a site, explain a finding with evidence, save a decision, produce a readable report and return later to verify a change. Research and traffic analysis use sources the owner can identify and inspect. The checklist includes cross-stage product acceptance and an owner sign-off for this outcome.
+
+Google, Brave and other connected features have separate live verification milestones. Ahrefs and Semrush inform the workflows; a continuously updated web-wide backlink index, market-wide keyword volumes and unattended rank monitoring would each require a separate data acquisition and operating plan.
+
 ## 1. Repair the two reported failures
 
 1. Trace the launcher's ready state and button callback on Windows. The working address confirms the server started on the reported machine. The callback currently returns on a successful webbrowser.open call, which cannot confirm a visible browser window. Try the Windows default URL handler, surface launch errors in the existing log and put Copy address next to Open Workbench. Both should use the actual server URL.
