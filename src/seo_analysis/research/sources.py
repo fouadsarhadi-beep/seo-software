@@ -6,9 +6,11 @@ import json
 import re
 from time import monotonic
 from types import SimpleNamespace
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
+from xml.etree.ElementTree import ParseError
 
 from bs4 import BeautifulSoup
+from defusedxml import ElementTree
 from defusedxml.common import DefusedXmlException
 import requests
 
@@ -24,6 +26,105 @@ from seo_analysis.web.transport import BudgetExceeded, ScopeError
 BRAVE_URL = "https://api.search.brave.com/res/v1/web/search"
 FEED_BYTES = 2_000_000
 SEARCH_BYTES = 1_000_000
+
+# Parameters that must not appear in a saved or displayed URL.
+SENSITIVE_PARAMETERS = frozenset({
+    "access_token", "apikey", "api_key", "auth", "client_secret", "code", "key",
+    "password", "secret", "session", "sig", "signature", "token",
+})
+FEED_ROOTS = ("rss", "feed", "rdf")
+FEED_MESSAGES = {
+    "empty": "The source returned an empty response. Check the feed address or try again later.",
+    "html": "The address returned an HTML page instead of a feed.",
+    "malformed": "The response is not valid XML, so it cannot be read as a feed.",
+    "prohibited": "The feed XML contains prohibited entities or external references.",
+    "too_large": "The feed response exceeds 2 MB.",
+    "robots": "robots.txt disallows the selected feed.",
+    "robots_unavailable": "Could not read the feed's robots.txt policy. See requests.json.",
+    "unsupported": "The response is valid XML but not an RSS or Atom feed (found <{detail}>).",
+}
+
+
+def redact_url(value: str) -> tuple[str, int]:
+    """Return the URL without credentials or sensitive parameters, and how many were hidden."""
+    try:
+        parts = urlsplit(value)
+    except ValueError:
+        return "(unreadable address)", 0
+    netloc = parts.hostname or ""
+    if parts.port:
+        netloc = f"{netloc}:{parts.port}"
+    pairs = parse_qsl(parts.query, keep_blank_values=True)
+    kept = [(name, item) for name, item in pairs if name.casefold() not in SENSITIVE_PARAMETERS]
+    return urlunsplit((parts.scheme, netloc, parts.path, urlencode(kept), "")), len(pairs) - len(kept)
+
+
+def _feed_error(ctx, reason: str, detail: str = "", source: str = "", candidate: str = ""):
+    """Record why a feed request failed, then return the exception to raise."""
+    if reason == "http":
+        message = f"The feed request returned HTTP {detail or 'unavailable'}."
+    elif reason == "request":
+        message = "The feed request failed before a response arrived."
+        if detail:
+            message = f"{message} {detail}"
+    elif reason == "redirect":
+        note = {"loop": "redirect loop", "too_many": "too many redirects"}.get(detail, "blocked redirect")
+        message = f"The feed address redirects and the app will not follow it ({note})."
+    else:
+        message = FEED_MESSAGES[reason].format(detail=detail)
+        if reason == "malformed" and detail:
+            message = f"{message} {detail}"
+    shown, hidden = redact_url(source) if source else ("", 0)
+    write_json(ctx.directory / "feed-source.json", {
+        "schema_version": 1, "reason": reason, "message": message, "detail": detail,
+        "source": shown, "hidden_parameters": hidden, "candidate": candidate,
+    })
+    return ValueError(message) if reason in ("empty", "html", "malformed", "prohibited", "robots",
+                                             "too_large", "unsupported") else RuntimeError(message)
+
+
+def _advertised_feed(response) -> str:
+    """Return a validated feed link that an HTML page advertises, if any."""
+    try:
+        soup = BeautifulSoup(response.raw, "html.parser")
+    except (ValueError, TypeError):
+        return ""
+    for tag in soup.find_all("link", href=True):
+        rel = tag.get("rel") or []
+        rel = [str(item).casefold() for item in rel] if isinstance(rel, list) else str(rel).casefold().split()
+        if "alternate" not in rel:
+            continue
+        kind = str(tag.get("type", "")).casefold()
+        if "rss" not in kind and "atom" not in kind:
+            continue
+        candidate = urljoin(response.final_url or "", str(tag["href"]).strip())
+        try:
+            HttpOrigin.from_url(candidate)
+        except ValueError:
+            continue
+        return candidate
+    return ""
+
+
+def _classify_feed(response) -> tuple[str, str]:
+    """Decide what a fetched response is before it is parsed as a feed."""
+    raw = response.raw or b""
+    head = raw.lstrip()[:4096]
+    if not head.strip():
+        return "empty", ""
+    if not head.startswith(b"<?xml") and re.search(rb"<(!doctype\s+html|html)\b", head, re.IGNORECASE):
+        return "html", ""
+    try:
+        root = ElementTree.fromstring(raw)
+    except DefusedXmlException:
+        return "prohibited", ""
+    except ParseError as exc:
+        detail = str(exc).strip()
+        return "malformed", detail.splitlines()[0][:120] if detail else ""
+    tag = root.tag.rsplit("}", 1)[-1].casefold()
+    if tag not in FEED_ROOTS:
+        return "unsupported", tag
+    return "feed", tag
 
 
 @dataclass
@@ -79,9 +180,9 @@ def read_feed(ctx, request):
         fetcher.robots_agent = TOOL_TOKEN
         response = fetcher.get(request.url)
     except RobotsUnavailable:
-        raise RuntimeError("Could not read the feed's robots.txt policy. See requests.json.") from None
+        raise _feed_error(ctx, "robots_unavailable", source=request.url) from None
     except (BudgetExceeded, ScopeError) as exc:
-        raise RuntimeError(f"Feed fetch stopped. {exc}") from None
+        raise _feed_error(ctx, "request", str(exc), request.url) from None
     finally:
         fetcher.session.close()
         write_json(ctx.directory / "requests.json", {"schema_version": 1, "attempts": fetcher.attempts})
@@ -89,11 +190,19 @@ def read_feed(ctx, request):
             ctx.data_egress.append({"method": "GET", "origin": asdict(origin), "purpose": "Read public feed and robots.txt",
                                     "attempt_log": "requests.json"})
     if response.redirect_note.startswith("blocked_robots"):
-        raise ValueError("robots.txt disallows the selected feed.")
-    if response.error or response.redirect_note or response.final_status != 200:
-        raise RuntimeError(f"Feed fetch failed (HTTP {response.final_status or 'unavailable'}).")
+        raise _feed_error(ctx, "robots", source=request.url)
+    if response.error:
+        raise _feed_error(ctx, "request", response.error, request.url)
+    if response.redirect_note:
+        raise _feed_error(ctx, "redirect", response.redirect_note, request.url)
+    if response.final_status != 200:
+        raise _feed_error(ctx, "http", str(response.final_status or "unavailable"), request.url)
     if response.truncated:
-        raise ValueError("Feed response exceeds 2 MB.")
+        raise _feed_error(ctx, "too_large", source=request.url)
+    kind, detail = _classify_feed(response)
+    if kind != "feed":
+        raise _feed_error(ctx, kind, detail, request.url,
+                          _advertised_feed(response) if kind == "html" else "")
     rows = []
     skipped = 0
     capped = False

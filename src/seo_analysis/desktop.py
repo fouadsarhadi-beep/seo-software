@@ -133,6 +133,26 @@ def bind_listener(port: int | None) -> socket.socket:
     return listener
 
 
+def _open_url(url: str) -> bool:
+    """Send the workbench address to the operating system's browser handler."""
+    if sys.platform == "win32":
+        try:
+            os.startfile(url)  # noqa: S606 - the OS URL handler, not a shell command
+        except OSError:
+            LOG.exception("The Windows URL handler could not open %s", url)
+        else:
+            LOG.info("Opened %s with the Windows URL handler", url)
+            return True
+    try:
+        if webbrowser.open(url):
+            LOG.info("Opened %s with the configured browser", url)
+            return True
+        LOG.warning("No configured browser accepted %s", url)
+    except (OSError, webbrowser.Error):
+        LOG.exception("Could not open the default browser for %s", url)
+    return False
+
+
 def serve_desktop(
     listener: socket.socket,
     workspace: Workspace,
@@ -163,15 +183,20 @@ def serve_desktop(
     buttons.pack(fill="x")
 
     def open_browser() -> None:
-        try:
-            if webbrowser.open(url):
-                return
-        except (OSError, webbrowser.Error):
-            LOG.exception("Could not open the default browser")
-        status.set("Open the address below in your browser.")
+        if _open_url(url):
+            status.set("The workbench is running. Opened in your browser.")
+            return
+        status.set("Could not open a browser. Use Copy address and paste it into any browser.")
+
+    def copy_address() -> None:
+        root.clipboard_clear()
+        root.clipboard_append(url)
+        status.set("Address copied. Paste it into your browser.")
 
     open_button = ttk.Button(buttons, text="Open Workbench", command=open_browser, state="disabled")
     open_button.pack(side="left")
+    copy_button = ttk.Button(buttons, text="Copy address", command=copy_address, state="disabled")
+    copy_button.pack(side="left", padx=(8, 0))
     exit_button = ttk.Button(buttons, text="Exit", command=lambda: stop())
     exit_button.pack(side="right")
 
@@ -192,6 +217,7 @@ def serve_desktop(
         server.should_exit = True
         status.set("Stopping the workbench…")
         open_button.state(["disabled"])
+        copy_button.state(["disabled"])
         exit_button.state(["disabled"])
 
     def poll() -> None:
@@ -206,6 +232,7 @@ def serve_desktop(
                 started = True
                 status.set("The workbench is running.")
                 open_button.state(["!disabled"])
+                copy_button.state(["!disabled"])
                 open_browser()
             elif monotonic() >= deadline:
                 stop()

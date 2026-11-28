@@ -147,3 +147,25 @@ def test_desktop_detects_a_read_only_history_after_migration(tmp_path, monkeypat
     with pytest.raises(sqlite3.OperationalError) as error:
         check_workspace(workspace)
     assert needs_writable_copy(error.value)
+
+
+def test_launcher_prefers_the_windows_url_handler(monkeypatch):
+    opened = []
+    monkeypatch.setattr(desktop.sys, "platform", "win32")
+    monkeypatch.setattr(desktop.os, "startfile", lambda url: opened.append(url), raising=False)
+    monkeypatch.setattr(desktop.webbrowser, "open", lambda url: pytest.fail("the browser was used first"))
+    assert desktop._open_url("http://127.0.0.1:8765") is True
+    assert opened == ["http://127.0.0.1:8765"]
+
+
+def test_launcher_falls_back_to_the_browser_and_reports_failure(monkeypatch):
+    attempts = []
+
+    def denied(url):
+        raise OSError("no handler registered")
+
+    monkeypatch.setattr(desktop.sys, "platform", "win32")
+    monkeypatch.setattr(desktop.os, "startfile", denied, raising=False)
+    monkeypatch.setattr(desktop.webbrowser, "open", lambda url: attempts.append(url) or False)
+    assert desktop._open_url("http://127.0.0.1:8765") is False
+    assert attempts == ["http://127.0.0.1:8765"]

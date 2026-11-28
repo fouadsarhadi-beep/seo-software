@@ -29,7 +29,7 @@ from seo_analysis.core import tools
 from seo_analysis.core.network import HttpOrigin
 from seo_analysis.reporting.workbook import WorkbookInput
 from seo_analysis.research.intelligence import ResearchInput
-from seo_analysis.research.sources import FeedInput
+from seo_analysis.research.sources import FeedInput, redact_url
 from seo_analysis.storage.history import History, workspace_access_error
 from seo_analysis.storage.removal import RemovalConflict, pending_removals, remove_saved_data, retry_removals
 from seo_analysis.ui.uploads import export_form, export_input, import_upload
@@ -577,14 +577,14 @@ def create_app(workspace, port=8765):
                                                         baseline=baseline, baseline_run_id=baseline_id), log=lambda _: None)
         return RedirectResponse("/runs/" + result.run_id, 303)
 
-    def research_form(*, selected=(), host="", error=""):
+    def research_form(*, selected=(), host="", error="", feed_url=""):
         datasets = [item for item in saved_datasets(RESEARCH_DATASETS, RESEARCH_SOURCE_TOOLS) if item["rows"]]
         return render("research_form", datasets=datasets, dataset_labels=RESEARCH_DATASETS,
-                      selected=selected, host=host, error=error)
+                      selected=selected, host=host, error=error, feed_url=feed_url)
 
     @app.get("/tools/research")
-    def research_options(added: str = "", host: str = ""):
-        return research_form(selected=(added,), host=host)
+    def research_options(added: str = "", host: str = "", url: str = ""):
+        return research_form(selected=(added,), host=host, feed_url=url)
 
     @app.post("/tools/research/import")
     async def research_import(request: Request):
@@ -630,6 +630,9 @@ def create_app(workspace, port=8765):
         except ValueError:
             return research_form(host=host, error="Choose between 1 and 500 feed items.")
         result = await run_in_threadpool(ToolRunner(workspace).run, tools.PUBLIC_FEED, FeedInput(url, limit), log=lambda _: None)
+        if result.status == "failed":
+            query = urlencode({"host": host}) if host else ""
+            return RedirectResponse("/runs/" + result.run_id + (("?" + query) if query else ""), 303)
         if not result.counts.get("rows"):
             return RedirectResponse("/runs/" + result.run_id, 303)
         return RedirectResponse("/tools/research?" + urlencode({"added": result.run_id, "host": host}), 303)
@@ -662,10 +665,22 @@ def create_app(workspace, port=8765):
                       q=q, rows=rows[(page - 1) * 30:page * 30], page=page, more=len(rows) > page * 30,
                       dataset_labels=RESEARCH_DATASETS)
 
+    def feed_failure(data):
+        manifest = data["manifest"]
+        if "feed-source.json" in manifest["artifacts"]:
+            return json.loads(artifact_path(data, "feed-source.json").read_text(encoding="utf-8"))
+        shown, hidden = redact_url(str(manifest["parameters"].get("url", "")))
+        warnings = manifest.get("warnings") or []
+        return {"reason": "unknown", "message": warnings[0] if warnings else "The feed request failed.",
+                "source": shown, "hidden_parameters": hidden, "candidate": ""}
+
     @app.get("/runs/{rid}")
-    def result(rid: str, page: int = 1, evidence_page: int = 1, q: str = "", category: str = "", url_q: str = ""):
+    def result(rid: str, page: int = 1, evidence_page: int = 1, q: str = "", category: str = "",
+               url_q: str = "", host: str = ""):
         data = detail(rid)
         run = data["manifest"]
+        if run["tool_id"] == tools.PUBLIC_FEED.id and run["status"] == "failed":
+            return render("feed_failed", rid=rid, run=run, failure=feed_failure(data), host=host)
         if run["tool_id"] == tools.COMPARE.id:
             return comparison_result(data, page, category)
         if run["tool_id"] == tools.RESEARCH.id:

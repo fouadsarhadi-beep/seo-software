@@ -95,4 +95,12 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 
 - Stages A–C review follow-up — Improved cross-origin redirect guidance and sitemap parsing, added Python 3.13 and CI quality checks, updated FileLock, separated integration CLI commands, and added stratified calibration sampling on 2026-11-28.
 
+## Workbench stage 1 — first session recovery
+
+- Workbench Stage 1, Step 1 — Traced the launcher ready state, button callback and browser dispatch on 2026-11-28. The Windows URL handler now opens the bound server address and each dispatch attempt is recorded in `launcher.log`.
+- Workbench Stage 1, Step 1 follow-up — Added **Copy address** beside **Open Workbench** on 2026-11-28, with clipboard confirmation and a selectable address when dispatch fails.
+- Workbench Stage 1, Step 3 — Classified a feed response before parsing on 2026-11-28: empty body, HTML page, malformed XML, prohibited XML, well-formed non-feed XML, HTTP and redirect failures. The RSS/Atom root decides validity, so a valid feed with an inaccurate content type still imports.
+- Workbench Stage 1, Step 4 — Added a feed failure view with the reason, the attempted source, **Edit source**, an advertised feed link and no empty downloads on 2026-11-28. URL credentials and sensitive parameters are hidden from the diagnostic copy.
+- Workbench Stage 1, Step 5 — Added coverage for the launcher dispatch fallback, every feed classification, credential redaction and the workbench recovery flow on 2026-11-28. The suite passed 167 tests with Hazm and Chromium skipped.
+
 [Current scope and remaining work](ROADMAP.md)

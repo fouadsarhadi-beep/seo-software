@@ -65,3 +65,9 @@ Use authorized properties and the documented [Google connection and CLI commands
 
 - [ ] **Windows installation and redirects.** Try a clean install with Python 3.13. If a known alternate URL for your site redirects to its HTTPS or `www` address, check that the workbench names the destination origin. Start a new audit at the intended URL and record its coverage against your sitemap. The earlier Windows run covered a 100-page Samatoos sample.
 - [ ] **Calibrate a saved audit.** Create a stratified sample using the [CLI instructions](../README.md#replay-and-review). Review both flagged and unflagged pairs. Confirm the report lists the population, sampled and reviewed counts. After all decisions are saved, check that the report includes weighted estimates for that snapshot.
+
+## Workbench stage 1 checkpoint — first session recovery (pending owner check)
+
+- [ ] **Open Workbench and Copy address.** Start the workbench from `Start SEO Workbench.cmd`. Click **Open Workbench** twice, close the browser tab and reopen it from the launcher window. If the browser does not appear, use **Copy address**, paste the address manually and confirm the address stays selectable.
+- [ ] **Feed failure reasons.** Open **Tools → Keyword and competitor research → Import articles from RSS or Atom** and try a site homepage, an empty address, a malformed XML endpoint and a real feed. Each failure should name what was returned and offer **Edit source**. A homepage that advertises a feed should offer that link.
+- [ ] **No empty downloads.** Confirm a failed import keeps no CSV or JSON downloads and that the failed run is still listed in **History**.

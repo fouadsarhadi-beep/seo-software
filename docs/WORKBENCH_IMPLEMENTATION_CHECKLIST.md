@@ -1,6 +1,6 @@
 # Workbench implementation checklist
 
-**Status on 2026-11-28:** planned. Start at **1.1**. These numbers expand the six stages in the [product plan](WORKBENCH_PRODUCT_PLAN.md). Stage 7 expands its research follow-up. The first release target is stages 1–4: launch, crawl, investigate, share. The second is stages 5–7: explain performance, track decisions, explore opportunities.
+**Status on 2026-11-28:** stage 1 is implemented with automated coverage; the owner walkthrough is pending. Continue at **2.1**. These numbers expand the six stages in the [product plan](WORKBENCH_PRODUCT_PLAN.md). Stage 7 expands its research follow-up. The first release target is stages 1–4: launch, crawl, investigate, share. The second is stages 5–7: explain performance, track decisions, explore opportunities.
 
 ## How to pick up the work
 
@@ -22,11 +22,11 @@ Use the current FastAPI/Jinja UI, project-local workspace and run manifests. All
 
 Entry points: `desktop.py`, `research/sources.py:read_feed`, `ui/server.py` at `/tools/research/feed`, `ui/research.html` and the failed-run view. Source paths in this document are relative to `src/seo_analysis/`.
 
-- [ ] **1.1 Trace Open Workbench.** Follow server-ready notification, enabled button, click callback and browser dispatch. Record the chosen method and any OS error in the project launcher log. Use the bound server address for every open action. Preserve double-click startup and shutdown.
-- [ ] **1.2 Implement a Windows launch fallback.** Once ready, use the Windows default URL handler for the loopback HTTP URL. Keep the existing cross-platform opener elsewhere. Put Copy address beside Open Workbench, give clipboard confirmation, and keep the URL selectable on dispatch failure. Reopening the browser uses the running server.
-- [ ] **1.3 Classify feed responses before parsing.** Preserve existing fetch, robots, redirect and size limits. Classify failed request, HTTP error, empty body, HTML, malformed XML and well-formed unsupported XML. Verify the RSS/Atom root so a valid feed with an inaccurate content type still works. Where HTML advertises a feed, display a validated candidate that the user can select.
-- [ ] **1.4 Close the recovery loop.** Call this action “Import articles from RSS or Atom”. Show what input it takes and what an article sample contains. On failure, display a short reason and Edit source, retain project context, redact URL credentials and sensitive parameters in diagnostics, and hide empty exports. A failed run remains available in History.
-- [ ] **1.5 Verify together.** Extend `test_desktop.py`, `test_research_sources.py` and the relevant `test_ui.py` flow. Cover dispatch error, repeated click, HTML served with status 200, valid Atom, malformed XML and an empty feed. Owner: start the CMD file, close the browser tab, reopen from the small window, then try a homepage and its real feed.
+- [x] **1.1 Trace Open Workbench.** Follow server-ready notification, enabled button, click callback and browser dispatch. Record the chosen method and any OS error in the project launcher log. Use the bound server address for every open action. Preserve double-click startup and shutdown.
+- [x] **1.2 Implement a Windows launch fallback.** Once ready, use the Windows default URL handler for the loopback HTTP URL. Keep the existing cross-platform opener elsewhere. Put Copy address beside Open Workbench, give clipboard confirmation, and keep the URL selectable on dispatch failure. Reopening the browser uses the running server.
+- [x] **1.3 Classify feed responses before parsing.** Preserve existing fetch, robots, redirect and size limits. Classify failed request, HTTP error, empty body, HTML, malformed XML and well-formed unsupported XML. Verify the RSS/Atom root so a valid feed with an inaccurate content type still works. Where HTML advertises a feed, display a validated candidate that the user can select.
+- [x] **1.4 Close the recovery loop.** Call this action “Import articles from RSS or Atom”. Show what input it takes and what an article sample contains. On failure, display a short reason and Edit source, retain project context, redact URL credentials and sensitive parameters in diagnostics, and hide empty exports. A failed run remains available in History.
+- [x] **1.5 Verify together.** Extend `test_desktop.py`, `test_research_sources.py` and the relevant `test_ui.py` flow. Cover dispatch error, repeated click, HTML served with status 200, valid Atom, malformed XML and an empty feed. Owner: start the CMD file, close the browser tab, reopen from the small window, then try a homepage and its real feed.
 
 ## Stage 2 — Make navigation project-centered
 

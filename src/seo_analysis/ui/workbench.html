@@ -88,7 +88,7 @@ form.compact{margin:0}button.secondary{background:#edf1ea;color:#254832;border:1
 {% elif view in ('compare', 'comparison') %}{% include 'comparison.html' %}
 {% elif view in ('review', 'review_pair') %}{% include 'review.html' %}
 {% elif view in ('report_form', 'report_preview') %}{% include 'workbook.html' %}
-{% elif view in ('tools', 'research_form', 'research_result', 'dataset', 'dataset_row') %}{% include 'research.html' %}
+{% elif view in ('tools', 'research_form', 'research_result', 'dataset', 'dataset_row', 'feed_failed') %}{% include 'research.html' %}
 {% elif view in ('site_qa_form', 'site_qa_result') %}{% include 'site_qa.html' %}
 {% elif view in ('browser_qa_form', 'browser_qa_result') %}{% include 'browser_qa.html' %}
 {% elif view=="workflow_form" %}{% include 'workflow.html' %}

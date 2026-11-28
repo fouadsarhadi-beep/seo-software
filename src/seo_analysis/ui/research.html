@@ -30,15 +30,15 @@
 <button>Run research</button>
 </form></section>
 {% endif %}
-<details>
-<summary>Sample a public RSS or Atom feed</summary>
+<details{% if feed_url %} open{% endif %}>
+<summary>Import articles from RSS or Atom</summary>
 <form method="post" action="/tools/research/feed">
 {{csrf()}}
 <input type="hidden" name="host" value="{{host}}">
-<p>The app requests the feed and its robots.txt. The saved sample contains feed entries.</p>
-<label>Public feed URL <input type="url" name="url" required></label>
+<p>Enter a public RSS or Atom feed address. The app requests the feed and its robots.txt, then saves entry titles, links and publication dates.</p>
+<label>Public feed URL <input type="url" name="url" required value="{{feed_url or ''}}"></label>
 <label>Maximum entries <input type="number" name="max_items" min="1" max="500" value="25"></label>
-<button>Fetch feed</button>
+<button>Import articles</button>
 </form>
 </details>
 <details{% if not datasets %} open{% endif %}>
@@ -61,6 +61,17 @@
 <button>Import export</button>
 </form>
 </details>
+{% elif view == 'feed_failed' %}
+<h1>Feed import failed</h1>
+<p role="alert"><strong>{{failure.message}}</strong></p>
+{% if failure.source %}<p>Attempted source: <code dir="ltr">{{failure.source}}</code>{% if failure.hidden_parameters %} · {{failure.hidden_parameters}} sensitive parameter(s) hidden{% endif %}</p>{% endif %}
+{% if failure.candidate %}<p>The page advertises a feed: <a href="/tools/research?url={{failure.candidate|urlencode}}&amp;host={{host|urlencode}}">Use this feed</a> · <code dir="ltr">{{failure.candidate}}</code></p>{% endif %}
+<div class="links">
+<a href="/tools/research?url={{failure.source|urlencode}}&amp;host={{host|urlencode}}">Edit source</a>
+<a href="/tools/research?host={{host|urlencode}}">Back to research</a>
+</div>
+<p>Nothing was saved, so this run has no downloads.</p>
+{% for warning in run.warnings %}{% if warning != failure.message %}<p>{{warning}}</p>{% endif %}{% endfor %}
 {% elif view == 'dataset' %}
 <h1>Research dataset</h1>
 <div class="links">{% if run.counts.rows %}<a href="/tools/research?added={{rid}}">Use in research</a>{% else %}<a href="/tools/research">Back to research</a>{% endif %}

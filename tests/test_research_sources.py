@@ -74,3 +74,63 @@ def test_brave_search_stores_one_ranked_sample_with_explicit_permission(tmp_path
     analyzed = json.loads(capsys.readouterr().out)
     data = json.loads((Path(analyzed["out_dir"]) / "research.json").read_text(encoding="utf-8"))
     assert data["keywords"][0]["observations"][0]["evidence"] == {"run_id": run["run_id"], "row": 1}
+
+
+def _feed_failure(capsys):
+    run = json.loads(capsys.readouterr().out)
+    return json.loads((Path(run["out_dir"]) / "feed-source.json").read_text(encoding="utf-8"))
+
+
+def _feed_request(tmp_path, monkeypatch):
+    monkeypatch.setattr(sources, "Fetcher", lambda *args, **kwargs: Fetcher(*args, **kwargs, allow_local=True))
+    return _prefix(tmp_path)
+
+
+def test_feed_reports_an_html_page_and_offers_the_feed_it_advertises(site, tmp_path, monkeypatch, capsys):
+    prefix = _feed_request(tmp_path, monkeypatch)
+    site.add("/robots.txt", "User-agent: *\n")
+    site.add("/page", '<!doctype html><html><head><meta charset="utf-8">'
+                      '<link rel="alternate" type="application/rss+xml" href="/feed.xml"></head>'
+                      "<body>Home</body></html>", ctype="text/html")
+    assert main([*prefix, "research-feed", site.base + "/page", "--json"]) == 2
+    failure = _feed_failure(capsys)
+    assert failure["reason"] == "html"
+    assert failure["candidate"] == site.base + "/feed.xml"
+    assert "HTML page" in failure["message"]
+
+
+def test_feed_distinguishes_empty_malformed_and_non_feed_xml(site, tmp_path, monkeypatch, capsys):
+    prefix = _feed_request(tmp_path, monkeypatch)
+    site.add("/robots.txt", "User-agent: *\n")
+    site.add("/empty", "", ctype="application/rss+xml")
+    site.add("/broken", "<feed><entry>", ctype="application/atom+xml")
+    site.add("/urlset.xml", '<?xml version="1.0"?><urlset><url><loc>https://example.org/</loc></url></urlset>',
+             ctype="application/xml")
+    for path, reason in (("/empty", "empty"), ("/broken", "malformed"), ("/urlset.xml", "unsupported")):
+        assert main([*prefix, "research-feed", site.base + path, "--json"]) == 2
+        assert _feed_failure(capsys)["reason"] == reason
+    site.add("/urlset2.xml", '<?xml version="1.0"?><urlset/>', ctype="application/xml")
+    assert main([*prefix, "research-feed", site.base + "/urlset2.xml", "--json"]) == 2
+    failure = _feed_failure(capsys)
+    assert failure["detail"] == "urlset" and "<urlset>" in failure["message"]
+
+
+def test_feed_accepts_a_valid_feed_whose_content_type_is_wrong(site, tmp_path, monkeypatch, capsys):
+    prefix = _feed_request(tmp_path, monkeypatch)
+    site.add("/robots.txt", "User-agent: *\n")
+    site.add("/feed", '<rss version="2.0"><channel><item><title>Item</title><link>/post</link></item>'
+                      "</channel></rss>", ctype="text/html")
+    assert main([*prefix, "research-feed", site.base + "/feed", "--json"]) == 0
+    _, dataset = _dataset(capsys)
+    assert [row["title"] for row in dataset["rows"]] == ["Item"]
+
+
+def test_feed_failure_hides_credentials_and_sensitive_parameters(site, tmp_path, monkeypatch, capsys):
+    prefix = _feed_request(tmp_path, monkeypatch)
+    site.add("/robots.txt", "User-agent: *\n")
+    assert main([*prefix, "research-feed", site.base + "/missing?token=SECRET&lang=fa", "--json"]) == 2
+    failure = _feed_failure(capsys)
+    assert failure["reason"] == "http" and "404" in failure["message"]
+    assert "SECRET" not in json.dumps(failure)
+    assert failure["source"] == site.base + "/missing?lang=fa"
+    assert failure["hidden_parameters"] == 1

@@ -11,6 +11,8 @@ from seo_analysis.app.runner import ToolRunner
 from seo_analysis.core import tools
 from seo_analysis.core.workspace import Workspace
 from seo_analysis.storage.history import History
+from seo_analysis.research import sources
+from seo_analysis.web.fetch import Fetcher
 from seo_analysis.ui.server import create_app
 from seo_analysis.web.crawl import CrawlConfig
 
@@ -278,3 +280,32 @@ def test_ui_runs_saved_checks_offline_and_matches_cli(site, tmp_path, capsys):
         older = client.post(form["action"], headers={"Origin": origin}, data={"token": token, "check": "assets"})
         assert "Technical checks · partial" in older.text and "markup fields unavailable: 1" in older.text
     assert site.hits == hits
+
+
+def test_ui_feed_failure_explains_the_source_and_offers_recovery(site, tmp_path, monkeypatch):
+    origin = "http://127.0.0.1:8972"
+    monkeypatch.setattr(sources, "Fetcher", lambda *args, **kwargs: Fetcher(*args, **kwargs, allow_local=True))
+    site.add("/robots.txt", "User-agent: *\n")
+    site.add("/page", '<!doctype html><html><head><link rel="alternate" type="application/rss+xml" '
+                      'href="/feed.xml"></head><body>Home</body></html>', ctype="text/html")
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    with TestClient(create_app(ws, 8972), base_url=origin) as client:
+        form = client.get("/tools/research")
+        token = BeautifulSoup(form.text, "html.parser").select_one("input[name=token]")["value"]
+        reply = client.post("/tools/research/feed", headers={"Origin": origin},
+                            data={"token": token, "url": site.base + "/page?token=SECRET",
+                                  "max_items": "25", "host": "example.org"})
+        assert reply.status_code == 200
+        assert "Feed import failed" in reply.text
+        assert "returned an HTML page" in reply.text
+        assert "SECRET" not in reply.text
+        assert "Use this feed" in reply.text and site.base + "/feed.xml" in reply.text
+        assert "Edit source" in reply.text
+        assert "normalized.csv" not in reply.text and "requests.json" not in reply.text
+        assert reply.url.path.startswith("/runs/") and "host=example.org" in str(reply.url)
+
+        links = BeautifulSoup(reply.text, "html.parser").select('a[href*="/tools/research?url="]')
+        edit = next(link for link in links if link.text.strip() == "Edit source")
+        reopened = client.get(edit["href"])
+        assert reopened.status_code == 200
+        assert f'value="{site.base}/page"' in reopened.text
