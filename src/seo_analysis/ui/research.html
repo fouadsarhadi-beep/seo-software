@@ -3,6 +3,11 @@
 {%- endmacro %}
 {% macro evidence(ref) %}<a href="/runs/{{ref.run_id}}/dataset/{{ref.row}}">Source row {{ref.row}}</a>{% endmacro %}
 {% macro keyword(query) %}<a href="/runs/{{rid}}?category=observations&amp;q={{query|urlencode}}">{{query}}</a>{% endmacro %}
+{% macro competitor_rows(competitors) %}
+{% for row in competitors %}<tr><td>{{row.host}}</td><td>{{row.observed_queries}}</td><td>{{row.shared_with_owned}}</td>
+<td>{{row.get('only_in_owned_sample', [])|length}}{% if row.get('only_in_owned_sample') %}<details><summary>View examples</summary><ul>{% for query in row.only_in_owned_sample[:8] %}<li>{{keyword(query)}} <form class="compact" method="post" action="/brief/add">{{ csrf() }}<input type="hidden" name="project" value="{{ brief_project }}"><input type="hidden" name="source_run" value="{{ rid }}"><input type="hidden" name="query" value="{{ query }}"><button class="secondary">Brief</button></form></li>{% endfor %}</ul></details>{% endif %}</td>
+<td>{{row.only_in_competitor_sample|length}}{% if row.only_in_competitor_sample %}<details><summary>View examples</summary><ul>{% for query in row.only_in_competitor_sample[:8] %}<li>{{keyword(query)}} <form class="compact" method="post" action="/brief/add">{{ csrf() }}<input type="hidden" name="project" value="{{ brief_project }}"><input type="hidden" name="source_run" value="{{ rid }}"><input type="hidden" name="query" value="{{ query }}"><button class="secondary">Brief</button></form></li>{% endfor %}</ul></details>{% endif %}</td></tr>{% endfor %}
+{% endmacro %}
 
 {% if view == 'tools' %}
 <h1>Tools</h1>
@@ -127,10 +132,18 @@
 <tr><th>Observed URL</th><th>Rank or position</th><th>Source context</th><th>Evidence</th></tr>
 {% for row in rows %}<tr><td>{{row.url or '—'}}</td><td>{{'—' if row.rank is none else row.rank}}</td><td>{{source_context(report.sources[row.evidence.run_id])}}</td><td>{{evidence(row.evidence)}}</td></tr>{% endfor %}
 {% elif section == 'competitors' %}
+{% set capture_gaps = report.get('captures', []) %}
+{% if capture_gaps|length > 1 %}
+<tr><th colspan="5">Each capture is shown on its own. No combined gap is presented: a query seen on desktop in one sample and on mobile in another cannot establish a shared ranking.</th></tr>
+{% for capture in capture_gaps %}
+<tr><th colspan="5">{{ capture.provider or 'Provider unknown' }} · {{ capture.observed or 'undated' }} · {{ capture.locale or 'Locale unknown' }} · {{ capture.device or 'Device unknown' }}</th></tr>
 <tr><th>Competitor host</th><th>Queries in sample</th><th>Shared with owned</th><th>Owned sample only</th><th>Competitor sample only</th></tr>
-{% for row in rows %}<tr><td>{{row.host}}</td><td>{{row.observed_queries}}</td><td>{{row.shared_with_owned}}</td>
-<td>{{row.get('only_in_owned_sample', [])|length}}{% if row.get('only_in_owned_sample') %}<details><summary>View examples</summary><ul>{% for query in row.only_in_owned_sample[:8] %}<li>{{keyword(query)}} <form class="compact" method="post" action="/brief/add">{{ csrf() }}<input type="hidden" name="project" value="{{ brief_project }}"><input type="hidden" name="source_run" value="{{ rid }}"><input type="hidden" name="query" value="{{ query }}"><button class="secondary">Brief</button></form></li>{% endfor %}</ul></details>{% endif %}</td>
-<td>{{row.only_in_competitor_sample|length}}{% if row.only_in_competitor_sample %}<details><summary>View examples</summary><ul>{% for query in row.only_in_competitor_sample[:8] %}<li>{{keyword(query)}} <form class="compact" method="post" action="/brief/add">{{ csrf() }}<input type="hidden" name="project" value="{{ brief_project }}"><input type="hidden" name="source_run" value="{{ rid }}"><input type="hidden" name="query" value="{{ query }}"><button class="secondary">Brief</button></form></li>{% endfor %}</ul></details>{% endif %}</td></tr>{% endfor %}
+{{ competitor_rows(capture.competitors) }}
+{% endfor %}
+{% else %}
+<tr><th>Competitor host</th><th>Queries in sample</th><th>Shared with owned</th><th>Owned sample only</th><th>Competitor sample only</th></tr>
+{{ competitor_rows(rows) }}
+{% endif %}
 {% elif section == 'serp_overlap' %}
 <tr><th>Queries</th><th>Shared URLs</th><th>Capture context</th></tr>
 {% for row in rows %}<tr><td>{{keyword(row.queries[0])}}<br>{{keyword(row.queries[1])}}</td><td><details><summary>{{row.shared_urls|length}}</summary><ul>{% for url in row.shared_urls %}<li>{{url}}</li>{% endfor %}</ul></details></td><td>{{row.context[0]}} · {{row.context[1]}} · {{row.context[2] or 'Locale unknown'}} · {{row.context[3] or 'Device unknown'}}</td></tr>{% endfor %}

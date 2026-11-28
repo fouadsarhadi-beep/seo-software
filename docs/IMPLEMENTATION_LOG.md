@@ -210,6 +210,8 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 - Batch 5 — Collect and Edit are now separate actions. Collecting a query creates the item once, records the run and source row it came from, and never overwrites an edited note; **Save note** edits the human decision on its own. The brief screen lists every source with a link to its row and a **Remove source** action, so removing one leaves the decision and the remaining evidence readable.
 - Batch 5 — Sources are validated: collecting from a run that no longer exists is refused with a recoverable error instead of filing a broken reference.
 - Batch 5 — The migration adds `brief_sources` and backfills each existing item's stored source, so earlier briefs keep their notes and gain provenance rather than being rewritten.
-- Batch 5 — Still open in this batch: computing gap sets only within compatible captures (provider, locale, device, period) with contributing rows and an explicit distinction from any broader aggregate; and identifying a source whose run has since been deleted as unavailable.
+- Batch 5 — Gaps are computed inside each capture. Queries are grouped by provider, locale, device and date, and each capture reports its own shared, owned-only and competitor-only sets with its scope named in the heading. When more than one capture is present, the report states that no combined gap is shown, because a query seen on desktop in one sample and on mobile in another cannot establish a shared ranking; the legacy combined table is kept only as a single labelled capture.
+- Batch 5 — The acceptance case is proven at tool level: a desktop-only owned result and a mobile-only competitor result produce two captures and no shared query at all.
+- Batch 5 — A brief source whose run has since been deleted is shown as **unavailable** with its short run id, and the note stays readable.
 
 [Current scope and remaining work](ROADMAP.md)

@@ -720,6 +720,34 @@ def test_ui_question_outline_expands_a_seed_and_exports_the_branch(tmp_path):
         assert "insurance,how,1" in export.text
 
 
+def test_ui_brief_marks_a_source_whose_run_has_gone(tmp_path):
+    origin = "http://127.0.0.1:8972"
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    History(ws).add_project("Acme")
+    rid = uuid4().hex
+    _saved_run(ws, {"run_id": rid, "tool_id": "research.import", "status": "succeeded", "project": "Acme",
+                    "saved_target": None, "started_at": "2026-11-20T00:00:00Z",
+                    "finished_at": "2026-11-20T00:00:05Z",
+                    "parameters": {"kind": "serp", "provider": "Export", "observed": "2026-11-20"},
+                    "counts": {"rows": 1}, "warnings": [], "artifacts": ["dataset.json"]},
+               {"dataset.json": json.dumps({"schema_version": 1,
+                                            "source": {"kind": "serp", "observed": "2026-11-20"},
+                                            "rows": [{"row": 1, "query": "delta", "url": "https://mine.test/a"}]})})
+    with TestClient(create_app(ws, 8972), base_url=origin) as client:
+        headers = {"Origin": origin}
+        token = BeautifulSoup(client.get("/brief").text, "html.parser").select_one("input[name=token]")["value"]
+        client.post("/brief/add", headers=headers,
+                    data={"token": token, "project": "Acme", "query": "delta", "source_run": rid})
+        assert "Source 1" in client.get("/brief", params={"project": "Acme"}).text
+        # The run is gone (deleted or cleaned), but the human decision stays readable.
+        with History(ws).transaction() as db:
+            db.execute("DELETE FROM evidence WHERE run_id=?", (rid,))
+            db.execute("DELETE FROM artifacts WHERE run_id=?", (rid,))
+            db.execute("DELETE FROM runs WHERE id=?", (rid,))
+        page = client.get("/brief", params={"project": "Acme"}).text
+        assert "delta" in page and "unavailable" in page
+
+
 def test_ui_brief_keeps_the_decision_and_every_source(tmp_path):
     origin = "http://127.0.0.1:8972"
     ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")

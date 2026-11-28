@@ -82,6 +82,7 @@ def build_research(ctx, request):
     comparisons, crawl_sources = [], []
     terms = defaultdict(list)
     domains = defaultdict(set)
+    capture_domains = {}
     questions, backlinks = [], []
     sources = {}
     serp = defaultdict(lambda: defaultdict(set))
@@ -116,6 +117,7 @@ def build_research(ctx, request):
                 if source["kind"] == "serp" and url and domain:
                     context = (source["provider"], source["observed"], source["locale"], source["device"])
                     domains[domain].add(query)
+                    capture_domains.setdefault(context, {}).setdefault(domain, set()).add(query)
                     serp[context][query].add(url_key(url))
                     rank = row.get("rank")
                     if rank is not None and rank >= 1:
@@ -159,6 +161,14 @@ def build_research(ctx, request):
                 )
             )
     competitors = competitor_gaps(domains, host)
+    for row in competitors:
+        row["scope"] = "combined across every selected sample"
+    # A gap only holds inside one capture: same provider, locale, device and date.
+    capture_gaps = [
+        {"provider": context[0], "observed": context[1], "locale": context[2], "device": context[3],
+         "scope": "same provider, locale, device and date", "competitors": competitor_gaps(mapping, host)}
+        for context, mapping in sorted(capture_domains.items())
+    ]
     rank_history = []
     for (provider, locale, device, query, domain), captures in sorted(ranks.items()):
         previous = None
@@ -226,6 +236,7 @@ def build_research(ctx, request):
             sources=sources,
             keywords=keywords,
             competitors=competitors,
+            captures=capture_gaps,
             serp_overlap=overlaps,
             questions=questions,
             backlinks=backlinks,
