@@ -123,6 +123,17 @@
 
 {% elif tab == 'exports' %}
 <h2>Exports</h2>
+<div class="grid">
+<div class="card"><h2>Read audit report</h2><p>Self-contained HTML: coverage, findings grouped by rule, example pages and the next check. It opens without this app or a network.</p>
+{% if has_pages %}<a class="button" href="/runs/{{rid}}/report.html" target="_blank" rel="noopener">Open report</a>{% else %}<p><span class="badge">Not available</span> This run saved no pages to report on.</p>{% endif %}</div>
+<div class="card"><h2>Work with pages</h2><p>Spreadsheet of the pages in the current filter: {% if page_query.active %}{{ page_query.matched }} matching of {{ page_query.total }}{% else %}all {{ page_query.total }}{% endif %} observed, with status, indexability, redirects and finding references.</p>
+{% if has_pages %}<a class="button" href="{{ export_href }}">Download CSV</a>{% endif %}
+<p><a href="?tab=pages">Change the filter</a></p></div>
+<div class="card"><h2>Download analysis bundle</h2><p>A ZIP with the crawl, analysis and diagnostics files plus a versioned index of grain, join keys, thresholds, coverage and skipped files.</p>
+<a class="button" href="/runs/{{rid}}/bundle.zip">Download bundle</a></div>
+</div>
+{% if not has_pages %}<section class="notice"><p><strong>This run has no page snapshot.</strong> A cancelled or failed run can end before its first page is saved, so only the manifests remain. The bundle still carries them.</p></section>{% endif %}
+<h2>Files already saved for this run</h2>
 {% set reports = {'checks.csv': 'Technical checks CSV', 'findings.csv': 'Findings CSV', 'inventory.csv': 'Page inventory CSV', 'issues.txt': 'Text report'} %}
 {% set extra = artifacts|rejectattr('path', 'in', reports)|list %}
 <div class="links">{% for a in artifacts if a.path in reports %}<a class="button ghost" href="/runs/{{rid}}/files/{{a.path}}">{{ reports[a.path] }}</a>{% endfor %}</div>

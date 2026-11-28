@@ -90,3 +90,10 @@ Use authorized properties and the documented [Google connection and CLI commands
 - [ ] **Filters and paging.** Filter by a URL fragment, a status class, indexability and a finding. Confirm the range text (for example “1–30 of 94”), numbered pages, and that changing a filter returns to page one. On the last page, open a page's evidence and use **Back to results** to return to the same filtered view.
 - [ ] **Missing data stays unknown.** Open an older run or one with unfetched pages and confirm Unknown appears instead of a blank or a zero, and that rows without page evidence say so.
 - [ ] **Exports.** Confirm the CSV and text downloads still work, technical files stay collapsed, and running technical checks from Exports produces a separate run.
+
+## Workbench stage 4 checkpoint — reports and bundles (pending owner check)
+
+- [ ] **Read the report offline.** Open **Exports → Read audit report**, then close the workbench and reopen the page from the download. It should still show site, date, coverage, findings and the affected pages, with its internal links working and no broken images or scripts.
+- [ ] **Check the spreadsheet.** Download the page CSV from a filtered table and open it in Excel. The first line should state the run, site, filters and counts; Persian titles should display correctly; header cells and page counts should match the table.
+- [ ] **Reconstruct a finding from the bundle alone.** Unzip the analysis bundle and use only `index.json` to go from a finding in `analysis/findings.json` to its page in `crawl/snapshot.jsonl`. With the workbench closed, confirm the index names every file, the join keys and what was skipped.
+- [ ] **Outputs that cannot exist.** Open a cancelled or failed run's Exports tab and confirm the report and spreadsheet are shown as unavailable with a reason, while the bundle still downloads.

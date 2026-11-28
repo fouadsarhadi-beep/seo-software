@@ -13,7 +13,7 @@ from urllib.parse import parse_qs, unquote, urlencode
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from filelock import Timeout
 from jinja2 import Environment, PackageLoader, select_autoescape
 from starlette.concurrency import run_in_threadpool
@@ -28,6 +28,7 @@ from seo_analysis.app.workflows import run_saved_audit
 from seo_analysis.core import tools
 from seo_analysis.core.network import HttpOrigin
 from seo_analysis.reporting.workbook import WorkbookInput
+from seo_analysis.reporting.export import build_bundle, page_csv, stamp
 from seo_analysis.research.intelligence import ResearchInput
 from seo_analysis.research.sources import FeedInput, redact_url
 from seo_analysis.storage.history import History, workspace_access_error
@@ -743,9 +744,32 @@ def create_app(workspace, port=8765):
         return {"reason": "unknown", "message": warnings[0] if warnings else "The feed request failed.",
                 "source": shown, "hidden_parameters": hidden, "candidate": ""}
 
-    def audit_result(rid, data, *, tab, page, q, url_q, category, status, redirect, indexability, rule, sort):
+    def audit_context(rid, data):
         run = data["manifest"]
         audit = load_audit(Path(data["directory"]), run)
+        rules = audit.rules()
+        examples = {}
+        for row in rules:
+            pages = [audit.evidence[evidence_id] for finding in audit.findings if finding.rule == row["rule"]
+                     for evidence_id in finding.evidence_ids if evidence_id in audit.evidence]
+            examples[row["rule"]] = list({page.url: page for page in pages}.values())[:8]
+        counts = run.get("counts") or {}
+        skipped = counts.get("skipped")
+        page_limited = bool(isinstance(skipped, dict) and skipped.get("page_limit"))
+        completion = {
+            "succeeded": "The crawl completed within its configured limits.",
+            "partial": "The crawl finished but did not cover every discovered page.",
+            "cancelled": "The run was cancelled before it finished, so this report covers what was observed.",
+            "failed": "The run failed before it could finish, so this report is incomplete.",
+            "no_pages_found": "No pages were found to check for this address.",
+        }.get(run.get("status"), "The run finished with an unusual status.")
+        return {"audit": audit, "rules": rules, "examples": examples, "counts": counts,
+                "page_limited": page_limited, "completion": completion}
+
+    def audit_result(rid, data, *, tab, page, q, url_q, category, status, redirect, indexability, rule, sort):
+        context = audit_context(rid, data)
+        audit, rules = context["audit"], context["rules"]
+        run = data["manifest"]
         chosen = tab if tab in ("overview", "findings", "pages", "exports") else ""
         if not chosen:
             legacy = any((q, url_q, status, redirect, indexability, rule))
@@ -753,7 +777,6 @@ def create_app(workspace, port=8765):
         page_query = query_pages(audit.pages, url=url_q or q, status=status, redirect=redirect,
                                  indexability=indexability, rule=rule, sort=sort, page=page)
         page_query.filters = {**page_query.filters, "tab": "pages"}
-        rules = audit.rules()
         categories = sorted({row["category"] for row in rules if row["category"]})
         selection = next((row for row in rules if row["rule"] == rule), None)
         affected = []
@@ -767,17 +790,19 @@ def create_app(workspace, port=8765):
                     if target is not None:
                         unique[target.url] = target
             affected = list(unique.values())
-        counts = run.get("counts") or {}
-        skipped = counts.get("skipped")
-        page_limited = bool(isinstance(skipped, dict) and skipped.get("page_limit"))
         window = list(range(max(1, page_query.page - 2), min(page_query.page_count, page_query.page + 2) + 1))
+        params = {key: value for key, value in page_query.filters.items()
+                  if value and key != "tab" and not (key == "sort" and value == "url")}
+        export_href = "/runs/" + rid + "/pages.csv" + ("?" + urlencode(params) if params else "")
         return render("audit_result", rid=rid, run=run, audit=audit, tab=chosen, page_query=page_query,
                       rules=[row for row in rules if not category or row["category"] == category],
                       all_rules=rules, categories=categories, category=category, selection=selection,
                       affected=affected, guidance=RULE_GUIDANCE, window=window,
                       artifacts=data["artifacts"], finding_labels=FINDING_LABELS,
                       check_labels=CHECK_LABELS, limit=run["parameters"].get("limit"),
-                      page_limited=page_limited)
+                      page_limited=context["page_limited"], examples=context["examples"],
+                      completion=context["completion"], has_pages=bool(audit.pages),
+                      export_href=export_href)
 
     @app.get("/runs/{rid}")
     def result(rid: str, page: int = 1, evidence_page: int = 1, q: str = "", category: str = "",
@@ -873,6 +898,44 @@ def create_app(workspace, port=8765):
         return render("comparison", run=run, rid=rid, report=report, sources=sources, rows=(rows or [])[(page - 1) * 30:page * 30],
                       unavailable=rows is None, page=page, more=len(rows or []) > page * 30,
                       category=category, findings=findings, finding_labels=FINDING_LABELS)
+
+    @app.get("/runs/{rid}/report.html")
+    def saved_report(rid: str):
+        data = detail(rid)
+        run = data["manifest"]
+        if run["tool_id"] not in (tools.AUDIT.id, tools.CRAWL.id):
+            raise HTTPException(404)
+        context = audit_context(rid, data)
+        html = templates.get_template("audit_report.html").render(
+            rid=rid, run=run, audit=context["audit"], rules=context["rules"], examples=context["examples"],
+            guidance=RULE_GUIDANCE, finding_labels=FINDING_LABELS, limit=run["parameters"].get("limit"),
+            page_limited=context["page_limited"], completion=context["completion"], generated_at=stamp())
+        return HTMLResponse(html, headers={"Content-Disposition": f'inline; filename="audit-{rid[:8]}.html"'})
+
+    @app.get("/runs/{rid}/pages.csv")
+    def saved_pages_csv(rid: str, url_q: str = "", status: str = "", redirect: str = "",
+                        indexability: str = "", rule: str = "", sort: str = "url"):
+        data = detail(rid)
+        run = data["manifest"]
+        if run["tool_id"] not in (tools.AUDIT.id, tools.CRAWL.id):
+            raise HTTPException(404)
+        audit = load_audit(Path(data["directory"]), run)
+        page_query = query_pages(audit.pages, url=url_q, status=status, redirect=redirect,
+                                 indexability=indexability, rule=rule, sort=sort, page=1,
+                                 per_page=max(1, len(audit.pages)))
+        return PlainTextResponse(page_csv(page_query, run=run, site=audit.site), media_type="text/csv",
+                                 headers={"Content-Disposition": f'attachment; filename="audit-{rid[:8]}-pages.csv"'})
+
+    @app.get("/runs/{rid}/bundle.zip")
+    def saved_bundle(rid: str):
+        data = detail(rid)
+        run = data["manifest"]
+        if run["tool_id"] not in (tools.AUDIT.id, tools.CRAWL.id):
+            raise HTTPException(404)
+        audit = load_audit(Path(data["directory"]), run)
+        return Response(build_bundle(Path(data["directory"]), run, site=audit.site),
+                        media_type="application/zip",
+                        headers={"Content-Disposition": f'attachment; filename="audit-{rid[:8]}-bundle.zip"'})
 
     @app.get("/runs/{rid}/review")
     def review_pairs(rid: str, pair: int | None = None, queue: str = "pending", page: int = 1):

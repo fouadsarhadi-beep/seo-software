@@ -1,6 +1,6 @@
 # Workbench implementation checklist
 
-**Status on 2026-11-28:** stages 1–3 are implemented with automated coverage. Continue at **4.1**. These numbers expand the six stages in the [product plan](WORKBENCH_PRODUCT_PLAN.md). Stage 7 expands its research follow-up. The first release target is stages 1–4: launch, crawl, investigate, share. The second is stages 5–7: explain performance, track decisions, explore opportunities.
+**Status on 2026-11-28:** stages 1–4 are implemented with automated coverage. Continue at **5.1**. These numbers expand the six stages in the [product plan](WORKBENCH_PRODUCT_PLAN.md). Stage 7 expands its research follow-up. The first release target is stages 1–4: launch, crawl, investigate, share. The second is stages 5–7: explain performance, track decisions, explore opportunities.
 
 ## How to pick up the work
 
@@ -53,11 +53,11 @@ Depends on 2.3. Today `GET /runs/{rid}` in `ui/server.py` filters findings and U
 
 Depends on 3.1–3.5. Start in `reporting/report.py`, `reporting/workbook.py`, `reporting/dataset_export.py`, `core/artifacts.py` and the existing run-file handler.
 
-- [ ] **4.1 Design the Exports tab.** Lead with “Read audit report” (offline HTML), “Work with pages” (spreadsheet), and “Download analysis bundle” (ZIP). Give format, scope and purpose. Keep existing manifest downloads available in details. Hide outputs that cannot be produced and explain older-run limitations.
-- [ ] **4.2 Implement the standalone report.** Include site and date, completion reason, coverage, top issues, affected page examples and next checks. Escape crawled text and URLs. Use embedded styling and internal anchors for supporting rows so a recipient can read it without the workbench running.
-- [ ] **4.3 Implement the table export.** Use the stage 3 query across all matching pages. Include original and destination URLs, HTTP status, reason for exclusion, rule references and scope metadata. Keep formulas inert and preserve Persian text. Retain the existing multi-source Excel workbook as a separate reporting task.
-- [ ] **4.4 Implement the machine bundle.** Package manifest-approved artifacts under crawl, analysis and diagnostics. Include a versioned index describing file paths, formats, row grain, identifiers, join keys, units, missing values, thresholds, coverage and skipped files. Where artifacts lack a common join key, include an explicit mapping. Stream or write atomically to avoid serving half-written exports. Keep logins, tokens and unrelated workspace data outside the bundle.
-- [ ] **4.5 Verify together.** Reconcile counts across Overview, HTML, workbook and ZIP. Open the HTML offline and the workbook in Excel. Use the index alone to trace one finding to evidence. Exercise a filtered export spanning two pages, missing legacy artifacts, unsafe filenames and repeated download. Existing run history remains readable.
+- [x] **4.1 Design the Exports tab.** Lead with “Read audit report” (offline HTML), “Work with pages” (spreadsheet), and “Download analysis bundle” (ZIP). Give format, scope and purpose. Keep existing manifest downloads available in details. Hide outputs that cannot be produced and explain older-run limitations.
+- [x] **4.2 Implement the standalone report.** Include site and date, completion reason, coverage, top issues, affected page examples and next checks. Escape crawled text and URLs. Use embedded styling and internal anchors for supporting rows so a recipient can read it without the workbench running.
+- [x] **4.3 Implement the table export.** Use the stage 3 query across all matching pages. Include original and destination URLs, HTTP status, reason for exclusion, rule references and scope metadata. Keep formulas inert and preserve Persian text. Retain the existing multi-source Excel workbook as a separate reporting task.
+- [x] **4.4 Implement the machine bundle.** Package manifest-approved artifacts under crawl, analysis and diagnostics. Include a versioned index describing file paths, formats, row grain, identifiers, join keys, units, missing values, thresholds, coverage and skipped files. Where artifacts lack a common join key, include an explicit mapping. Stream or write atomically to avoid serving half-written exports. Keep logins, tokens and unrelated workspace data outside the bundle.
+- [x] **4.5 Verify together.** Reconcile counts across Overview, HTML, workbook and ZIP. Open the HTML offline and the workbook in Excel. Use the index alone to trace one finding to evidence. Exercise a filtered export spanning two pages, missing legacy artifacts, unsafe filenames and repeated download. Existing run history remains readable.
 
 ## Stage 5 — Bring Search Console and GA4 into the workbench
 

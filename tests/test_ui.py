@@ -1,8 +1,10 @@
 import json
+from io import BytesIO
 from pathlib import Path
 import time
 from threading import Event
 from uuid import uuid4
+from zipfile import ZipFile
 from bs4 import BeautifulSoup
 from fastapi.testclient import TestClient
 
@@ -254,6 +256,11 @@ def test_ui_page_table_paginates_filters_and_opens_exact_counts(tmp_path):
                                "html.parser")
         assert detail.find("h3", string="What was observed") and detail.find("h3", string="Why it matters")
         assert len(detail.select('a[href*="/evidence/"]')) == 32
+        # The spreadsheet covers every matching page, not just the 30 on screen.
+        csv_text = client.get(base + "/pages.csv", params={"rule": "seo.missing-meta"}).text
+        assert csv_text.splitlines()[0].lstrip("\ufeff").startswith("# SEO Analysis page export")
+        csv_rows = [line for line in csv_text.splitlines() if line and not line.lstrip("\ufeff").startswith("#")]
+        assert len(csv_rows) == 33 and csv_rows[0].startswith("URL,URL (decoded),Final URL")
 
 
 def test_ui_runs_saved_checks_offline_and_matches_cli(site, tmp_path, capsys):
@@ -383,5 +390,80 @@ def test_ui_overview_centers_the_selected_project(site, tmp_path):
         assert beta.h1.text == "Beta"
         assert "No audits for this project yet." in beta.text
         assert beta.select_one(f'a[href="{run_path}"]') is None
-        assert BeautifulSoup(client.get("/?project=Acme").text, "html.parser").select_one(f'a[href="{run_path}"]')
         assert overview.select_one('form.switcher[action="/"]')
+        assert BeautifulSoup(client.get("/?project=Acme").text, "html.parser").select_one(f'a[href="{run_path}"]')
+
+
+def test_ui_standalone_report_and_bundle_are_self_contained(tmp_path):
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    rid = uuid4().hex
+    folder = ws.runs_dir / rid
+    folder.mkdir(parents=True)
+    pages = [
+        {"evidence_id": "page-000001", "url": "https://example.com/آزمون", "final_url": "https://example.com/آزمون",
+         "first_status": 200, "final_status": 200, "chain": [], "effective_indexability": "indexable",
+         "indexability_reason": "no noindex or none directive for Googlebot", "title": "صفحه آزمون",
+         "words": 12, "depth": 0, "observed_at": "2026-11-22T00:00:00+00:00"},
+        {"evidence_id": "page-000002", "url": "https://example.com/b", "final_url": "https://example.com/b",
+         "first_status": 200, "final_status": 200, "chain": [], "effective_indexability": "indexable",
+         "indexability_reason": "", "title": "B", "words": 8, "depth": 0,
+         "observed_at": "2026-11-22T00:00:00+00:00"},
+    ]
+    (folder / "snapshot.jsonl").write_text(
+        "\n".join(json.dumps(page, ensure_ascii=False) for page in pages) + "\n", encoding="utf-8")
+    observations = folder / "observations"
+    observations.mkdir()
+    for page in pages:
+        (observations / f"{page['evidence_id']}.json").write_text(
+            json.dumps(page, ensure_ascii=False), encoding="utf-8")
+    (folder / "findings.json").write_text(json.dumps({"schema_version": 1, "findings": [
+        {"category": "review", "rule": "content.overlap", "detail": "<script>alert(1)</script>",
+         "evidence_ids": ["page-000001", "page-000002"]}]}), encoding="utf-8")
+    (folder / "analysis_manifest.json").write_text(json.dumps({
+        "config": {"settings": {"thr_dup": 0.35}},
+        "limitations": ["Similarity is not proof of cannibalization."]}), encoding="utf-8")
+    manifest = {"run_id": rid, "tool_id": "seo.audit", "status": "succeeded", "project": None,
+                "saved_target": None, "started_at": "2026-11-22T00:00:00Z",
+                "finished_at": "2026-11-22T00:00:02Z", "parameters": {"source": "https://example.com/"},
+                "counts": {"observed": 2, "findings": 1}, "warnings": [], "tool_version": "0.4.0",
+                "artifacts": ["analysis_manifest.json", "findings.json", "snapshot.jsonl"]}
+    (folder / "run.json").write_text(json.dumps(manifest), encoding="utf-8")
+    History(ws).index(folder)
+    with TestClient(create_app(ws, 8972), base_url="http://127.0.0.1:8972") as client:
+        report = client.get(f"/runs/{rid}/report.html")
+        assert report.status_code == 200 and "text/html" in report.headers["content-type"]
+        html = report.text
+        assert "<script>alert(1)</script>" not in html and "&lt;script&gt;" in html
+        assert "/runs/" not in html
+        assert "https://example.com/آزمون" in html
+        assert 'id="f-1"' in html and 'href="#f-1"' in html and "What to check next." in html
+
+        bundle = client.get(f"/runs/{rid}/bundle.zip")
+        assert bundle.status_code == 200 and bundle.headers["content-type"] == "application/zip"
+        with ZipFile(BytesIO(bundle.content)) as archive:
+            names = set(archive.namelist())
+            index = json.loads(archive.read("index.json"))
+        assert {"index.json", "crawl/snapshot.jsonl", "analysis/findings.json",
+                "analysis/analysis_manifest.json", "diagnostics/run.json"} <= names
+        assert index["schema_version"] == 1 and index["run"]["run_id"] == rid
+        assert index["thresholds"] == {"thr_dup": 0.35}
+        assert index["joins"][0]["from_field"] == "evidence_ids[]"
+        assert any(item["file"] == "observations/" for item in index["skipped"])
+        snapshot = next(item for item in index["files"] if item["path"] == "crawl/snapshot.jsonl")
+        assert snapshot["rows"] == 2 and snapshot["grain"] == "one observed page"
+        assert "token" not in json.dumps(index).lower()
+
+
+def test_ui_exports_hide_outputs_a_run_cannot_produce(tmp_path):
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    rid = uuid4().hex
+    folder = ws.runs_dir / rid
+    folder.mkdir(parents=True)
+    manifest = {"run_id": rid, "tool_id": "seo.audit", "status": "cancelled", "project": None,
+                "saved_target": None, "started_at": "2026-11-22T00:00:00Z", "finished_at": None,
+                "parameters": {"source": "https://example.com/"}, "counts": {}, "warnings": [], "artifacts": []}
+    (folder / "run.json").write_text(json.dumps(manifest), encoding="utf-8")
+    History(ws).index(folder)
+    with TestClient(create_app(ws, 8972), base_url="http://127.0.0.1:8972") as client:
+        exports = client.get(f"/runs/{rid}", params={"tab": "exports"}).text
+        assert "Not available" in exports and "no page snapshot" in exports

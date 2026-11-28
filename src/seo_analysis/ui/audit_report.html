@@ -1,0 +1,79 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit report · {{ audit.site or 'saved run' }}</title>
+<style>
+:root{--ink:#14201a;--soft:#55645a;--line:#dcded0;--paper:#f7f6ef;--card:#fffef9;--pine:#122a1e;--accent:#cdf36b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 "Segoe UI Variable Text","Segoe UI","Noto Sans",system-ui,sans-serif}
+.page{max-width:860px;margin:0 auto;padding:44px 28px 70px}
+header{border-bottom:2px solid var(--pine);padding-bottom:18px;margin-bottom:26px}
+.kicker{margin:0 0 8px;font-family:"Bahnschrift","Segoe UI Variable Display",system-ui,sans-serif;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--soft)}
+h1,h2,h3{font-family:"Bahnschrift","Segoe UI Variable Display",system-ui,sans-serif;font-weight:600;letter-spacing:-.01em;line-height:1.15}
+h1{font-size:32px;margin:0 0 10px;overflow-wrap:anywhere}
+h2{font-size:20px;margin:38px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+h3{font-size:16px;margin:0 0 6px}
+.meta{margin:0;color:var(--soft);font-size:13.5px}
+.status{display:inline-block;padding:2px 9px;border-radius:999px;background:var(--pine);color:#fff;font-size:11.5px;font-weight:650;text-transform:uppercase;letter-spacing:.06em}
+.metrics{display:flex;gap:30px;flex-wrap:wrap;margin:16px 0 6px}
+.metrics span{display:flex;flex-direction:column;gap:2px;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--soft)}
+.metrics strong{font-family:"Bahnschrift",system-ui,sans-serif;font-size:28px;color:var(--ink)}
+.note{background:#f2f4e4;border-left:3px solid var(--accent);padding:10px 14px;margin:16px 0;font-size:13.5px}
+table{border-collapse:collapse;width:100%;font-size:13px;background:var(--card);border:1px solid var(--line)}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;overflow-wrap:anywhere}
+th{font-family:"Bahnschrift",system-ui,sans-serif;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--soft)}
+tr:last-child td{border-bottom:0}
+article{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:18px 20px;margin:14px 0}
+article p{margin:0 0 8px}
+.label{font-weight:650}
+.cat{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:999px;background:#eef0e3;color:#3a5340;font-size:11px;font-weight:650}
+ul.links{margin:0;padding-left:20px}
+footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);color:var(--soft);font-size:12.5px}
+@media print{body{background:#fff}.page{padding:0}article{break-inside:avoid}header{margin-bottom:18px}}
+</style></head><body><div class="page">
+<header>
+<p class="kicker">SEO Analysis · audit report</p>
+<h1>{{ audit.site or 'Saved audit' }}</h1>
+<p class="meta">{{ run.started_at[:19]|replace('T',' ') if run.started_at else 'Date unavailable' }} UTC · <span class="status">{{ run.status|replace('_',' ') }}</span> · run <code>{{ rid }}</code>{% if run.project %} · {{ run.project }}{% endif %}</p>
+</header>
+
+<h2>Coverage</h2>
+<div class="metrics">
+<span><strong>{{ run.counts.get('observed', 0) }}</strong>URLs observed</span>
+<span><strong>{{ run.counts.get('findings', 0) }}</strong>findings</span>
+<span><strong>{{ run.counts.get('errors', 0) }}</strong>fetch errors</span>
+<span><strong>{{ run.counts.get('redirecting', 0) }}</strong>redirecting</span>
+</div>
+<p>{{ completion }}</p>
+{% if page_limited %}<p class="note"><strong>This is a capped sample.</strong> The crawl stopped after {{ limit }} pages. Pages outside the sample were not assessed, so their absence from the findings is not a clean result.</p>{% endif %}
+
+<h2>Findings at a glance</h2>
+{% if rules %}
+<table>
+<thead><tr><th>Rule</th><th>Category</th><th>Occurrences</th><th>Affected URLs</th></tr></thead>
+<tbody>
+{% for row in rules %}<tr><td><a href="#f-{{ loop.index }}">{{ finding_labels.get(row.rule, row.rule) }}</a></td><td>{{ row.category or '—' }}</td><td>{{ row.occurrences }}</td><td>{{ row.urls }}</td></tr>{% endfor %}
+</tbody></table>
+{% else %}<p>No findings were recorded for this run.{% if page_limited %} With a capped sample that does not mean the site is clean.{% endif %}</p>{% endif %}
+
+<h2>What each finding means</h2>
+{% for row in rules %}
+<article id="f-{{ loop.index }}">
+<h3>{{ finding_labels.get(row.rule, row.rule) }}<span class="cat">{{ row.category or 'finding' }}</span></h3>
+<p><span class="label">What was observed.</span> {{ row.detail }}</p>
+{% if guidance.get(row.rule) %}
+<p><span class="label">Why it matters.</span> {{ guidance[row.rule][0] }}</p>
+<p><span class="label">What to check next.</span> {{ guidance[row.rule][1] }}</p>
+{% endif %}
+{% if examples.get(row.rule) %}
+<table>
+<thead><tr><th>Affected page</th><th>Status</th><th>Evidence ID</th></tr></thead>
+<tbody>{% for page in examples[row.rule] %}<tr><td>{{ page.url }}</td><td>{{ page.status_text }}</td><td>{{ page.evidence_id or '—' }}</td></tr>{% endfor %}</tbody>
+</table>
+{% if row.urls > examples[row.rule]|length %}<p class="meta">Showing {{ examples[row.rule]|length }} of {{ row.urls }} affected pages. The full list is in the analysis bundle.</p>{% endif %}
+{% endif %}
+</article>
+{% endfor %}
+
+<footer>
+<p>Generated {{ generated_at }} by SEO Analysis {{ run.tool_version or '' }}. This report is self-contained: it needs no server and no network. Findings are observations from one crawl, not verdicts about ranking, and a missing page is unassessed rather than clean.</p>
+</footer>
+</div></body></html>
