@@ -77,6 +77,10 @@ class ToolRunner:
                 directory = self.workspace.create_run_directory()
                 active.enter_context(FileLock(str(directory / ".active.lock")))
                 parameters = asdict(request)
+                # A request may know which of its inputs must not be written down verbatim.
+                redact = getattr(request, "redacted_parameters", None)
+                if callable(redact):
+                    parameters = redact(parameters)
                 if workflow is not None:
                     parameters["workflow"] = workflow
                 if isinstance(request, CrawlConfig):

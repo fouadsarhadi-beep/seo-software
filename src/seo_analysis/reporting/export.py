@@ -100,6 +100,21 @@ def _analysis(run_dir: Path) -> tuple[dict, list]:
     return data.get("config", {}).get("settings", {}) or {}, data.get("limitations", []) or []
 
 
+def _entry_path(run_dir: Path, name: str, manifest: dict):
+    """Resolve one bundle entry through the same rules the run-file handler uses."""
+    path = run_dir / name
+    if path.is_symlink():
+        return None, "is a link and is not followed"
+    if not path.is_file():
+        return None, "not written by this run"
+    resolved = path.resolve()
+    if resolved.parent != run_dir.resolve():
+        return None, "resolves outside the run directory"
+    if name != "run.json" and name not in (manifest.get("artifacts") or []):
+        return None, "not listed in the run manifest"
+    return resolved, ""
+
+
 def build_bundle(run_dir, manifest: dict, *, site: str = "", generated_at: str = "") -> bytes:
     """A ZIP carrying the allowlisted run files plus an index describing how to join them."""
     run_dir = Path(run_dir)
@@ -109,9 +124,9 @@ def build_bundle(run_dir, manifest: dict, *, site: str = "", generated_at: str =
     with ZipFile(buffer, "w", ZIP_DEFLATED) as archive:
         for group, names in BUNDLE_GROUPS.items():
             for name in names:
-                path = run_dir / name
-                if not path.is_file():
-                    skipped.append({"file": f"{group}/{name}", "reason": "not written by this run"})
+                path, reason = _entry_path(run_dir, name, manifest)
+                if path is None:
+                    skipped.append({"file": f"{group}/{name}", "reason": reason})
                     continue
                 size = path.stat().st_size
                 if size > BUNDLE_FILE_LIMIT:

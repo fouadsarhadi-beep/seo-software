@@ -150,6 +150,18 @@ def _row_limit(value, default: int = 25000) -> int:
         return default
 
 
+def redacted_source(source):
+    """A dataset source as displayed or exported: a signed address loses its secret parts."""
+    if not isinstance(source, dict):
+        return source
+    cleaned = dict(source)
+    for key in ("url", "resolved_url"):
+        value = cleaned.get(key)
+        if isinstance(value, str) and value.startswith(("http://", "https://")):
+            cleaned[key] = redact_url(value)[0]
+    return cleaned
+
+
 def alignment_note(item: dict, crawl: dict) -> str:
     """Point out a measurement whose period or origin does not line up with this audit."""
     notes = []
@@ -1068,7 +1080,8 @@ def create_app(workspace, port=8765):
         row = next((row for row in dataset["rows"] if row.get("row") == row_id), None)
         if row is None:
             raise HTTPException(404, "Unknown source row")
-        return render("dataset_row", rid=rid, row=row, dataset=dataset["source"], dataset_labels=RESEARCH_DATASETS)
+        return render("dataset_row", rid=rid, row=row, dataset=redacted_source(dataset["source"]),
+                      dataset_labels=RESEARCH_DATASETS)
 
     def research_result(data, page, category, q):
         run = data["manifest"]
@@ -1078,6 +1091,8 @@ def create_app(workspace, port=8765):
             plan = json.loads(artifact_path(data, "content-plan.json").read_text(encoding="utf-8"))
             report.update({key: plan.get(key, []) for key in ("content_briefs", "keyword_clusters")})
         sources = report.get("sources") or {}
+        report["sources"] = {key: redacted_source(value) if isinstance(value, dict) else value
+                             for key, value in sources.items()}
         contexts = {(item.get("provider"), item.get("locale"), item.get("device"))
                     for item in sources.values() if isinstance(item, dict) and item.get("kind") == "serp"}
         incompatible = len(contexts) > 1
@@ -1190,7 +1205,8 @@ def create_app(workspace, port=8765):
             dataset = json.loads(artifact_path(data, "dataset.json").read_text(encoding="utf-8"))
             rows = dataset["rows"]
             page = min(max(1, page), max(1, (len(rows) + 29) // 30))
-            return render("dataset", rid=rid, run=run, dataset=dataset["source"], rows=rows[(page - 1) * 30:page * 30],
+            return render("dataset", rid=rid, run=run, dataset=redacted_source(dataset["source"]),
+                          rows=rows[(page - 1) * 30:page * 30],
                           page=page, more=len(rows) > page * 30, dataset_labels=RESEARCH_DATASETS)
         if run["tool_id"] == tools.SITE_QA.id:
             report = (json.loads(artifact_path(data, "site-qa.json").read_text(encoding="utf-8"))

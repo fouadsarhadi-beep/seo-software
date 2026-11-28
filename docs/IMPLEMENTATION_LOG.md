@@ -188,4 +188,11 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 - Batch 2 — Acceptance test drives the Beta journey end to end: rail links carry Beta, the research screen posts Beta, a brief item lands only in Beta, an unknown project is rejected, a research run is recorded under Beta, and a dataset owned by Alpha is refused. Ad-hoc auditing is unchanged.
 - Batch 2 — Not covered in this pass: pickers still list workspace-wide datasets (compatibility is enforced on submit, the list is not scoped), shared dataset rows do not yet label their owning project, and collecting a one-off run into a project still defaults rather than asking explicitly.
 
+## DS delivery plan — batch 3: report and feed protections
+
+- Batch 3 — Bundle reads now go through one resolver that applies the same rules as the run-file handler: a candidate must be a plain file inside the run directory and listed in the run manifest (with `run.json` as the single explicit exception). A link is not followed, a file the run never wrote is reported as skipped with its reason, and an unlisted file is refused rather than packaged.
+- Batch 3 — A signed feed address is now transient. `FeedInput` declares which of its parameters must not be written down, the runner honours that hook for any request that provides it, and the feed tool stores the redacted address in `dataset.json` and in the request log. Existing runs keep their stored original, while the dataset view, source-row view and research report redact the address when displaying it.
+- Batch 3 — A failed feed now says that parameters were removed from the address shown and that a signed address must be pasted again in Edit source.
+- Batch 3 — Focused regression: bundle entry rules, unlisted and missing files, a successful signed feed and a failed signed feed, plus the existing workbench and source suites. The symlink refusal is covered by a test that skips on machines where creating a link needs elevation, so it stayed unverified here.
+
 [Current scope and remaining work](ROADMAP.md)

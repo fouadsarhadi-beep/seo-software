@@ -132,6 +132,10 @@ class FeedInput:
     url: str
     max_items: int = 100
 
+    def redacted_parameters(self, parameters):
+        """A feed address may be signed for one request, so it is never written to the manifest."""
+        return {**parameters, "url": redact_url(self.url)[0]}
+
 
 @dataclass
 class BraveSearchInput:
@@ -140,6 +144,18 @@ class BraveSearchInput:
     language: str = "en"
     count: int = 10
     allow_storage: bool = False
+
+
+def _redact_attempt(attempt):
+    """Copy one request-log entry with signed URLs reduced to their safe form."""
+    if not isinstance(attempt, dict):
+        return attempt
+    cleaned = dict(attempt)
+    for key in ("url", "target", "location", "final_url", "redirect"):
+        value = cleaned.get(key)
+        if isinstance(value, str) and value.startswith(("http://", "https://")):
+            cleaned[key] = redact_url(value)[0]
+    return cleaned
 
 
 def _save(ctx, rows, columns, source, raw, warnings):
@@ -185,7 +201,8 @@ def read_feed(ctx, request):
         raise _feed_error(ctx, "request", str(exc), request.url) from None
     finally:
         fetcher.session.close()
-        write_json(ctx.directory / "requests.json", {"schema_version": 1, "attempts": fetcher.attempts})
+        write_json(ctx.directory / "requests.json", {"schema_version": 1,
+                                                     "attempts": [_redact_attempt(item) for item in fetcher.attempts]})
         if fetcher.attempts:
             ctx.data_egress.append({"method": "GET", "origin": asdict(origin), "purpose": "Read public feed and robots.txt",
                                     "attempt_log": "requests.json"})
@@ -224,7 +241,9 @@ def read_feed(ctx, request):
         warnings.append(f"Skipped {skipped} entries without a usable title and link.")
     return _save(ctx, rows, ("row", "title", "url", "published"), {
         "kind": "community", "provider": origin.host, "retrieval": "public RSS/Atom",
-        "url": request.url, "resolved_url": response.final_url, "capped": capped, "skipped": skipped,
+        "url": redact_url(request.url)[0],
+        "resolved_url": redact_url(response.final_url)[0] if response.final_url else "",
+        "capped": capped, "skipped": skipped,
         "limitations": ["A feed is a publisher-selected sample. Linked pages were not retrieved."],
     }, response.raw, warnings)
 

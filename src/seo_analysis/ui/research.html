@@ -70,6 +70,7 @@
 <h1>Feed import failed</h1>
 <p role="alert"><strong>{{failure.message}}</strong></p>
 {% if failure.source %}<p>Attempted source: <code dir="ltr">{{failure.source}}</code>{% if failure.hidden_parameters %} · {{failure.hidden_parameters}} sensitive parameter(s) hidden{% endif %}</p>{% endif %}
+{% if failure.hidden_parameters %}<p><small>Parameters were removed from the address shown. If this feed needs a signed token, paste the full address again in Edit source.</small></p>{% endif %}
 {% if failure.candidate %}<p>The page advertises a feed: <a href="/tools/research?url={{failure.candidate|urlencode}}&amp;host={{host|urlencode}}">Use this feed</a> · <code dir="ltr">{{failure.candidate}}</code></p>{% endif %}
 <div class="links">
 <a href="/tools/research?url={{failure.source|urlencode}}&amp;host={{host|urlencode}}">Edit source</a>
