@@ -4,11 +4,13 @@ from argparse import ArgumentParser
 from contextlib import closing
 import logging
 from logging.handlers import RotatingFileHandler
+import os
 from pathlib import Path
 import shutil
 import socket
 import sqlite3
-from tempfile import mkdtemp
+import sys
+from tempfile import TemporaryDirectory, mkdtemp
 from threading import Thread
 from time import monotonic
 import webbrowser
@@ -24,15 +26,50 @@ from seo_analysis.ui.server import create_app
 HOST = "127.0.0.1"
 TITLE = "SEO Workbench"
 LOG = logging.getLogger(__name__)
+STATE_FOLDER = "SEOAnalysisWorkbench"
+WORKSPACE_POINTER = "workspace-config.txt"
 
 
-def load_workspace(state: Path, config_file: Path | None) -> Workspace:
+def launcher_locations(override: Path | None) -> tuple[Path, ...]:
+    if override is not None:
+        return (override.expanduser().absolute(),)
+    return (
+        PlatformDirs(STATE_FOLDER, appauthor=False).user_data_path,
+        Path.home() / STATE_FOLDER,
+    )
+
+
+def open_launcher_state(
+    locations: tuple[Path, ...], config_file: Path | None,
+) -> tuple[Path, RotatingFileHandler, Path | None]:
+    """Choose writable launcher storage and resume the most recently recovered workspace."""
+    preferred = None
     if config_file is None:
+        saved = []
+        for location in locations:
+            try:
+                with (location / WORKSPACE_POINTER).open(encoding="utf-8") as pointer:
+                    candidate = Path(pointer.read())
+                    modified = os.fstat(pointer.fileno()).st_mtime_ns
+            except (FileNotFoundError, NotADirectoryError, PermissionError):
+                continue
+            saved.append((modified, location, candidate))
+        if saved:
+            _, preferred, config_file = max(saved, key=lambda item: item[0])
+
+    failures = []
+    for location in dict.fromkeys(locations if preferred is None else (preferred, *locations)):
         try:
-            config_file = Path((state / "workspace-config.txt").read_text(encoding="utf-8"))
-        except FileNotFoundError:
-            pass
-    return Workspace.load(config_file)
+            location.mkdir(parents=True, exist_ok=True)
+            with TemporaryDirectory(prefix=".write-check-", dir=location):
+                pass
+            log = RotatingFileHandler(location / "launcher.log", maxBytes=1_048_576, backupCount=1, encoding="utf-8")
+        except OSError as exc:
+            failures.append(f"{location} ({exc.strerror or exc})")
+        else:
+            return location, log, config_file
+    raise OSError("Could not write launcher files. Start the launcher with --state-dir and a writable folder.\n\n"
+                  + "\n".join(failures))
 
 
 def check_workspace(workspace: Workspace) -> None:
@@ -65,7 +102,7 @@ def recover_workspace(workspace: Workspace, state: Path) -> Workspace:
         write_text(config, '[paths]\ndata_dir = "data"\n')
         copied = Workspace.load(config)
         check_workspace(copied)
-        write_text(state / "workspace-config.txt", str(config))
+        write_text(state / WORKSPACE_POINTER, str(config))
     except Exception:
         shutil.rmtree(recovery, ignore_errors=True)
         raise
@@ -179,6 +216,7 @@ def serve_desktop(
 def main() -> int:
     parser = ArgumentParser(prog="SEO-Workbench", description="Start the local SEO workbench.")
     parser.add_argument("--config-file", type=Path, help="Use a specific workspace configuration.")
+    parser.add_argument("--state-dir", type=Path, help="Set the folder for launcher logs and recovered workspaces.")
     parser.add_argument("--no-window", action="store_true", help="Serve without opening the launcher or browser.")
     parser.add_argument("--port", type=int, help="Use a specific local port.")
     args = parser.parse_args()
@@ -192,13 +230,12 @@ def main() -> int:
         root.title(TITLE)
         root.resizable(False, False)
         root.withdraw()
-    state = PlatformDirs("SEOAnalysisWorkbench", appauthor=False).user_data_path
-    log_path = state / "launcher.log"
+    log_path = None
     try:
-        state.mkdir(parents=True, exist_ok=True)
-        handler = RotatingFileHandler(log_path, maxBytes=1_048_576, backupCount=1, encoding="utf-8")
+        state, handler, config_file = open_launcher_state(launcher_locations(args.state_dir), args.config_file)
+        log_path = state / "launcher.log"
         logging.basicConfig(handlers=[handler], level=logging.INFO)
-        workspace = load_workspace(state, args.config_file)
+        workspace = Workspace.load(config_file)
         try:
             check_workspace(workspace)
         except (PermissionError, sqlite3.OperationalError) as exc:
@@ -216,9 +253,14 @@ def main() -> int:
         with bind_listener(args.port) as listener:
             return serve_desktop(listener, workspace, root)
     except (OSError, ValueError, sqlite3.Error) as exc:
-        LOG.exception("Could not start the workbench")
+        message = f"Could not start the workbench.\n\n{exc}"
+        if log_path is not None:
+            LOG.exception("Could not start the workbench")
+            message += f"\n\nLog: {log_path}"
         if root is not None:
-            messagebox.showerror(TITLE, f"Could not start the workbench.\n\n{exc}\n\nLog: {log_path}", parent=root)
+            messagebox.showerror(TITLE, message, parent=root)
+        else:
+            print(message, file=sys.stderr)
         return 1
     finally:
         if root is not None:

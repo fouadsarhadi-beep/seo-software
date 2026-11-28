@@ -10,6 +10,8 @@ If you've already installed the project, double-click **Start SEO Workbench.cmd*
 
 The launcher opens the workbench in your default browser. Use **Open Workbench** to reopen the tab and **Exit** to stop the app. It starts with your usual workspace in `%LOCALAPPDATA%\SEOAnalysisSoftware`. If Windows prevents writes, the launcher offers to copy your projects, history and saved files to a writable workspace. It reopens the copy on later launches. You may need to reconnect external accounts after switching to a copy. To open a custom workspace, pass `--config-file "C:\path\to\config.toml"` to the launcher.
 
+If Windows blocks the launcher folder in Local AppData, the launcher tries `%USERPROFILE%\SEOAnalysisWorkbench` for its logs and recovered workspaces. To choose a location yourself, pass `--state-dir "C:\path\to\writable-folder"` to the launcher.
+
 ### Optional standalone Windows app
 
 If you need a copy with Python included, download **SEO-Workbench-Windows-x64** from a successful build. Extract the ZIP and double-click **SEO-Workbench.exe**. Optional browser captures use Playwright's Chromium when installed and can use Microsoft Edge on Windows. External providers require their own credentials and setup. [Windows desktop builds](https://github.com/fouadsarhadi-beep/seo-software/actions/workflows/windows-desktop.yml)

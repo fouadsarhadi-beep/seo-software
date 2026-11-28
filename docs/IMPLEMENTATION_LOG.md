@@ -78,6 +78,7 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 - Stage J, Step 4 follow-up — Added a single-file Windows workbench launcher, a writable workspace copy option and a Windows executable build workflow on 2026-11-28.
 - Stage J, Step 4 follow-up — Added a double-click Windows script that reuses the project's Python environment and limited executable builds to version tags and manual runs on 2026-11-28.
 - Stage C, Step 2 follow-up — Added individual run deletion, bulk audit and run deletion, workspace reset and retryable file cleanup on 2026-11-28. Added a storage write check to terminal startup and recovery guidance for read-only browser requests.
+- Stage J, Step 4 follow-up — Added a writable profile fallback for launcher logs and workspace recovery when Windows denies Local AppData access on 2026-11-28.
 
 - Stage H, Step 3 follow-up — Added the local Lighthouse runner on 2026-11-22. Lighthouse 13.6 and Chromium 156 produced six lab measurements from a local fixture. The HTTP fixture verified that external requests and paths outside the build are refused.
 

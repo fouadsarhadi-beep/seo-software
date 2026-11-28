@@ -5,7 +5,7 @@ import sqlite3
 import pytest
 
 from seo_analysis.core.workspace import Workspace
-from seo_analysis.desktop import check_workspace, load_workspace, needs_writable_copy, recover_workspace
+from seo_analysis.desktop import check_workspace, needs_writable_copy, open_launcher_state, recover_workspace
 from seo_analysis.storage.history import History
 
 
@@ -38,8 +38,57 @@ def test_desktop_workspace_recovery_preserves_history_and_files(tmp_path):
     assert (copied.runs_dir / artifact).read_text(encoding="utf-8") == "Saved audit"
     History(copied).add_project("Only in copy")
     assert History(original).projects() == [{"name": "Latest project"}, {"name": "نمونه"}]
-    assert load_workspace(state, None) == copied
-    assert load_workspace(state, existing_config) == original
+    _, log, saved_config = open_launcher_state((state,), None)
+    with closing(log):
+        assert Workspace.load(saved_config) == copied
+    _, log, explicit_config = open_launcher_state((state,), existing_config)
+    with closing(log):
+        assert Workspace.load(explicit_config) == original
+
+
+def test_desktop_uses_writable_state_when_windows_denies_appdata(tmp_path, monkeypatch):
+    original_config = tmp_path / "existing.toml"
+    original_config.write_text('[paths]\ndata_dir = "existing"\n', encoding="utf-8")
+    original = Workspace.load(original_config)
+    History(original).add_project("Saved project")
+    appdata = tmp_path / "AppData" / "Local" / "SEOAnalysisWorkbench"
+    fallback = tmp_path / "user profile" / "SEOAnalysisWorkbench"
+    locations = (appdata, fallback)
+    mkdir = Path.mkdir
+
+    def denied(path, *args, **kwargs):
+        if path == appdata:
+            raise PermissionError(13, "Access is denied", str(path))
+        return mkdir(path, *args, **kwargs)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, "mkdir", denied)
+        state, log, config = open_launcher_state(locations, None)
+        with closing(log):
+            assert state == fallback and config is None
+            assert (fallback / "launcher.log").is_file()
+        copied = recover_workspace(original, state)
+
+    # Prefer the recovery already in use when AppData becomes writable again.
+    state, log, config = open_launcher_state(locations, None)
+    with closing(log):
+        assert state == fallback
+        assert Workspace.load(config) == copied
+        assert History(copied).projects() == [{"name": "Saved project"}]
+        assert not appdata.exists()
+
+
+def test_desktop_keeps_a_saved_workspace_when_only_the_log_needs_to_move(tmp_path):
+    primary = tmp_path / "appdata"
+    fallback = tmp_path / "profile"
+    primary.mkdir()
+    (primary / "launcher.log").mkdir()
+    existing_workspace = tmp_path / "existing.toml"
+    (primary / "workspace-config.txt").write_text(str(existing_workspace), encoding="utf-8")
+
+    state, log, config = open_launcher_state((primary, fallback), None)
+    with closing(log):
+        assert state == fallback and config == existing_workspace
 
 
 def test_desktop_recovery_does_not_treat_arbitrary_sqlite_errors_as_permissions():
