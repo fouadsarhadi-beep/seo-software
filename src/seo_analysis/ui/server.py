@@ -73,6 +73,14 @@ CONNECTED_REPORT_TOOLS = {tools.SEARCH_ANALYTICS.id: "gsc", tools.GA4_LANDING_PA
 RESEARCH_SOURCE_TOOLS = {tools.PUBLIC_FEED.id: "community", tools.BRAVE_SEARCH.id: "serp"}
 RESEARCH_DATASETS = {"serp": "Search results (SERP)", "keywords": "Keywords", "gsc": "Search Console",
                      "backlinks": "Backlinks", "community": "Community"}
+# What each source can answer, shown beside it so an operator picks the right sample.
+RESEARCH_CAPABILITIES = {
+    "serp": "Keyword overlap and competitor gaps: which pages ranked for a query in this sample.",
+    "keywords": "Keyword volume or intent lists; these carry no observed rankings.",
+    "gsc": "Your own search performance: clicks and impressions per query and page.",
+    "backlinks": "Referring hosts and target pages, limited to the sample.",
+    "community": "Articles and topics from feeds; not search rankings.",
+}
 RESEARCH_SECTIONS = {"keywords": "Keywords", "competitors": "Competitor gaps", "serp_overlap": "SERP overlap",
                      "rank_history": "Rank samples", "keyword_clusters": "Keyword clusters",
                      "content_briefs": "Content briefs", "backlinks": "Backlinks",
@@ -887,7 +895,8 @@ def create_app(workspace, port=8765):
     def research_form(*, selected=(), host="", error="", feed_url=""):
         datasets = [item for item in saved_datasets(RESEARCH_DATASETS, RESEARCH_SOURCE_TOOLS) if item["rows"]]
         return render("research_form", datasets=datasets, dataset_labels=RESEARCH_DATASETS,
-                      selected=selected, host=host, error=error, feed_url=feed_url)
+                      selected=selected, host=host, error=error, feed_url=feed_url,
+                      capabilities=RESEARCH_CAPABILITIES)
 
     @app.get("/tools/research")
     def research_options(added: str = "", host: str = "", url: str = ""):

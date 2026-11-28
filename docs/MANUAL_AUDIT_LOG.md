@@ -114,3 +114,8 @@ Use authorized properties and the documented [Google connection and CLI commands
 - [ ] **An older audit still compares.** Include a run from before the current version and confirm its findings are still placed on the right pages.
 - [ ] **Record a decision.** Open an audit, choose a finding, pick an affected page and save a decision with a note. It should appear in **Review queue** with that page, status and note.
 - [ ] **A decision survives a restart, and reopens when the page changes.** Restart the workbench and confirm the decision is still there. Run a new audit where that page's title or status changed, then reopen the queue: the item should read **needs re-review** with the previous note still visible.
+
+## Workbench stage 7 checkpoint — research sources (pending owner check)
+
+- [ ] **The picker explains itself.** Open **Keyword and competitor research**. Each saved dataset should say what it can answer, and the page should explain that two comparable samples support a gap comparison while an absent query is not proof of no ranking.
+- [ ] **A gap uses comparable samples only.** Import two search-result exports from the same provider, locale and device but different dates or sites. The competitor section should report shared and competitor-only queries within those samples, with the capture context visible.

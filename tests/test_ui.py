@@ -643,6 +643,23 @@ def _audit_pages(ws, project, rid, *, started, title):
     return rid
 
 
+def test_ui_research_picker_states_what_each_source_can_answer(tmp_path):
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    rid = uuid4().hex
+    _saved_run(ws, {"run_id": rid, "tool_id": "research.import", "status": "succeeded", "project": None,
+                    "saved_target": None, "started_at": "2026-11-20T00:00:00Z",
+                    "finished_at": "2026-11-20T00:00:05Z",
+                    "parameters": {"kind": "serp", "filename": "rankings.csv", "observed": "2026-11-20"},
+                    "counts": {"rows": 12}, "warnings": [], "artifacts": ["dataset.json"]},
+               {"dataset.json": json.dumps({"schema_version": 1, "source": {"kind": "serp"},
+                                            "rows": [{"query": "x"}]})})
+    with TestClient(create_app(ws, 8972), base_url="http://127.0.0.1:8972") as client:
+        page = client.get("/tools/research").text
+        assert "Keyword overlap and competitor gaps" in page
+        assert "not proof that a site never ranks" in page
+        assert "Search results (SERP)" in page and "12 rows" in page
+
+
 def test_ui_review_queue_keeps_a_decision_and_reopens_it_when_the_page_changes(tmp_path):
     origin = "http://127.0.0.1:8972"
     ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")

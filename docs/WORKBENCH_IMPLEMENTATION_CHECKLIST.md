@@ -1,6 +1,6 @@
 # Workbench implementation checklist
 
-**Status on 2026-11-28:** stages 1–6 are implemented with automated coverage; live Google checks remain pending owner credentials. Stage 7 remains. Stage 7 expands its research follow-up. The first release target is stages 1–4: launch, crawl, investigate, share. The second is stages 5–7: explain performance, track decisions, explore opportunities.
+**Status on 2026-11-28:** stages 1–6 are implemented with automated coverage; live Google checks remain pending owner credentials. Stage 7 has 7.1 done; 7.2–7.5 remain (a dedicated keyword-gap view and question relationships). Stage 7 expands its research follow-up. The first release target is stages 1–4: launch, crawl, investigate, share. The second is stages 5–7: explain performance, track decisions, explore opportunities.
 
 ## How to pick up the work
 
@@ -82,7 +82,7 @@ Depends on stages 2–3; traffic context uses stage 5 when available. Reuse `/co
 
 Depends on stage 2 and existing research datasets. Can follow stage 5 offline work without waiting for live credentials. Entry points: `research/imports.py`, `research/intelligence.py`, `research/content_plan.py`, `ui/research.html` and the source-row route.
 
-- [ ] **7.1 Add a source picker.** Show dataset type, domain, date, locale, device and row count. Explain whether it supports keyword overlap, article discovery or question relationships. Offer an example import for each new format. A feed remains a source of articles.
+- [x] **7.1 Add a source picker.** Show dataset type, domain, date, locale, device and row count. Explain whether it supports keyword overlap, article discovery or question relationships. Offer an example import for each new format. A feed remains a source of articles.
 - [ ] **7.2 Build keyword gap.** Select owned and competitor samples; check locale, date, device and source compatibility. Group comparable normalized queries while retaining original strings and provenance. Offer Shared, Owned sample only and Competitor sample only. Include scope in labels and exports. Pick a query to inspect contributing source rows or add it to a brief.
 - [ ] **7.3 Import question relationships.** Require seed, parent and child; preserve source row, locale, country and observation date. Validate rows individually with a preview and explicit skipped-row count. Preserve original Persian spelling for display. Deduplicate identical edges within a source, retain provenance across samples and preserve multiple parents. Flat keyword imports open as lists.
 - [ ] **7.4 Build Explore questions.** Choose seed and dataset, expand one branch at a time, provide an accessible outline and RTL display, and detect cycles on the current traversal path. Limit expansion per page with a visible “show more” action. Selecting a question opens the source. Export selected edges or add selected questions to an existing editorial brief. Leave a live question provider for a later integration.
