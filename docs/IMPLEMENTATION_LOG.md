@@ -140,4 +140,9 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 
 - Workbench Stage 5, Step 5 — Verified with fixtures and a deterministic credential vault: consent start, property choice, the completed connection, the expired-credential fetch path, project-scoped disconnect, and two projects holding different properties. Live consent and data retrieval stay in the manual audit log until an owner runs them with real credentials. The suite passed 182 tests with Hazm and Chromium skipped.
 
+## Workbench stage 6 — comparing audits and following up
+
+- Workbench Stage 6, Step 1 — Made the comparison entry project-aware on 2026-11-28. It lists only runs for the selected project, preselects the two most recent, and every option states the run's date, observed count and page cap so the operator can judge comparability before generating anything.
+- Workbench Stage 6, Step 2 — Classified changes from evidence rather than from URLs alone. Findings now read **new**, **persistent** or **resolved**, and a page that fell outside a capped sample reads **unassessed: outside the sample** instead of disappearing or looking fixed. Findings from runs that predate the `urls` field resolve their pages through page evidence, so an older audit still compares. Evidence links on each row point at the correct run's observation.
+
 [Current scope and remaining work](ROADMAP.md)

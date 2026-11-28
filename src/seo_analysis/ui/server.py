@@ -483,8 +483,18 @@ def create_app(workspace, port=8765):
         return await delete_saved(request, "single", run_id=rid)
 
     @app.get("/compare")
-    def comparison_form():
-        return render("compare", snapshots=history.runs_with_artifact("snapshot.jsonl"))
+    def comparison_form(project: str = "", before: str = "", after: str = ""):
+        projects = history.projects()
+        selected = next((item for item in projects if item["name"] == project), None)
+        if selected is None and projects:
+            selected = projects[0]
+        snapshots = history.runs_with_artifact("snapshot.jsonl")
+        if selected:
+            snapshots = [run for run in snapshots if run.get("project") == selected["name"]]
+        if not before and not after and len(snapshots) >= 2:
+            before, after = snapshots[1]["run_id"], snapshots[0]["run_id"]
+        return render("compare", snapshots=snapshots, before=before, after=after,
+                      selected=selected, projects=projects)
 
     @app.post("/compare")
     async def run_comparison(request: Request):

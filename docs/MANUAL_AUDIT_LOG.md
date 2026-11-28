@@ -105,3 +105,10 @@ Use authorized properties and the documented [Google connection and CLI commands
 - [ ] **Fetch a small date range.** Pull one week with query and page dimensions. The run should appear in History and as a saved measurement with its period and row count, and its Excel-style dataset should be selectable from an audit's **Create Excel report**.
 - [ ] **A failure is not empty data.** Disconnect, then try to fetch again. The screen should report the credential problem explicitly rather than showing zero rows.
 - [ ] **Disconnect scope.** Disconnect Search Console on one project and confirm another project's connection is untouched.
+
+## Workbench stage 6 checkpoint — comparing audits (pending owner check)
+
+- [ ] **Comparable runs are chosen for you.** Open **Compare saved audits** from a project with two audits. The two most recent should be preselected, and each option should state its date, observed URL count and page cap.
+- [ ] **A fix reads as resolved.** Compare a pair where you know a finding was fixed, one that stayed the same, and one that appeared. They should read **resolved**, **persistent** and **new**, and the evidence link on each should open the observation from the correct run.
+- [ ] **A capped run does not fake a fix.** Compare a full run against a run with a lower page cap. Pages that fell outside the later sample should read **unassessed**, never resolved.
+- [ ] **An older audit still compares.** Include a run from before the current version and confirm its findings are still placed on the right pages.

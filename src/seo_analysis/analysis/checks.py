@@ -118,25 +118,55 @@ def check_snapshot(ctx, request):
                 warnings=[f"{k}: {v}" for k, v in missing.items()] + ([f"Source: {source['status']}"] if source["status"] != "succeeded" else []))
 
 
+def _finding_urls(directory, row):
+    """URLs for one finding, falling back to the snapshot for runs that predate the urls field."""
+    urls = row.get("urls") or []
+    if urls:
+        return urls
+    identifiers = row.get("evidence_ids") or []
+    path = Path(directory) / "snapshot.jsonl"
+    if not identifiers or not path.is_file():
+        return []
+    by_id = {item.get("evidence_id"): item.get("url") for item in load_snapshot(path)}
+    return [by_id[identifier] for identifier in identifiers if by_id.get(identifier)]
+
+
 def compare_findings(directories):
+    """Classify findings as new, persistent or resolved using URL identity plus detail."""
     reports = []
     for directory in directories:
         path = Path(directory) / "findings.json"
         if path.is_symlink() or not path.is_file():
             return None
-        findings = json.loads(path.read_text(encoding="utf-8"))["findings"]
-        reports.append({(row["rule"], tuple(sorted(url_key(url) for url in row["urls"])), row["detail"]): row
-                        for row in findings if row.get("urls")})
+        rows = {}
+        for row in json.loads(path.read_text(encoding="utf-8"))["findings"]:
+            urls = _finding_urls(directory, row)
+            if not urls:
+                continue
+            key = (row["rule"], tuple(sorted(url_key(url) for url in urls)), row["detail"])
+            rows[key] = row | {"urls": urls}
+        reports.append(rows)
     before, after = reports
-    return [{"state": "reported only before" if key in before else "reported only after",
-             "finding": before[key] if key in before else after[key]}
-            for key in sorted(before.keys() ^ after.keys())]
+    changes = []
+    for key in sorted(before.keys() | after.keys()):
+        if key in before and key in after:
+            state = "persistent"
+        elif key in before:
+            state = "resolved"
+        else:
+            state = "new"
+        changes.append({"state": state, "finding": before[key] if key in before else after[key]})
+    return changes
 
 
 def compare_snapshots(ctx, request):
     sources = [source_info(d) for d in (request.before, request.after)]
     if not sources[0]["origin"] or sources[0]["origin"] != sources[1]["origin"]:
         raise ValueError("Comparison requires two crawl manifests for the same origin.")
+    cap_before = bool(isinstance((sources[0].get("coverage") or {}).get("skipped"), dict)
+                      and (sources[0].get("coverage") or {}).get("skipped", {}).get("page_limit"))
+    cap_after = bool(isinstance((sources[1].get("coverage") or {}).get("skipped"), dict)
+                     and (sources[1].get("coverage") or {}).get("skipped", {}).get("page_limit"))
     indexes = [{url_key(p["url"]): p for p in load_snapshot(Path(d) / "snapshot.jsonl")}
                for d in (request.before, request.after)]
     rows = []
@@ -145,7 +175,13 @@ def compare_snapshots(ctx, request):
     for key in sorted(indexes[0].keys() | indexes[1].keys()):
         a, b = (index.get(key) for index in indexes)
         if a is None or b is None:
-            state = "only observed after" if a is None else "only observed before"
+            only_before = a is not None
+            # A page outside a capped sample is unassessed in that run, not missing from the site.
+            if (only_before and cap_after) or (not only_before and cap_before):
+                state = ("unassessed: outside the later sample" if only_before
+                         else "unassessed: outside the earlier sample")
+            else:
+                state = "only observed after" if a is None else "only observed before"
             changes = {}
         else:
             changes = {f: [a[f], b[f]] for f in fields if f in a and f in b and a[f] != b[f]}

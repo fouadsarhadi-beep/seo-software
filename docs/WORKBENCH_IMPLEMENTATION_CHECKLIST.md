@@ -1,6 +1,6 @@
 # Workbench implementation checklist
 
-**Status on 2026-11-28:** stages 1–5 are implemented with automated coverage; live Google checks remain pending owner credentials. Continue at **6.1**. Stage 7 expands its research follow-up. The first release target is stages 1–4: launch, crawl, investigate, share. The second is stages 5–7: explain performance, track decisions, explore opportunities.
+**Status on 2026-11-28:** stages 1–5 are implemented with automated coverage; live Google checks remain pending owner credentials. Stage 6 has 6.1 and 6.2 done; the review queue (6.3) and 6.4 remain. Stage 7 expands its research follow-up. The first release target is stages 1–4: launch, crawl, investigate, share. The second is stages 5–7: explain performance, track decisions, explore opportunities.
 
 ## How to pick up the work
 
@@ -73,8 +73,8 @@ Depends on the project navigation and existing workbook flow. Start with `cli_in
 
 Depends on stages 2–3; traffic context uses stage 5 when available. Reuse `/compare`, `ui/comparison.html`, `analysis/checks.py`, `analysis/review.py` and existing pair decisions.
 
-- [ ] **6.1 Choose comparable runs.** Start from a project/target, preselect the latest two compatible audits and let the user change either. Display dates, limits, observed counts and which checks ran before generating a comparison.
-- [ ] **6.2 Define changes using evidence.** Both crawls assessed a page/rule: show new, persistent or resolved as appropriate. Missing observation or unavailable check: show unassessed and the reason. A changed URL or redirect destination retains the recorded identities. Link each side to evidence from the correct date.
+- [x] **6.1 Choose comparable runs.** Start from a project/target, preselect the latest two compatible audits and let the user change either. Display dates, limits, observed counts and which checks ran before generating a comparison.
+- [x] **6.2 Define changes using evidence.** Both crawls assessed a page/rule: show new, persistent or resolved as appropriate. Missing observation or unavailable check: show unassessed and the reason. A changed URL or redirect destination retains the recorded identities. Link each side to evidence from the correct date.
 - [ ] **6.3 Add a review queue.** Start from an issue or page; save status, note, project, rule, affected page identities and evidence reference. Reuse pair review for pairs. For other findings define a stable identity and evidence fingerprint. Repeated saves update the same decision; changed evidence reopens review while retaining the prior note. Scope queue records to their project and integrate with cleanup.
 - [ ] **6.4 Verify together.** Compare different caps, an observed fix, an unchanged issue and a changed pair. After restart verify the queue and note. With traffic data show its source/date beside priority; without data use observable severity and affected pages. Owner: follow one fix through two saved runs.
 

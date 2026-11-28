@@ -1,24 +1,24 @@
 {% if view == 'compare' %}
 <h1>Compare saved audits</h1>
-<p><a href="/history">Back to history</a></p>
+<p><a href="/history">Back to history</a>{% if selected %} · project {{ selected.name }}{% endif %}</p>
 {% if snapshots|length > 1 %}
 <section>
 <form method="post" action="/compare">
 {{csrf()}}
-<p>Choose two runs from the same site. Their saved data is used for the comparison.</p>
+<p>Choose two runs of the same site. The comparison reads their saved data; a page outside a capped sample is reported as unassessed rather than fixed or missing.</p>
 {% for side in ('before', 'after') %}
 <label for="{{side}}">{{side|capitalize}} run</label>
 <select id="{{side}}" name="{{side}}" required style="max-width:100%">
 <option value="">Select a run</option>
 {% for run in snapshots %}
-<option value="{{run.run_id}}">{{run.started_at[:19]|replace('T',' ')}} UTC · {{run.parameters.source or run.parameters.sitemap or run.tool_id}} · {{run.status}}{% if run.archived %} · archived{% endif %}</option>
+<option value="{{run.run_id}}"{% if (side == 'before' and run.run_id == before) or (side == 'after' and run.run_id == after) %} selected{% endif %}>{{run.started_at[:19]|replace('T',' ')}} UTC · {{run.parameters.source or run.parameters.sitemap or run.tool_id}} · {{run.status}}{% if run.counts is defined and run.counts.observed is defined %} · {{run.counts.observed}} observed{% endif %}{% if run.parameters.limit %} · {{run.parameters.limit}}-page cap{% endif %}{% if run.archived %} · archived{% endif %}</option>
 {% endfor %}
 </select>
 {% endfor %}
 <p><button>Compare runs</button></p>
 </form>
 </section>
-{% else %}<p>Save at least two audits or crawls before comparing them.</p>{% endif %}
+{% else %}<p>Save at least two audits or crawls for this project before comparing them.{% if not selected %} <a href="/audit/new">Start an audit</a>.{% endif %}</p>{% endif %}
 {% else %}
 <h1>Audit comparison</h1>
 <p><a href="/compare">Compare other runs</a></p>
@@ -50,17 +50,19 @@
 {% if 'finding_changes.csv' in run.artifacts %}<a href="/runs/{{rid}}/files/finding_changes.csv">Finding changes CSV</a>{% endif %}
 </div>
 <h2>{{'Finding changes' if findings else 'Page observations'}}</h2>
-{% if findings and not unavailable %}<p>Items are shown as reported in each audit. Coverage and available evidence affect which findings appear.</p>{% endif %}
+{% if findings and not unavailable %}<p>New means the finding appears only in the later run, persistent means both runs report it, resolved means the later run no longer does. Coverage and available evidence still govern what each run could report.</p>
+{% if rows %}<p>{% for state in ('new', 'persistent', 'resolved') %}{% set count = rows|selectattr('state', 'equalto', state)|list|length %}{% if count %}<span class="badge">{{count}} {{state}}</span> {% endif %}{% endfor %}</p>{% endif %}
+{% endif %}
 {% if unavailable %}<p>Finding changes require findings reports from both runs.</p>
 {% elif rows %}
 <div class="table"><table>
 {% if findings %}
-<tr><th>Reported</th><th>Finding</th><th>Page evidence</th></tr>
+{% set sides = {'new': [1], 'resolved': [0], 'persistent': [0, 1]} %}
+<tr><th>Change</th><th>Finding</th><th>Page evidence</th></tr>
 {% for row in rows %}
 {% set item = row.finding %}
-{% set source = sources[0 if row.state == 'reported only before' else 1] %}
 <tr><td>{{row.state|capitalize}}</td><td><strong>{{finding_labels.get(item.rule, item.rule)}}</strong><br>{{item.detail}}</td>
-<td>{% for url in item.urls %}{% if source and item.evidence_ids[loop.index0] is defined %}<a href="/runs/{{source.manifest.run_id}}/evidence/{{item.evidence_ids[loop.index0]}}">{{url}}</a>{% else %}{{url}}{% endif %}<br>{% endfor %}</td></tr>
+<td>{% for url in item.urls %}{% set idx = loop.index0 %}{% for position in sides.get(row.state, [0]) %}{% if sources[position] and item.evidence_ids[idx] is defined %}<a href="/runs/{{sources[position].manifest.run_id}}/evidence/{{item.evidence_ids[idx]}}">{{'Before' if position == 0 else 'After'}}</a> {% endif %}{% endfor %}{{url}}<br>{% endfor %}</td></tr>
 {% endfor %}
 {% else %}
 <tr><th>URL</th><th>Observation</th><th>Changes</th><th>Evidence</th></tr>
