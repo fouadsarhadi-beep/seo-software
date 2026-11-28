@@ -544,9 +544,16 @@ def create_app(workspace, port=8765):
         return render("history", runs=records[:30], page=page, more=len(records) > 30, archived=archived)
 
     @app.get("/history/data")
-    def saved_data(updated: bool = False):
+    def saved_data(updated: bool = False, reindexed: int | None = None):
         return render("saved_data", pending=pending_removals(history), updated=updated, scopes=DELETE_SCOPES,
-                      path=workspace.data_dir)
+                      path=workspace.data_dir, reindexed=reindexed)
+
+    @app.post("/history/data/reindex")
+    async def recover_runs(request: Request):
+        """Recover runs a stopped process left behind, without rebuilding the whole workspace."""
+        await form(request)
+        counts = history.reindex()
+        return RedirectResponse("/history/data?" + urlencode({"reindexed": counts.get("recovered", 0)}), 303)
 
     @app.get("/history/data/{scope}")
     def confirm_clear(scope: str):
@@ -1212,16 +1219,28 @@ def create_app(workspace, port=8765):
                 "page_limited": page_limited, "completion": completion}
 
     def audit_result(rid, data, *, tab, page, q, url_q, category, status, redirect, indexability, rule, sort,
-                     project=""):
+                     project="", evidence_page=1):
         context = audit_context(rid, data)
         audit, rules = context["audit"], context["rules"]
         run = data["manifest"]
+        # Old bookmarks: q searched findings, url_q searched pages, and the evidence list was the page list.
+        first_page = page if page > 1 else evidence_page
         chosen = tab if tab in ("overview", "findings", "pages", "exports") else ""
         if not chosen:
-            legacy = any((q, url_q, status, redirect, indexability, rule))
-            chosen = "findings" if category else "pages" if legacy else "overview"
-        page_query = query_pages(audit.pages, url=url_q or q, status=status, redirect=redirect,
-                                 indexability=indexability, rule=rule, sort=sort, page=page)
+            if category or q:
+                chosen = "findings"
+            elif any((url_q, status, redirect, indexability, rule)) or first_page > 1:
+                chosen = "pages"
+            else:
+                chosen = "overview"
+        if q:
+            term = unquote(q).strip().casefold()
+            rules = [row for row in rules
+                     if term in row["rule"].casefold()
+                     or term in FINDING_LABELS.get(row["rule"], "").casefold()
+                     or term in str(row["detail"]).casefold()]
+        page_query = query_pages(audit.pages, url=url_q, status=status, redirect=redirect,
+                                 indexability=indexability, rule=rule, sort=sort, page=first_page)
         page_query.filters = {**page_query.filters, "tab": "pages"}
         categories = sorted({row["category"] for row in rules if row["category"]})
         selection = next((row for row in rules if row["rule"] == rule), None)
@@ -1266,7 +1285,7 @@ def create_app(workspace, port=8765):
         if run["tool_id"] in (tools.AUDIT.id, tools.CRAWL.id):
             return audit_result(rid, data, tab=tab, page=page, q=q, url_q=url_q, category=category,
                                 status=status, redirect=redirect, indexability=indexability, rule=rule, sort=sort,
-                                project=project or (run.get("project") or ""))
+                                project=project or (run.get("project") or ""), evidence_page=evidence_page)
         if run["tool_id"] == tools.COMPARE.id:
             return comparison_result(data, page, category)
         if run["tool_id"] == tools.RESEARCH.id:

@@ -214,4 +214,12 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 - Batch 5 — The acceptance case is proven at tool level: a desktop-only owned result and a mobile-only competitor result produce two captures and no shared query at all.
 - Batch 5 — A brief source whose run has since been deleted is shown as **unavailable** with its short run id, and the note stays readable.
 
+## DS delivery plan — batch 6: launch, navigation and recovery
+
+- Batch 6 — Old bookmark semantics are restored on an audit run: `?page=2` and `?evidence_page=2` both open the page table at page two, `?q=` filters findings again (rule id, label or detail) instead of being read as a URL search, and `?url_q=` still filters pages. `?category=` continues to open findings.
+- Batch 6 — A known indexing exclusion is now distinct from an unknown verdict. `not_indexable_status` is filtered as **Excluded by HTTP status** in the page table, the overview links and the filtered spreadsheet, while **Unknown** means the directive genuinely could not be read.
+- Batch 6 — Interrupted runs are recoverable from a discoverable action: **Manage saved data → Recover interrupted runs** reuses the existing reindex, reports how many runs it recovered, and leaves completed runs and active writers alone. Startup still runs only a writable check, not a workspace rebuild.
+- Batch 6 — The everyday `seo.bat` and `SEO-Workbench.bat` now pass `--config-file` for the project-local `.seo-workbench` workspace when it exists, so the CLI, the browser launcher and `Start SEO Workbench.cmd` share one history instead of the launcher writing to a different workspace.
+- Batch 6 — Verified by test: page-two and evidence-page bookmarks, a findings search, the exclusion filter and the filtered CSV. The actual Windows launch from a path with spaces and Persian text stays owner-pending until observed.
+
 [Current scope and remaining work](ROADMAP.md)

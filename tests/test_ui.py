@@ -875,6 +875,61 @@ def _target_audit(ws, project, target, rid, started, title):
                 "findings.json": json.dumps({"schema_version": 1, "findings": findings})})
 
 
+def test_ui_old_bookmarks_and_indexability_filters(tmp_path):
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    pages = []
+    for index in range(1, 36):
+        page = {"evidence_id": f"page-{index:06d}", "url": f"https://example.org/page-{index:02d}",
+                "final_url": f"https://example.org/page-{index:02d}", "first_status": 200, "final_status": 200,
+                "chain": [], "effective_indexability": "indexable", "indexability_reason": "",
+                "title": f"Page {index}", "words": 5, "depth": 0, "content_hash": f"h{index}",
+                "observed_at": "2026-11-22T00:00:00+00:00"}
+        if index == 30:
+            page.update(effective_indexability="not_indexable_status", final_status=404,
+                        indexability_reason="HTTP status 404")
+        if index == 31:
+            page.update(effective_indexability="unknown", indexability_reason="page was not fetched")
+        pages.append(page)
+    rid = uuid4().hex
+    findings = [{"category": "review", "rule": "seo.missing-title", "detail": "https://example.org/page-30",
+                 "evidence_ids": ["page-000030"], "urls": ["https://example.org/page-30"]}]
+    _saved_run(ws, {"run_id": rid, "tool_id": "seo.audit", "status": "succeeded", "project": None,
+                    "saved_target": None, "started_at": "2026-11-22T00:00:00Z",
+                    "finished_at": "2026-11-22T00:00:30Z", "parameters": {"source": "https://example.org/"},
+                    "counts": {"observed": 35, "findings": 1}, "warnings": [],
+                    "artifacts": ["findings.json", "snapshot.jsonl"]},
+               {"snapshot.jsonl": "\n".join(json.dumps(page) for page in pages) + "\n",
+                "findings.json": json.dumps({"schema_version": 1, "findings": findings})})
+    with TestClient(create_app(ws, 8972), base_url="http://127.0.0.1:8972") as client:
+        base = f"/runs/{rid}"
+        # An old page-two bookmark opens the page table at page two.
+        assert "31–35 of 35" in client.get(base, params={"page": 2}).text
+        # The old evidence-page bookmark pointed at the same list.
+        assert "31–35 of 35" in client.get(base, params={"evidence_page": 2}).text
+        # An old findings search still filters findings.
+        found = client.get(base, params={"q": "missing"}).text
+        assert "Findings" in found and "Missing title" in found
+        # A known HTTP-status exclusion is distinct from an unknown verdict.
+        excluded = client.get(base, params={"tab": "pages", "indexability": "excluded"}).text
+        assert "/page-30" in excluded and "/page-01" not in excluded
+        unknown = client.get(base, params={"tab": "pages", "indexability": "unknown"}).text
+        assert "/page-31" in unknown and "/page-30" not in unknown
+        # The filtered spreadsheet carries the same distinction.
+        csv_text = client.get(base + "/pages.csv", params={"indexability": "excluded"}).text
+        assert "page-30" in csv_text and "page-01" not in csv_text
+
+
+def test_ui_recent_changes_are_recoverable_from_saved_data(tmp_path):
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    origin = "http://127.0.0.1:8972"
+    with TestClient(create_app(ws, 8972), base_url=origin) as client:
+        page = client.get("/history/data")
+        token = BeautifulSoup(page.text, "html.parser").select_one("input[name=token]")["value"]
+        assert 'action="/history/data/reindex"' in page.text
+        reply = client.post("/history/data/reindex", headers={"Origin": origin}, data={"token": token})
+        assert reply.status_code == 200 and "Recovered" in reply.text
+
+
 def test_ui_persian_question_fixture_imports_and_expands(tmp_path):
     origin = "http://127.0.0.1:8972"
     ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")

@@ -477,6 +477,8 @@ p{overflow-wrap:anywhere}
 <p role="status">Database entries have been deleted. {{pending}} saved {{'item still needs' if pending == 1 else 'items still need'}} cleanup. Close any programs using the files and retry.</p>
 <form method="post" action="/history/data/retry">{{csrf()}}<button>Retry file cleanup</button></form>
 {% elif updated %}<p role="status">Saved data deleted.</p>{% endif %}
+{% if reindexed is not none %}<p role="status">Recovered {{ reindexed }} interrupted {{ 'run' if reindexed == 1 else 'runs' }} from their saved evidence.</p>{% endif %}
+<form method="post" action="/history/data/reindex">{{csrf()}}<button class="secondary">Recover interrupted runs</button></form>
 <ul>{% for scope, option in scopes.items() %}<li><a href="/history/data/{{scope}}">{{option[0]}}</a></li>{% endfor %}</ul>
 </section>
 {% elif view=="confirm_delete" %}

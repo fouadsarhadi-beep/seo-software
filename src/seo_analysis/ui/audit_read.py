@@ -230,7 +230,11 @@ def query_pages(pages, *, url="", status="", redirect="", indexability="", rule=
         if redirect == "none" and item.redirect_count > 0:
             continue
         if indexability == "unknown":
-            if item.indexability in ("indexable", "noindex"):
+            if item.indexability != "unknown":
+                continue
+        elif indexability == "excluded":
+            # A known exclusion: the HTTP status itself keeps the page out of the index.
+            if item.indexability != "not_indexable_status":
                 continue
         elif indexability and item.indexability != indexability:
             continue

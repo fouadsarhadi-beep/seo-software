@@ -34,6 +34,7 @@
 <a href="?tab=pages&status=5xx">Server errors</a>
 <a href="?tab=pages&redirect=any">Redirecting</a>
 <a href="?tab=pages&indexability=noindex">Noindex</a>
+<a href="?tab=pages&indexability=excluded">Excluded by HTTP status</a>
 <a href="?tab=pages&indexability=unknown">Unknown indexability</a>
 </div>
 </div>
@@ -100,7 +101,7 @@
 <label>URL <input type="search" name="url_q" value="{{ page_query.filters.url_q }}" placeholder="path or text"></label>
 <label>Status <select name="status">{% for value, label in [('', 'Any'), ('2xx','2xx'), ('3xx','3xx'), ('4xx','4xx'), ('5xx','5xx'), ('error','Any error')] %}<option value="{{value}}"{% if page_query.filters.status == value %} selected{% endif %}>{{label}}</option>{% endfor %}</select></label>
 <label>Redirects <select name="redirect">{% for value, label in [('', 'Any'), ('any','Redirected'), ('none','No redirect')] %}<option value="{{value}}"{% if page_query.filters.redirect == value %} selected{% endif %}>{{label}}</option>{% endfor %}</select></label>
-<label>Indexability <select name="indexability">{% for value, label in [('', 'Any'), ('indexable','Indexable'), ('noindex','Noindex'), ('unknown','Unknown')] %}<option value="{{value}}"{% if page_query.filters.indexability == value %} selected{% endif %}>{{label}}</option>{% endfor %}</select></label>
+<label>Indexability <select name="indexability">{% for value, label in [('', 'Any'), ('indexable','Indexable'), ('noindex','Noindex'), ('excluded','Excluded by HTTP status'), ('unknown','Unknown')] %}<option value="{{value}}"{% if page_query.filters.indexability == value %} selected{% endif %}>{{label}}</option>{% endfor %}</select></label>
 <label>Finding <select name="rule"><option value="">Any</option>{% for row in all_rules %}<option value="{{row.rule}}"{% if page_query.filters.rule == row.rule %} selected{% endif %}>{{ finding_labels.get(row.rule, row.rule) }}</option>{% endfor %}</select></label>
 <label>Sort <select name="sort">{% for value, label in [('url','URL'), ('status','Status'), ('findings','Most findings')] %}<option value="{{value}}"{% if page_query.filters.sort == value %} selected{% endif %}>{{label}}</option>{% endfor %}</select></label>
 <button class="ghost">Apply filters</button>

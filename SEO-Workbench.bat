@@ -10,6 +10,10 @@ if "%PORT%"=="" set "PORT=8765"
 call "%~dp0scripts\_find-python.bat"
 if not defined SEO_PY goto :nopython
 
+rem Share the project-local workspace the .cmd launcher creates, when it exists.
+set "SEO_CONFIG="
+if exist "%~dp0.seo-workbench\config.toml" set SEO_CONFIG=--config-file "%~dp0.seo-workbench\config.toml"
+
 set "URL=http://127.0.0.1:%PORT%/"
 echo ============================================================
 echo   SEO Analysis Workbench
@@ -24,7 +28,7 @@ echo.
 
 start "SEO Analysis browser" /min cmd /c "timeout /t 2 /nobreak >nul & start %URL%"
 
-%SEO_PY% -m seo_analysis serve --port %PORT%
+%SEO_PY% %SEO_CONFIG% -m seo_analysis serve --port %PORT%
 set "CODE=%ERRORLEVEL%"
 
 echo.

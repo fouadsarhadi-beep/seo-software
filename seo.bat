@@ -7,12 +7,16 @@ title SEO Analysis CLI
 call "%~dp0scripts\_find-python.bat"
 if not defined SEO_PY goto :nopython
 
+rem Share the project-local workspace the .cmd launcher creates, when it exists.
+set "SEO_CONFIG="
+if exist "%~dp0.seo-workbench\config.toml" set SEO_CONFIG=--config-file "%~dp0.seo-workbench\config.toml"
+
 if "%~1"=="" goto :help
 if /i "%~1"=="help" goto :help
 if /i "%~1"=="--help" goto :help
 if /i "%~1"=="-h" goto :help
 
-%SEO_PY% -m seo_analysis %*
+%SEO_PY% %SEO_CONFIG% -m seo_analysis %*
 exit /b %ERRORLEVEL%
 
 :help
