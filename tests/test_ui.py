@@ -37,19 +37,20 @@ def test_ui_end_to_end(site, tmp_path):
             time.sleep(.05)
         dom = BeautifulSoup(reply.text, "html.parser")
         assert dom.h1.text == "Run results"
-        assert dom.find("h2", string="Crawled pages") is not None
-        evidence = dom.select_one('a[href*="/evidence/"]')
-        assert evidence.text == site.base + "/"
+        assert dom.select_one('nav.tabs a[aria-current="page"]').get_text(strip=True) == "Overview"
+        assert "at least two eligible pages" in reply.text
+        run_path = reply.url.path
+        pages_tab = BeautifulSoup(client.get(run_path, params={"tab": "pages"}).text, "html.parser")
+        evidence = pages_tab.select_one('a[href*="/evidence/"]')
+        assert evidence.text == "/"
         page = client.get(evidence["href"])
         assert page.status_code == 200 and "متن فارسی مقاله" in page.text
         assert "3 words" in page.text
-        assert "at least two eligible pages" in reply.text
-        assert client.get(dom.select_one('a[href$="inventory.csv"]')["href"]).status_code == 200
-        technical = dom.find("summary", string="Technical files").parent
+        exports = BeautifulSoup(client.get(run_path, params={"tab": "exports"}).text, "html.parser")
+        assert client.get(exports.select_one('a[href$="inventory.csv"]')["href"]).status_code == 200
+        technical = exports.find("summary", string="Technical files").parent
         assert not technical.has_attr("open")
         assert technical.select_one('a[href$="snapshot.jsonl"]')
-
-        run_path = reply.url.path
         history = BeautifulSoup(client.get("/history").text, "html.parser")
         archive = history.select_one(f'form[action="{run_path}/archive"]')
         request = {"token": archive.select_one('input[name="token"]')["value"], "action": "archive"}
@@ -62,7 +63,8 @@ def test_ui_end_to_end(site, tmp_path):
         archived = client.get("/history?archived=true")
         assert run_path in archived.text and "Restore" in archived.text
         assert client.get(run_path).status_code == 200
-        assert client.get(dom.select_one('a[href$="inventory.csv"]')["href"]).status_code == 200
+        archived_exports = BeautifulSoup(client.get(run_path, params={"tab": "exports"}).text, "html.parser")
+        assert client.get(archived_exports.select_one('a[href$="inventory.csv"]')["href"]).status_code == 200
         assert client.post(archive["action"], headers=headers, data=request | {"action": "restore"}).status_code == 200
         assert run_path in client.get("/history").text
         assert run_path not in client.get("/history?archived=true").text
@@ -130,8 +132,8 @@ def test_ui_cancel_interrupts_retry_and_preserves_observations(site, tmp_path):
         assert manifest["status"] == "cancelled"
         assert manifest["counts"]["observed"] == 1
         assert site.hits["/busy"] == 1
-        results_page = client.get(result.headers["location"])
-        evidence_link = BeautifulSoup(results_page.text, "html.parser").find("a", string=f"{site.base}/ok")
+        results_page = client.get(result.headers["location"], params={"tab": "pages"})
+        evidence_link = BeautifulSoup(results_page.text, "html.parser").find("a", string="/ok")
         assert client.get(evidence_link["href"]).status_code == 200
 
 
@@ -170,78 +172,88 @@ def test_ui_clean_five_page_sample_shows_every_evidence_link(site, tmp_path):
             time.sleep(.05)
         assert "/runs/" in str(response.url)
         dom = BeautifulSoup(response.text, "html.parser")
-        assert "partial" in dom.select_one("section strong").text
-        assert dom.find(string="The crawl was capped at 5 pages. Site-wide coverage is unknown.")
+        assert dom.select_one(".badge").get_text(strip=True) == "partial"
+        assert "A capped sample." in dom.get_text(" ", strip=True)
         assert "Reached the configured limit" not in dom.get_text(" ", strip=True)
         assert "0 findings" in dom.get_text(" ", strip=True)
-        heading = dom.find("h2", string="Crawled pages")
-        assert heading is not None
-        links = heading.find_next("ul").find_all("a")
+        pages_tab = BeautifulSoup(client.get(response.url.path, params={"tab": "pages"}).text, "html.parser")
+        links = pages_tab.select('a[href*="/evidence/"]')
         assert len(links) == 5
         for link in links:
             evidence = client.get(link["href"])
             assert evidence.status_code == 200
-            assert link.get_text(strip=True) in evidence.text
+            assert f"{site.base}{link.text}" in evidence.text
 
 
-def test_ui_result_paginates_observations_and_findings_independently(tmp_path):
-    """Both sections stay visible; advancing one does not alter the other."""
+def test_ui_page_table_paginates_filters_and_opens_exact_counts(tmp_path):
+    """The table slices 30 rows, keeps filters in the URL and reproduces each overview count."""
     ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
     rid = uuid4().hex
     folder = ws.runs_dir / rid
-    observations = folder / "observations"
-    observations.mkdir(parents=True)
-    entries = []
+    folder.mkdir(parents=True)
+    pages = []
     for i in range(35):
-        eid = f"page-{i+1:06d}"
         url = f"https://example.com/page-{i+1}"
-        entry = {"evidence_id": eid, "url": url, "observed_at": "2026-11-22T00:00:00Z",
-                 "text": f"Page {i+1} content"}
-        (observations / f"{eid}.json").write_text(json.dumps(entry), encoding="utf-8")
-        entries.append(entry)
-    findings = [
-        {"category": "review", "rule": "seo.missing-meta", "detail": f"Finding {i+1}",
-         "evidence_ids": [entries[i]["evidence_id"]]} for i in range(32)
-    ]
+        page = {"evidence_id": f"page-{i+1:06d}", "url": url, "final_url": url, "first_status": 200,
+                "final_status": 200, "chain": [], "effective_indexability": "indexable",
+                "indexability_reason": "no noindex or none directive for Googlebot",
+                "title": f"Page {i+1}", "words": 5, "depth": 0,
+                "observed_at": "2026-11-22T00:00:00+00:00"}
+        if i >= 33:
+            page.update(final_status=301, final_url=f"https://example.com/moved-{i+1}",
+                        chain=[url, f"https://example.com/moved-{i+1}"])
+        pages.append(page)
+    (folder / "snapshot.jsonl").write_text("\n".join(json.dumps(page) for page in pages) + "\n", encoding="utf-8")
+    observations = folder / "observations"
+    observations.mkdir()
+    for page in pages:
+        (observations / f"{page['evidence_id']}.json").write_text(json.dumps(page), encoding="utf-8")
+    findings = [{"category": "review", "rule": "seo.missing-meta", "detail": f"Finding {i+1}",
+                 "evidence_ids": [pages[i]["evidence_id"]]} for i in range(32)]
     (folder / "findings.json").write_text(json.dumps({"findings": findings}), encoding="utf-8")
     manifest = {
-        "run_id": rid, "tool_id": "seo.audit", "status": "partial", "project": None,
-        "saved_target": None, "started_at": "2026-11-22T00:00:00Z",
-        "finished_at": "2026-11-22T00:00:01Z",
+        "run_id": rid, "tool_id": "seo.audit", "status": "succeeded", "project": None,
+        "saved_target": None, "started_at": "2026-11-22T00:00:00Z", "finished_at": "2026-11-22T00:00:01Z",
         "parameters": {"source": "https://example.com/", "limit": 35},
-        "counts": {"observed": 35, "findings": 32}, "warnings": [],
-        "artifacts": ["findings.json"],
+        "counts": {"observed": 35, "findings": 32, "redirecting": 2, "errors": 0},
+        "warnings": [], "artifacts": ["findings.json", "snapshot.jsonl"],
     }
     (folder / "run.json").write_text(json.dumps(manifest), encoding="utf-8")
     History(ws).index(folder)
+
+    def rows(text):
+        return [row for row in BeautifulSoup(text, "html.parser").select("table tr") if row.find("td")]
+
     with TestClient(create_app(ws, 8972), base_url="http://127.0.0.1:8972") as client:
         base = f"/runs/{rid}"
-        dom = BeautifulSoup(client.get(base, params={"q": "missing meta", "category": "review", "url_q": "page-"}).text,
-                            "html.parser")
-        pages = dom.find("h2", string="Crawled pages")
-        findings_header = dom.find("h2", string="Findings")
-        assert len(pages.find_next("ul").find_all("a")) == 30
-        assert len(findings_header.find_next("table").find_all("tr")) == 31
-        next_pages = dom.find("a", string="Next pages")["href"]
-        next_findings = dom.find("a", string="Next findings")["href"]
-
-        page_two = BeautifulSoup(client.get(base + next_pages).text, "html.parser")
-        assert len(page_two.find("h2", string="Crawled pages").find_next("ul").find_all("a")) == 5
-        assert len(page_two.find("h2", string="Findings").find_next("table").find_all("tr")) == 31
-        assert page_two.find("a", string="Previous pages") is not None
-        assert page_two.find("a", string="Next findings") is not None
-
-        findings_two = BeautifulSoup(client.get(base + next_findings).text, "html.parser")
-        assert len(findings_two.find("h2", string="Crawled pages").find_next("ul").find_all("a")) == 30
-        assert len(findings_two.find("h2", string="Findings").find_next("table").find_all("tr")) == 3
-        assert findings_two.find("a", string="Previous findings") is not None
-        assert findings_two.find("a", string="Next pages") is not None
-
-        response = client.get(base, params={"q": "page-32", "url_q": "page-35", "category": "review"})
-        filtered = BeautifulSoup(response.text, "html.parser")
-        assert [a.text for a in filtered.find("ul").find_all("a")] == [entries[34]["url"]]
-        assert [a.text for a in filtered.find("table").find_all("a")] == [entries[31]["url"]]
-        assert "No findings match." in client.get(base, params={"q": "unmatched"}).text
+        first = client.get(base, params={"tab": "pages"})
+        assert len(rows(first.text)) == 30 and "1–30 of 35" in first.text
+        second = client.get(base, params={"tab": "pages", "page": 2})
+        assert len(rows(second.text)) == 5 and "31–35 of 35" in second.text
+        assert "Previous" in second.text
+        clamped = client.get(base, params={"tab": "pages", "page": 99})
+        assert "31–35 of 35" in clamped.text
+        redirecting = rows(client.get(base, params={"tab": "pages", "redirect": "any"}).text)
+        assert len(redirecting) == 2
+        assert "moved-35" in " ".join(row.get_text(" ", strip=True) for row in redirecting)
+        filtered_rule = client.get(base, params={"tab": "pages", "rule": "seo.missing-meta"})
+        assert "1–30 of 32" in filtered_rule.text
+        single = rows(client.get(base, params={"tab": "pages", "url_q": "page-35"}).text)
+        assert len(single) == 1 and "/page-35" in single[0].get_text(" ", strip=True)
+        evidence_page = client.get(single[0].find("a", href=True)["href"])
+        assert evidence_page.status_code == 200
+        back = BeautifulSoup(evidence_page.text, "html.parser").find("a", string="Back to results")["href"]
+        assert back.startswith(f"/runs/{rid}?") and "url_q=page-35" in back
+        spoofed = client.get(f"/runs/{rid}/evidence/{pages[34]['evidence_id']}", params={"back": "//evil.test"})
+        assert "evil.test" not in spoofed.text
+        empty = client.get(base, params={"tab": "pages", "url_q": "nothing-matches"})
+        assert "No observed pages match these filters." in empty.text
+        legacy = BeautifulSoup(client.get(base, params={"url_q": "page-35"}).text, "html.parser")
+        assert legacy.select_one('input[name="url_q"]')["value"] == "page-35"
+        detail = BeautifulSoup(client.get(base, params={"tab": "findings", "rule": "seo.missing-meta"}).text,
+                               "html.parser")
+        assert detail.find("h3", string="What was observed") and detail.find("h3", string="Why it matters")
+        assert len(detail.select('a[href*="/evidence/"]')) == 32
 
 
 def test_ui_runs_saved_checks_offline_and_matches_cli(site, tmp_path, capsys):
@@ -256,7 +268,7 @@ def test_ui_runs_saved_checks_offline_and_matches_cli(site, tmp_path, capsys):
     assert cli.main(["--config-file", str(ws.config_file), "check", "--run", audit.run_id, "--json"]) == 0
     check = json.loads(capsys.readouterr().out)
     with TestClient(create_app(ws, 8972), base_url=origin) as client:
-        dom = BeautifulSoup(client.get(base).text, "html.parser")
+        dom = BeautifulSoup(client.get(base, params={"tab": "exports"}).text, "html.parser")
         form = dom.select_one(f'form[action="{base}/checks"]')
         token = form.select_one('input[name="token"]')["value"]
         assert client.post(form["action"], data={"token": token}).status_code == 403

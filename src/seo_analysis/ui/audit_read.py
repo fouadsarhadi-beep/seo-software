@@ -5,8 +5,9 @@ from math import ceil
 from pathlib import Path
 from urllib.parse import unquote, urlencode, urlsplit
 
+from seo_analysis.core.urls import url_key
+
 PAGE_SIZE = 30
-INDEXABILITY_VALUES = ("indexable", "noindex", "unknown")
 
 
 @dataclass
@@ -41,7 +42,7 @@ class PageRow:
 
     @property
     def indexability_text(self) -> str:
-        return self.indexability if self.indexability in INDEXABILITY_VALUES else "unknown"
+        return self.indexability or "unknown"
 
 
 @dataclass
@@ -93,6 +94,25 @@ def _number(value):
         return None
 
 
+def _status(value):
+    """A status of 0 means no HTTP response was received, not a real status code."""
+    number = _number(value)
+    return number if number else None
+
+
+def _redirected_to(url: str, final_url: str, redirect_count: int) -> str:
+    """Compare normalised URLs so an encoding or case change is not read as a redirect."""
+    if not final_url or redirect_count <= 0:
+        return ""
+    try:
+        if url_key(url) == url_key(final_url):
+            return ""
+    except ValueError:
+        if url == final_url:
+            return ""
+    return final_url
+
+
 def load_audit(directory, manifest: dict) -> Audit:
     """Build the read model from the saved run directory. Missing files are empty, not errors."""
     directory = Path(directory)
@@ -114,9 +134,9 @@ def load_audit(directory, manifest: dict) -> Audit:
                 url=url,
                 url_decoded=unquote(url),
                 final_url=final_url,
-                status=_number(record.get("final_status")),
-                first_status=_number(record.get("first_status")),
-                redirect_to=final_url if final_url and final_url != url else "",
+                status=_status(record.get("final_status")),
+                first_status=_status(record.get("first_status")),
+                redirect_to=_redirected_to(url, final_url, redirect_count),
                 redirect_count=redirect_count,
                 indexability=str(record.get("effective_indexability") or "unknown"),
                 indexability_reason=str(record.get("indexability_reason") or ""),
@@ -222,7 +242,7 @@ def query_pages(pages, *, url="", status="", redirect="", indexability="", rule=
         rows=rows[start:start + per_page], total=total, matched=matched, page=page,
         page_count=page_count, per_page=per_page,
         first=start + 1 if matched else 0, last=min(start + per_page, matched),
-        filters={"url": url, "status": status, "redirect": redirect, "indexability": indexability,
+        filters={"url_q": url, "status": status, "redirect": redirect, "indexability": indexability,
                  "rule": rule, "sort": sort},
         active=bool(term or status.strip() or redirect or indexability or rule),
     )

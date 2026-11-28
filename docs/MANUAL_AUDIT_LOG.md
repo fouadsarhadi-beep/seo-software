@@ -81,3 +81,12 @@ Use authorized properties and the documented [Google connection and CLI commands
 - [ ] **Start an audit.** Confirm the page-cap and local-network explanations sit beside their fields, and that choosing a project pre-selects it.
 - [ ] **Search and traffic.** Confirm the screen explains what each entry answers and which are import-ready versus unavailable, without claiming a live connection.
 - [ ] **Keyboard and narrow window.** Tab through the rail and the primary action with a visible focus ring. Narrow the window below 900px and confirm the rail becomes a horizontal bar and mixed Persian/Latin text stays readable.
+
+## Workbench stage 3 checkpoint — exploring an audit (pending owner check)
+
+- [ ] **Overview first.** Open the saved 100-page audit. The site, date and status should lead, the capped sample should be explained once without repeating the crawler's own limit warning, and findings should be grouped with separate occurrence and URL counts.
+- [ ] **A count opens exactly its pages.** Click **Redirecting** on a run that reported redirects. The page table should show exactly that many rows, with the destination under each path.
+- [ ] **A finding explains itself.** Open a content-overlap finding. It should say what was observed, why it matters and what to check next, and list both affected pages. For a noindex finding, confirm it asks whether exclusion was intended.
+- [ ] **Filters and paging.** Filter by a URL fragment, a status class, indexability and a finding. Confirm the range text (for example “1–30 of 94”), numbered pages, and that changing a filter returns to page one. On the last page, open a page's evidence and use **Back to results** to return to the same filtered view.
+- [ ] **Missing data stays unknown.** Open an older run or one with unfetched pages and confirm Unknown appears instead of a blank or a zero, and that rows without page evidence say so.
+- [ ] **Exports.** Confirm the CSV and text downloads still work, technical files stay collapsed, and running technical checks from Exports produces a separate run.

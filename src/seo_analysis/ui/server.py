@@ -33,6 +33,7 @@ from seo_analysis.research.sources import FeedInput, redact_url
 from seo_analysis.storage.history import History, workspace_access_error
 from seo_analysis.storage.removal import RemovalConflict, pending_removals, remove_saved_data, retry_removals
 from seo_analysis.ui.uploads import export_form, export_input, import_upload
+from seo_analysis.ui.audit_read import load_audit, query_pages
 from seo_analysis.web.crawl import CrawlConfig
 
 LOG = logging.getLogger("uvicorn.error")
@@ -83,6 +84,25 @@ TOOL_LABELS = {
     "google.inspect-url": "URL inspection", "google.pagespeed": "PageSpeed test",
     "google.crux": "CrUX report", "google.publish-sheets": "Sheets publication",
     "cms.wordpress-inventory": "WordPress inventory", "system.doctor": "System check",
+}
+# Rule detail answers three questions in order: what was observed, why it matters, what to check next.
+RULE_GUIDANCE = {
+    "content.extraction": ("The crawler reached the page but could read little or no usable text from the HTML.",
+                           "Open the page in a browser and compare what a reader sees with the HTML the server returned."),
+    "content.overlap": ("Two or more pages share a heading or most of their text, so they may compete for the same query.",
+                        "Decide whether to merge, canonicalise or differentiate the pair, then record that decision in Review similar pages."),
+    "seo.redirect": ("The requested URL answered with a redirect, so visitors and crawlers land somewhere else.",
+                     "Confirm the destination is the intended final URL, then point internal links at it directly."),
+    "seo.multiple-h1": ("The page contains more than one H1 heading.", "Check whether the extra headings are a template artefact; one H1 per page is the reliable default."),
+    "seo.noindex": ("The page asks search engines not to index it.", "Confirm whether keeping this page out of search results is intentional before changing any robots directive."),
+    "seo.missing-title": ("The page has no title element.", "Add a unique, descriptive title that states what the page offers."),
+    "seo.missing-meta": ("The page has no meta description.", "Add a short description for search results, or accept that a search engine will write one."),
+    "seo.missing-h1": ("The page has no H1 heading.", "Add one H1 that matches the page's main purpose."),
+    "seo.canonical": ("The declared canonical differs from the URL that was crawled.", "Check that the canonical target is the version you want indexed and that it answers 200."),
+    "crawl.fetch_error": ("The request failed before a usable response arrived.", "Retry the URL and check the server log; a transient failure is not a content problem."),
+    "crawl.robots_disallowed": ("robots.txt kept this tool from reading the URL.", "Confirm the rule is intended, then audit the URL only if it should be crawlable."),
+    "crawl.non_html": ("The response was not HTML, so no page content could be read.", "Check whether this URL is meant to be a page; exclude files and endpoints from the crawl if not."),
+    "crawl.redirect_blocked_external": ("A redirect points outside the audited origin, so the app did not follow it.", "Verify the destination is correct, then audit that origin separately if needed."),
 }
 
 
@@ -723,13 +743,53 @@ def create_app(workspace, port=8765):
         return {"reason": "unknown", "message": warnings[0] if warnings else "The feed request failed.",
                 "source": shown, "hidden_parameters": hidden, "candidate": ""}
 
+    def audit_result(rid, data, *, tab, page, q, url_q, category, status, redirect, indexability, rule, sort):
+        run = data["manifest"]
+        audit = load_audit(Path(data["directory"]), run)
+        chosen = tab if tab in ("overview", "findings", "pages", "exports") else ""
+        if not chosen:
+            legacy = any((q, url_q, status, redirect, indexability, rule))
+            chosen = "findings" if category else "pages" if legacy else "overview"
+        page_query = query_pages(audit.pages, url=url_q or q, status=status, redirect=redirect,
+                                 indexability=indexability, rule=rule, sort=sort, page=page)
+        page_query.filters = {**page_query.filters, "tab": "pages"}
+        rules = audit.rules()
+        categories = sorted({row["category"] for row in rules if row["category"]})
+        selection = next((row for row in rules if row["rule"] == rule), None)
+        affected = []
+        if selection:
+            unique = {}
+            for finding in audit.findings:
+                if finding.rule != rule:
+                    continue
+                for evidence_id in finding.evidence_ids:
+                    target = audit.evidence.get(evidence_id)
+                    if target is not None:
+                        unique[target.url] = target
+            affected = list(unique.values())
+        counts = run.get("counts") or {}
+        skipped = counts.get("skipped")
+        page_limited = bool(isinstance(skipped, dict) and skipped.get("page_limit"))
+        window = list(range(max(1, page_query.page - 2), min(page_query.page_count, page_query.page + 2) + 1))
+        return render("audit_result", rid=rid, run=run, audit=audit, tab=chosen, page_query=page_query,
+                      rules=[row for row in rules if not category or row["category"] == category],
+                      all_rules=rules, categories=categories, category=category, selection=selection,
+                      affected=affected, guidance=RULE_GUIDANCE, window=window,
+                      artifacts=data["artifacts"], finding_labels=FINDING_LABELS,
+                      check_labels=CHECK_LABELS, limit=run["parameters"].get("limit"),
+                      page_limited=page_limited)
+
     @app.get("/runs/{rid}")
     def result(rid: str, page: int = 1, evidence_page: int = 1, q: str = "", category: str = "",
-               url_q: str = "", host: str = ""):
+               url_q: str = "", host: str = "", tab: str = "", status: str = "", redirect: str = "",
+               indexability: str = "", rule: str = "", sort: str = "url"):
         data = detail(rid)
         run = data["manifest"]
         if run["tool_id"] == tools.PUBLIC_FEED.id and run["status"] == "failed":
             return render("feed_failed", rid=rid, run=run, failure=feed_failure(data), host=host)
+        if run["tool_id"] in (tools.AUDIT.id, tools.CRAWL.id):
+            return audit_result(rid, data, tab=tab, page=page, q=q, url_q=url_q, category=category,
+                                status=status, redirect=redirect, indexability=indexability, rule=rule, sort=sort)
         if run["tool_id"] == tools.COMPARE.id:
             return comparison_result(data, page, category)
         if run["tool_id"] == tools.RESEARCH.id:
@@ -884,10 +944,13 @@ def create_app(workspace, port=8765):
         return FileResponse(artifact_path(data, name), media_type="image/png")
 
     @app.get("/runs/{rid}/evidence/{eid}")
-    def evidence(rid: str, eid: str):
+    def evidence(rid: str, eid: str, back: str = ""):
         data = detail(rid)
         row = next((e for e in data["evidence"] if e["id"] == eid), None)
         if not row:
             raise HTTPException(404)
-        return render("evidence", rid=rid, observation=read_observation(data, row))
+        prefix = "/runs/" + rid
+        if not back.startswith(prefix):
+            back = prefix
+        return render("evidence", rid=rid, observation=read_observation(data, row), back=back)
     return app

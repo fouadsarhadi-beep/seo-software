@@ -79,6 +79,20 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 p{overflow-wrap:anywhere}
 .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#eef0e3;color:#35513c;font-size:11.5px;font-weight:650}
 .notice{border-left:3px solid var(--accent);background:#f8f9ec}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin:22px 0 18px}
+.tabs a{padding:9px 14px;border-radius:7px 7px 0 0;text-decoration:none;color:var(--ink-soft);font-weight:600;font-size:13.5px;border:1px solid transparent;border-bottom:0}
+.tabs a:hover{color:var(--ink);background:#f6f7ec}
+.tabs a[aria-current="page"]{color:var(--ink);background:var(--card);border-color:var(--line);position:relative;top:1px}
+.pager{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:14px 0}
+.pager a,.pager .range{font-size:13px}
+.pager a{padding:5px 10px;border:1px solid var(--line-strong);border-radius:6px;text-decoration:none}
+.pager a[aria-current="page"]{background:var(--pine);color:#fff;border-color:var(--pine)}
+.pager .range{color:var(--ink-soft);margin-right:6px}
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-items:end;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:18px}
+.filters label{margin:0}
+.filters input,.filters select{width:100%}
+.ruled{margin:0;padding-left:20px}
+.ruled li{margin:6px 0}
 .project-list{list-style:none;margin:0;padding:0}
 .project-list li{margin:10px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 @media(max-width:900px){.app{grid-template-columns:1fr}.rail{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:flex-start;gap:16px}.rail-foot{display:none}.switcher{min-width:180px}.tasks{flex-direction:row;flex-wrap:wrap}.tasks .nav-label{display:none}.topbar{padding:12px 18px}main{padding:22px 18px 70px}}
@@ -286,6 +300,7 @@ p{overflow-wrap:anywhere}
 {% elif view in ('tools', 'research_form', 'research_result', 'dataset', 'dataset_row', 'feed_failed') %}{% include 'research.html' %}
 {% elif view in ('site_qa_form', 'site_qa_result') %}{% include 'site_qa.html' %}
 {% elif view in ('browser_qa_form', 'browser_qa_result') %}{% include 'browser_qa.html' %}
+{% elif view=="audit_result" %}{% include 'audit.html' %}
 {% elif view=="workflow_form" %}{% include 'workflow.html' %}
 {% elif view=="projects" %}
 <h1>Projects</h1>
@@ -453,7 +468,7 @@ p{overflow-wrap:anywhere}
 <p>{% if checks_view %}{{'No observations match.' if q or category else 'No check observations were recorded.'}}{% else %}{{'No findings match.' if q or category else 'No findings were recorded.'}}{% endif %}</p>
 {% endif %}
 {% endif %}
-{% else %}<h1>Page evidence</h1><a href="/runs/{{rid}}">Back to results</a><section><strong>{{observation.url}}</strong>
+{% else %}<h1>Page evidence</h1><a href="{{ back or ('/runs/' ~ rid) }}">Back to results</a><section><strong>{{observation.url}}</strong>
 <dl>
 <dt>HTTP response</dt><dd>{{observation.final_status or 'Unavailable'}}</dd>
 <dt>Text extraction</dt><dd>{{ {'success': 'Text extracted', 'fallback': 'Text extracted from an alternative container', 'empty': 'No usable text in the received HTML', 'truncated': 'HTML response truncated'}.get(observation.extraction_state, observation.extraction_state|default('Unknown')|replace('_',' ')) }}</dd>

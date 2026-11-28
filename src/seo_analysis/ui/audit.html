@@ -1,0 +1,141 @@
+{% set counts = run.counts %}
+<div class="page-head"><div>
+<p class="crumbs"><a href="/history">History</a></p>
+<h1>Run results</h1>
+<p class="lede">{{ audit.site }}{% if run.started_at %} · {{ run.started_at[:19]|replace('T',' ') }} UTC{% endif %} · <span class="badge">{{ run.status|replace('_',' ') }}</span>{% if run.project %} · {{ run.project }}{% endif %}</p>
+</div>
+<div class="page-actions">
+{% if 'pairs.json' in run.artifacts %}<a class="button ghost" href="/runs/{{rid}}/review">Review similar pages</a>{% endif %}
+{% if counts.get('observed') %}<a class="button ghost" href="/runs/{{rid}}/report">Create Excel report</a>{% endif %}
+</div>
+</div>
+
+<nav class="tabs" aria-label="Run views">
+{% for key, label in [('overview','Overview'),('findings','Findings'),('pages','Pages'),('exports','Exports')] %}<a href="?tab={{key}}"{% if tab == key %} aria-current="page"{% endif %}>{{label}}</a>{% endfor %}
+</nav>
+
+{% if tab == 'overview' %}
+{% if page_limited %}<section class="notice"><p><strong>A capped sample.</strong> The crawl stopped after {{ limit }} pages: {{ counts.get('discovered', 0) }} URLs were discovered and {{ counts.get('observed', 0) }} observed. Pages outside the sample are unassessed, not clean.</p></section>{% endif %}
+<div class="grid">
+<div class="card"><h2>Coverage</h2>
+<div class="metrics">
+<span><strong>{{ counts.get('observed', 0) }}</strong>URLs observed</span>
+<span><strong>{{ counts.get('findings', 0) }}</strong>findings</span>
+<span><strong>{{ counts.get('errors', 0) }}</strong>fetch errors</span>
+<span><strong>{{ counts.get('redirecting', 0) }}</strong>redirecting</span>
+</div>
+<p><a href="?tab=pages">Browse every observed page</a></p>
+</div>
+<div class="card"><h2>Filter the page table</h2>
+<p>Each counter opens the page table with the filter that reproduces it.</p>
+<div class="links">
+<a href="?tab=pages&status=4xx">Client errors</a>
+<a href="?tab=pages&status=5xx">Server errors</a>
+<a href="?tab=pages&redirect=any">Redirecting</a>
+<a href="?tab=pages&indexability=noindex">Noindex</a>
+<a href="?tab=pages&indexability=unknown">Unknown indexability</a>
+</div>
+</div>
+</div>
+
+<h2>Findings by rule</h2>
+{% if rules %}
+<div class="table"><table>
+<tr><th>Rule</th><th>Category</th><th>Occurrences</th><th>Affected URLs</th></tr>
+{% for row in rules %}
+<tr><td><a href="?tab=findings&rule={{row.rule|urlencode}}">{{ finding_labels.get(row.rule, row.rule) }}</a></td>
+<td>{{ row.category or '—' }}</td>
+<td><a href="?tab=pages&rule={{row.rule|urlencode}}">{{ row.occurrences }}</a></td>
+<td><a href="?tab=pages&rule={{row.rule|urlencode}}">{{ row.urls }}</a></td></tr>
+{% endfor %}
+</table></div>
+{% else %}<p>No findings were recorded for this run. That is not the same as a clean site when the sample was capped.</p>{% endif %}
+
+<details><summary>Run details</summary>
+<p>Run ID <code>{{rid}}</code>{% if limit %} · page cap {{ limit }}{% endif %}</p>
+<dl>{% for key, value in counts.items() if value is number %}<dt>{{ key|replace('_',' ')|capitalize }}</dt><dd>{{ value }}</dd>{% endfor %}</dl>
+{% for warning in run.warnings if not (page_limited and warning.startswith('Reached the configured limit of ')) %}<p>{{ warning }}</p>{% endfor %}
+</details>
+
+{% elif tab == 'findings' %}
+{% if selection %}
+<h2>{{ finding_labels.get(selection.rule, selection.rule) }}</h2>
+<section>
+<p><span class="badge">{{ selection.category or 'finding' }}</span> {{ selection.occurrences }} {{ 'occurrence' if selection.occurrences == 1 else 'occurrences' }} · {{ selection.urls }} affected {{ 'URL' if selection.urls == 1 else 'URLs' }}</p>
+<h3>What was observed</h3><p>{{ selection.detail }}</p>
+{% if guidance.get(selection.rule) %}<h3>Why it matters</h3><p>{{ guidance[selection.rule][0] }}</p>
+<h3>What to check next</h3><p>{{ guidance[selection.rule][1] }}</p>{% endif %}
+{% if selection.rule == 'seo.noindex' %}<p><strong>Was excluding this page from search results intended?</strong> If not, inspect the robots meta tag and the X-Robots-Tag header on the pages below.</p>{% endif %}
+</section>
+<h2>Affected pages</h2>
+{% if affected %}
+<ul class="ruled">{% for page in affected %}<li><a href="/runs/{{rid}}/evidence/{{page.evidence_id}}?back={{ ('/runs/' ~ rid ~ '?tab=findings&rule=' ~ (selection.rule|urlencode))|urlencode }}">{{ page.path }}</a> · {{ page.status_text }} · {{ page.indexability_text }}</li>{% endfor %}</ul>
+<p><a href="?tab=pages&rule={{selection.rule|urlencode}}">Open these pages in the page table</a></p>
+{% else %}<p>No page evidence is linked to this rule in this run.</p>{% endif %}
+{% else %}
+<h2>Findings</h2>
+{% if categories %}<div class="links">{% for name in categories %}<a href="?tab=findings&category={{name|urlencode}}"{% if name == category %} aria-current="page"{% endif %}>{{ name|capitalize }}</a>{% endfor %}{% if category %}<a href="?tab=findings">All categories</a>{% endif %}</div>{% endif %}
+{% if rules %}
+<div class="table"><table>
+<tr><th>Rule</th><th>Category</th><th>Occurrences</th><th>Affected URLs</th></tr>
+{% for row in rules %}<tr><td><a href="?tab=findings&rule={{row.rule|urlencode}}">{{ finding_labels.get(row.rule, row.rule) }}</a></td><td>{{ row.category or '—' }}</td><td>{{ row.occurrences }}</td><td><a href="?tab=pages&rule={{row.rule|urlencode}}">{{ row.urls }}</a></td></tr>{% endfor %}
+</table></div>
+{% else %}<p>No findings match.</p>{% endif %}
+{% endif %}
+
+{% elif tab == 'pages' %}
+<h2>Pages</h2>
+<form class="filters" method="get" action="/runs/{{rid}}">
+<input type="hidden" name="tab" value="pages">
+<label>URL <input type="search" name="url_q" value="{{ page_query.filters.url_q }}" placeholder="path or text"></label>
+<label>Status <select name="status">{% for value, label in [('', 'Any'), ('2xx','2xx'), ('3xx','3xx'), ('4xx','4xx'), ('5xx','5xx'), ('error','Any error')] %}<option value="{{value}}"{% if page_query.filters.status == value %} selected{% endif %}>{{label}}</option>{% endfor %}</select></label>
+<label>Redirects <select name="redirect">{% for value, label in [('', 'Any'), ('any','Redirected'), ('none','No redirect')] %}<option value="{{value}}"{% if page_query.filters.redirect == value %} selected{% endif %}>{{label}}</option>{% endfor %}</select></label>
+<label>Indexability <select name="indexability">{% for value, label in [('', 'Any'), ('indexable','Indexable'), ('noindex','Noindex'), ('unknown','Unknown')] %}<option value="{{value}}"{% if page_query.filters.indexability == value %} selected{% endif %}>{{label}}</option>{% endfor %}</select></label>
+<label>Finding <select name="rule"><option value="">Any</option>{% for row in all_rules %}<option value="{{row.rule}}"{% if page_query.filters.rule == row.rule %} selected{% endif %}>{{ finding_labels.get(row.rule, row.rule) }}</option>{% endfor %}</select></label>
+<label>Sort <select name="sort">{% for value, label in [('url','URL'), ('status','Status'), ('findings','Most findings')] %}<option value="{{value}}"{% if page_query.filters.sort == value %} selected{% endif %}>{{label}}</option>{% endfor %}</select></label>
+<button class="ghost">Apply filters</button>
+{% if page_query.active %}<a href="?tab=pages">Clear filters</a>{% endif %}
+</form>
+
+{% if page_query.rows %}
+<div class="table"><table>
+<tr><th>Path</th><th>Status</th><th>Indexability</th><th>Findings</th></tr>
+{% for page in page_query.rows %}
+<tr>
+<td>{% if page.evidence_id %}<a href="/runs/{{rid}}/evidence/{{page.evidence_id}}?back={{ ('/runs/' ~ rid ~ page_query.href(page_query.page))|urlencode }}">{{ page.path }}</a>{% else %}{{ page.path }}<br><small>Page evidence unavailable for this row.</small>{% endif %}
+{% if page.redirect_to %}<br><small>→ {{ page.redirect_to }}</small>{% endif %}</td>
+<td>{{ page.status_text }}</td>
+<td>{{ page.indexability_text }}{% if page.indexability_reason %}<br><small>{{ page.indexability_reason }}</small>{% endif %}</td>
+<td>{% for name in page.rules %}<a href="?tab=findings&rule={{name|urlencode}}">{{ finding_labels.get(name, name) }}</a>{% if not loop.last %}<br>{% endif %}{% else %}—{% endfor %}</td>
+</tr>
+{% endfor %}
+</table></div>
+<div class="pager">
+<span class="range">{{ page_query.first }}–{{ page_query.last }} of {{ page_query.matched }}{% if page_query.matched != page_query.total %} · {{ page_query.total }} observed{% endif %}</span>
+{% if page_query.page > 1 %}<a href="{{ page_query.href(page_query.page - 1) }}">Previous</a>{% endif %}
+{% for number in window %}<a href="{{ page_query.href(number) }}"{% if number == page_query.page %} aria-current="page"{% endif %}>{{ number }}</a>{% endfor %}
+{% if page_query.page < page_query.page_count %}<a href="{{ page_query.href(page_query.page + 1) }}">Next</a>{% endif %}
+</div>
+{% else %}
+<p>No observed pages match these filters.</p>
+<p><a href="?tab=pages">Clear filters</a></p>
+{% endif %}
+
+{% elif tab == 'exports' %}
+<h2>Exports</h2>
+{% set reports = {'checks.csv': 'Technical checks CSV', 'findings.csv': 'Findings CSV', 'inventory.csv': 'Page inventory CSV', 'issues.txt': 'Text report'} %}
+{% set extra = artifacts|rejectattr('path', 'in', reports)|list %}
+<div class="links">{% for a in artifacts if a.path in reports %}<a class="button ghost" href="/runs/{{rid}}/files/{{a.path}}">{{ reports[a.path] }}</a>{% endfor %}</div>
+{% if extra %}<details><summary>Technical files</summary><div class="links">{% for a in extra %}<a href="/runs/{{rid}}/files/{{a.path}}">{{ a.path }}</a>{% endfor %}</div></details>{% endif %}
+<h2>Actions</h2>
+{% if 'snapshot.jsonl' in run.artifacts %}
+<form class="line" method="post" action="/runs/{{rid}}/checks">
+{{ csrf() }}
+<label>Checks <select name="check"><option value="all">All checks</option>{% for kind, label in check_labels.items() %}<option value="{{kind}}">{{label}}</option>{% endfor %}</select></label>
+<button class="ghost">Run technical checks</button>
+</form>
+<p><small>Technical checks read the saved snapshot and make no requests to the site.</small></p>
+{% endif %}
+{% if counts.get('observed') %}<p><a class="button ghost" href="/runs/{{rid}}/report">Create Excel report</a></p>{% endif %}
+{% if 'pairs.json' in run.artifacts %}<p><a class="button ghost" href="/runs/{{rid}}/review">Review similar pages</a></p>{% endif %}
+{% endif %}

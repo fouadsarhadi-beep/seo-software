@@ -58,13 +58,30 @@ def test_rule_summary_separates_occurrences_from_affected_urls(tmp_path):
 
 
 def test_read_model_tolerates_missing_and_legacy_artifacts(tmp_path):
-    (tmp_path / "snapshot.jsonl").write_text(json.dumps({"url": SITE + "a"}) + "\n", encoding="utf-8")
+    (tmp_path / "snapshot.jsonl").write_text(
+        json.dumps({"url": SITE + "a"}) + "\n"
+        + json.dumps({"url": SITE + "b", "final_status": 0, "effective_indexability": "not_indexable_status",
+                      "indexability_reason": "HTTP status 0"}) + "\n", encoding="utf-8")
     audit = load_audit(tmp_path, {"parameters": {"sitemap": SITE}})
     page = audit.pages[0]
     assert audit.site == SITE
     assert page.status is None and page.status_text == "Unknown"
     assert page.indexability_text == "unknown" and page.words is None
+    blocked = audit.pages[1]
+    assert blocked.status is None and blocked.status_text == "Unknown"
+    assert blocked.indexability_text == "not_indexable_status"
     assert audit.findings == []
+
+
+def test_redirect_detection_ignores_encoding_only_differences(tmp_path):
+    encoded = SITE + "%D8%A2/x"
+    audit = _write(tmp_path, [{
+        "url": encoded, "final_url": SITE + "آ/x", "first_status": 301, "final_status": 200,
+        "chain": [[encoded, 301], [SITE + "آ/x", 200]], "effective_indexability": "indexable",
+        "indexability_reason": "", "title": "", "words": 1, "evidence_id": "page-000001", "depth": 0,
+    }])
+    assert audit.pages[0].redirect_count == 1
+    assert audit.pages[0].redirect_to == ""
 
 
 def test_page_query_combines_filters_and_matches_decoded_text(tmp_path):
