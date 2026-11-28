@@ -77,7 +77,10 @@ class ToolRunner:
                 directory = self.workspace.create_run_directory()
                 active.enter_context(FileLock(str(directory / ".active.lock")))
                 parameters = asdict(request)
-                # A request may know which of its inputs must not be written down verbatim.
+                # A request may know which of its inputs must never be written verbatim.
+                # A feed address is signed and short-lived, so FeedInput supplies a redacted
+                # copy; every other request carries only identifiers or a query, with secrets
+                # held in the OS credential store and never in the request itself.
                 redact = getattr(request, "redacted_parameters", None)
                 if callable(redact):
                     parameters = redact(parameters)

@@ -39,7 +39,14 @@ from seo_analysis.reporting.workbook import WorkbookInput
 from seo_analysis.reporting.report import csv_safe
 from seo_analysis.reporting.export import build_bundle, page_csv, stamp
 from seo_analysis.research.intelligence import ResearchInput
-from seo_analysis.research.questions import build_question_tree, capture_changes, outline_edges, question_seeds
+from seo_analysis.research.questions import (
+    build_question_tree,
+    capture_changes,
+    capture_rows,
+    outline_edges,
+    question_roots,
+    question_seeds,
+)
 from seo_analysis.research.sources import FeedInput, redact_url
 from seo_analysis.storage.history import History, workspace_access_error
 from seo_analysis.storage.removal import RemovalConflict, pending_removals, remove_saved_data, retry_removals
@@ -358,15 +365,42 @@ def create_app(workspace, port=8765):
         rows = payload.get("rows") or []
         limit = min(max(1, limit), 200)
         tree = build_question_tree(rows, seed, limit=limit) if seed else None
-        others = [item for item in saved_datasets({"questions": "Question relationships"}, RESEARCH_SOURCE_TOOLS)
-                  if item["id"] != dataset]
-        changes = None
+
+        def capture_meta(manifest, payload):
+            source = payload.get("source") or {}
+            return {"project": manifest.get("project"), "provider": source.get("provider") or "",
+                    "locale": source.get("locale") or "", "observed": source.get("observed") or ""}
+
+        current = capture_meta(run, payload)
+        others, hidden = [], 0
+        for item in saved_datasets({"questions": "Question relationships"}, RESEARCH_SOURCE_TOOLS):
+            if item["id"] == dataset:
+                continue
+            other_data = detail(item["id"])
+            other_payload = json.loads(artifact_path(other_data, "dataset.json").read_text(encoding="utf-8"))
+            meta = capture_meta(other_data["manifest"], other_payload)
+            known = all((current["provider"], current["locale"], meta["provider"], meta["locale"]))
+            compatible = meta["project"] == current["project"] and (
+                not known or (meta["provider"], meta["locale"]) == (current["provider"], current["locale"]))
+            if compatible:
+                others.append(item | meta | {"comparability": "known" if known else "unknown"})
+            else:
+                hidden += 1
+        changes, compared, seed_note = None, None, ""
         if compare and seed:
-            other = detail(compare)
-            if (other["manifest"].get("parameters") or {}).get("kind") != "questions":
-                raise HTTPException(400, "Compare with another question-relationship dataset.")
-            earlier = json.loads(artifact_path(other, "dataset.json").read_text(encoding="utf-8"))
-            changes = capture_changes(rows, earlier.get("rows") or [], seed)
+            chosen = next((item for item in others if item["id"] == compare), None)
+            if chosen is None:
+                raise HTTPException(400, "Those captures are not comparable. Choose another capture of this seed "
+                                         "from the same project, provider and locale.")
+            other_data = detail(compare)
+            earlier = json.loads(artifact_path(other_data, "dataset.json").read_text(encoding="utf-8"))
+            earlier_rows = earlier.get("rows") or []
+            compared = {"current": current, "other": capture_meta(other_data["manifest"], earlier),
+                        "comparability": chosen["comparability"]}
+            if not capture_rows(earlier_rows, seed):
+                seed_note = (f"This seed was not observed in the capture dated "
+                             f"{compared['other']['observed'] or 'undated'}.")
+            changes = capture_changes(rows, earlier_rows, seed)
         if export and tree is not None:
             buffer = StringIO()
             buffer.write("\ufeffseed,parent,child,source_row\r\n")
@@ -381,7 +415,9 @@ def create_app(workspace, port=8765):
             chosen = project_named(history.projects()[0]["name"])
         return render("question_tree", dataset_id=dataset, dataset=payload.get("source") or {},
                       seeds=question_seeds(rows), seed=seed, tree=tree, limit=limit, total=len(rows),
-                      others=others, compare=compare, changes=changes,
+                      others=others, compare=compare, changes=changes, compared=compared,
+                      seed_note=seed_note, hidden_captures=hidden,
+                      other_roots=[item for item in question_roots(rows, seed) if item != seed] if seed else [],
                       brief_project=chosen["name"] if chosen else "", selected=chosen)
 
     @app.get("/tools/search-traffic")

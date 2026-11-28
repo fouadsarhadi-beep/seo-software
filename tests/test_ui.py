@@ -776,7 +776,7 @@ def test_ui_question_outline_compares_two_captures_and_offers_the_brief(tmp_path
     with TestClient(create_app(ws, 8972), base_url="http://127.0.0.1:8972") as client:
         page = client.get("/tools/research/questions",
                           params={"dataset": later, "seed": "insurance", "compare": earlier}).text
-        assert "Compared with another capture" in page
+        assert "Comparing" in page and "2026-10-01" in page and "2026-11-20" in page
         assert "No longer observed" in page and "retired question" in page
         assert 'action="/brief/add"' in page
 
@@ -795,6 +795,43 @@ def _target_audit(ws, project, target, rid, started, title):
                     "artifacts": ["findings.json", "snapshot.jsonl"]},
                {"snapshot.jsonl": "\n".join(json.dumps(page) for page in pages) + "\n",
                 "findings.json": json.dumps({"schema_version": 1, "findings": findings})})
+
+
+def test_ui_persian_question_fixture_imports_and_expands(tmp_path):
+    origin = "http://127.0.0.1:8972"
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    History(ws).add_project("Acme")
+    rows = [["بیمه", "بیمه", "پرسش الف"],
+            ["بیمه", "بیمه", "پرسش دیگر"],
+            ["بیمه", "بیمه", "پرسش گسترده"],
+            ["بیمه", "پرسش الف", "پرسش مشترک"],
+            ["بیمه", "پرسش دیگر", "پرسش مشترک"],
+            ["بیمه", "پرسش مشترک", "پرسش الف"],
+            ["بیمه", "پرسش گسترده", "فرزند 1"]]
+    rows += [["بیمه", "پرسش گسترده", f"فرزند {index}"] for index in range(2, 56)]
+    sheet = "seed,parent,child\n" + "\n".join(",".join(row) for row in rows) + "\n"
+    with TestClient(create_app(ws, 8972), base_url=origin) as client:
+        token = BeautifulSoup(client.get("/tools/research").text, "html.parser").select_one(
+            "input[name=token]")["value"]
+        imported = client.post("/tools/research/import", headers={"Origin": origin},
+                               data={"token": token, "kind": "questions", "provider": "نمونه",
+                                     "observed": "2026-11-20", "locale": "fa-IR", "project": "Acme"},
+                               files={"file": ("پرسش.csv", sheet.encode("utf-8"), "text/csv")})
+        assert imported.status_code == 200
+        dataset = imported.url.params.get("added")
+        assert dataset, imported.url
+        picker = client.get("/tools/research/questions", params={"dataset": dataset, "project": "Acme"}).text
+        assert "بیمه" in picker
+        expanded = client.get("/tools/research/questions",
+                              params={"dataset": dataset, "project": "Acme", "seed": "بیمه",
+                                      "limit": 200}).text
+        assert "cycle" in expanded
+        assert expanded.count("پرسش مشترک") >= 2      # the shared child appears under both parents
+        assert "فرزند 55" in expanded                  # every sibling is reachable
+        narrow = client.get("/tools/research/questions",
+                            params={"dataset": dataset, "project": "Acme", "seed": "بیمه",
+                                    "limit": 1}).text
+        assert "Show" in narrow
 
 
 def test_ui_project_context_survives_each_tool(tmp_path):

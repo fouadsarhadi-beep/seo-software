@@ -412,14 +412,16 @@ p{overflow-wrap:anywhere}
 <form class="line" method="get" action="/tools/research/questions">
 <input type="hidden" name="dataset" value="{{dataset_id}}">
 <input type="hidden" name="seed" value="{{seed}}">
-<label>Compare with another capture <select name="compare">{% for item in others %}<option value="{{item.id}}"{% if item.id == compare %} selected{% endif %}>{{ item.observed or 'undated' }}{% if item.rows %} · {{item.rows}} rows{% endif %}</option>{% endfor %}</select></label>
+<label>Compare with another capture <select name="compare">{% for item in others %}<option value="{{item.id}}"{% if item.id == compare %} selected{% endif %}>{{ item.observed or 'undated' }}{% if item.provider %} · {{item.provider}}{% endif %}{% if item.locale %} · {{item.locale}}{% endif %}{% if item.rows %} · {{item.rows}} rows{% endif %}</option>{% endfor %}</select></label>
 <button class="ghost">Compare captures</button>
 </form>
-{% endif %}
+{% elif hidden_captures %}<p><small>{{ hidden_captures }} other question capture(s) exist but differ in project, provider or locale, so they cannot be compared.</small></p>{% endif %}
+{% if seed_note %}<p class="note">{{ seed_note }}</p>{% endif %}
 {% if changes %}
 <section class="notice">
-<p><strong>Compared with another capture.</strong> {{ changes.added|length }} question links appeared, {{ changes.removed|length }} no longer appear, {{ changes.persisted|length }} persist.</p>
+<p><strong>{% if compared %}Comparing {{ compared.current.observed or 'undated' }} with {{ compared.other.observed or 'undated' }}.{% else %}Compared with another capture.{% endif %}</strong> {{ changes.added|length }} question links appeared since the earlier capture, {{ changes.removed|length }} were observed earlier but are not now, {{ changes.persisted|length }} persist.</p>
 {% if changes.removed %}<p>No longer observed: {% for parent, child in changes.removed[:10] %}<span dir="auto">{{ child }}</span>{% if not loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
+{% if compared and compared.comparability == 'unknown' %}<p><small>Provider or locale is missing on one of these captures, so their comparability is unknown.</small></p>{% endif %}
 <p><small>Each capture is a sample. A question missing from one capture was not observed there, which is not proof that it stopped being asked.</small></p>
 </section>
 {% endif %}
@@ -433,6 +435,9 @@ p{overflow-wrap:anywhere}
 {% if tree.topic_only %}<p class="note"><strong>Topic heading.</strong> No row supplies an edge from this seed, so the outline shows the questions observed under this capture.</p>{% endif %}
 <p><small>Showing up to {{ limit }} children per question. A question marked as a cycle already appeared on its own path, so it is not expanded again.</small></p>
 <ul class="ruled" aria-label="Question outline">{{ node(tree) }}</ul>
+{% if other_roots %}<h3>Other roots observed under this capture</h3>
+<p><small>These questions lead their own branches in the same capture and are not reached from this seed.</small></p>
+<ul class="ruled">{% for item in other_roots[:20] %}<li><a href="?dataset={{dataset_id}}&amp;seed={{item|urlencode}}">{{ item }}</a></li>{% endfor %}</ul>{% endif %}
 {% endif %}
 {% elif view=="brief" %}
 <div class="page-head"><div>

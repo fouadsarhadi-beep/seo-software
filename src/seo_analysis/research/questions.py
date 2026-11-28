@@ -54,6 +54,13 @@ def _root_row(rows, seed):
     return 0
 
 
+def question_roots(rows, seed):
+    """Parent questions observed under this capture that no edge points at."""
+    edges = question_edges(capture_rows(rows, seed))
+    children = {child for items in edges.values() for child, _ in items}
+    return [parent for parent in edges if parent not in children]
+
+
 def build_question_tree(rows, seed, *, limit=50, max_nodes=200, max_depth=6):
     """Expand one capture topic into an outline.
 
@@ -65,8 +72,8 @@ def build_question_tree(rows, seed, *, limit=50, max_nodes=200, max_depth=6):
     """
     capture = capture_rows(rows, seed)
     edges = question_edges(capture)
-    children = {child for items in edges.values() for child, _ in items}
-    roots = [parent for parent in edges if parent not in children]
+    roots = [parent for parent in edges
+             if parent not in {child for items in edges.values() for child, _ in items}]
     limit = max(1, int(limit))
     max_nodes = max(2, int(max_nodes))
     max_depth = max(1, int(max_depth))
