@@ -340,4 +340,16 @@ Credentials are stored in the OS credential manager and scoped to the installati
 
 Run `system doctor` to locate the configuration, data, run and export directories. Configuration is optional. To customize paths, copy [config.example.toml](config.example.toml) to the reported config path, or select a file with `seo-analysis --config-file "<path>" system doctor`. Relative directory settings resolve beside the configuration file. When all commands have exited, back up the config file and complete data directory, including history.sqlite3 and runs/. Restore them to the locations reported by doctor. Reindexing recovers run records from manifests. The database backup also preserves projects and targets that have never been used. To start a fresh workspace, select a new data directory.
 
+### Back up and restore the workspace
+
+Stop the workbench and every command first. The database and the run folders are only consistent while nothing is writing to them.
+
+1. Run `seo-analysis system doctor` and note the configuration file, data directory and export directory it prints.
+2. Copy the configuration file and the **entire data directory**, including `history.sqlite3` and `runs/`, to the backup location.
+3. To restore, put them back at the printed paths. To restore somewhere else, copy both the configuration file and the data directory together and start with `seo-analysis --config-file "<copied config>"`, because relative `data_dir` settings resolve beside the configuration file.
+4. Run `seo-analysis history reindex` if the database is missing or older than the `runs` folder. Run records, evidence and archived state are rebuilt from each run's manifest, and a run interrupted before finalization is recovered with reduced coverage rather than lost.
+5. Reconnect connected accounts. A Google connection is stored against the workspace's data-directory path, so a restored copy at a different location needs `google connect` again for each service and project. Existing published spreadsheet links stay readable; publishing again needs the connection.
+
+Archived runs, saved workflows, projects, targets and review decisions travel inside the database, so they survive a restore. Exports you already downloaded are ordinary files and are not managed by the workspace.
+
 Follow the [roadmap](docs/ROADMAP.md) for the current step and what comes next. See the [architecture](SEO_ANALYSIS_SOFTWARE_ARCHITECTURE.md) for the detailed design, the [implementation state](docs/IMPLEMENTATION_STATE.md) for verification and limits, and the [implementation log](docs/IMPLEMENTATION_LOG.md) for dated changes. The rules each audit and snapshot check can report are catalogued in [docs/AUDIT_RULES.md](docs/AUDIT_RULES.md), every screen and its prerequisites in [docs/TOOL_CATALOGUE.md](docs/TOOL_CATALOGUE.md), and which provider actions have actually run live in [docs/CAPABILITY_STATUS.md](docs/CAPABILITY_STATUS.md).
