@@ -170,6 +170,19 @@ def redacted_source(source):
     return cleaned
 
 
+# How the review queue orders work: lower is more urgent. Severity is a property of the rule,
+# not of a guess about traffic, so the order stays sensible when no analytics exist.
+RULE_SEVERITY = {
+    "crawl.fetch_error": 0, "crawl.client_error": 0, "crawl.server_error": 0, "crawl.redirect_loop": 0,
+    "crawl.redirect_blocked_external": 1, "crawl.robots_disallowed": 1, "crawl.non_html": 1,
+    "content.extraction": 1, "seo.noindex": 1, "seo.canonical": 1,
+    "seo.redirect": 2, "seo.missing-title": 2, "seo.missing-h1": 2, "content.overlap": 2,
+    "seo.missing-meta": 3, "seo.multiple-h1": 3,
+}
+DEFAULT_SEVERITY = 2
+SEVERITY_LABEL = {0: "error-level", 1: "warning-level", 2: "review-level", 3: "minor"}
+
+
 def alignment_note(item: dict, crawl: dict) -> str:
     """Point out a measurement whose period or origin does not line up with this audit."""
     notes = []
@@ -615,6 +628,31 @@ def create_app(workspace, port=8765):
         return render("compare", snapshots=snapshots, before=before, after=after,
                       selected=selected, projects=projects)
 
+    def traffic_for_project(project):
+        """Clicks per observed URL from the most recent compatible Search Console dataset."""
+        if not project:
+            return {}
+        for run in history.runs_with_artifact("dataset.json"):
+            if run.get("project") != project or dataset_kind(run, CONNECTED_REPORT_TOOLS) != "gsc":
+                continue
+            try:
+                payload = json.loads(artifact_path(history.show(run["run_id"]), "dataset.json")
+                                     .read_text(encoding="utf-8"))
+            except (HTTPException, ValueError, OSError):
+                continue
+            rows = payload.get("rows") or []
+            if not rows or "clicks" not in rows[0]:
+                continue
+            source = payload.get("source") or {}
+            label = f"Search Console data dated {source.get('observed') or 'undated'}"
+            clicks = {}
+            for row in rows:
+                url = str(row.get("url") or "")
+                if url:
+                    clicks[url] = clicks.get(url, 0) + (row.get("clicks") or 0)
+            return {url: (value, label) for url, value in clicks.items()}
+        return {}
+
     @app.get("/review-queue")
     def review_queue(project: str = ""):
         projects = history.projects()
@@ -638,6 +676,7 @@ def create_app(workspace, port=8765):
             return audits[target]
 
         items = []
+        traffic = traffic_for_project(name)
         for row in reviews:
             target = None
             if row.get("run_id"):
@@ -660,7 +699,19 @@ def create_app(workspace, port=8765):
                 state = "needs re-review"
             else:
                 state = "current"
-            items.append(row | {"state": state})
+            affected = sum(1 for page in (audit.pages if audit else []) if row["rule"] in page.rules)
+            hits = traffic.get(row["page_key"], traffic.get(unquote(row["page_key"])))
+            severity = RULE_SEVERITY.get(row["rule"], DEFAULT_SEVERITY)
+            rationale = " · ".join(part for part in (
+                SEVERITY_LABEL[severity],
+                f"{affected} page(s) affected in the latest audit" if affected else "",
+                f"{hits[0]} clicks in {hits[1]}" if hits else "traffic unknown",
+            ) if part)
+            items.append(row | {"state": state, "severity": severity, "affected": affected,
+                                "traffic": hits, "rationale": rationale})
+        items.sort(key=lambda item: (item["severity"], -item["affected"],
+                                     -(item["traffic"][0] if item["traffic"] else -1),
+                                     item["rule"], item["page_key"]))
         latest_id = next((audit.manifest["run_id"] for audit in audits.values() if audit), None)
         return render("review_queue", selected=selected, projects=projects, items=items,
                       latest=latest_id, finding_labels=FINDING_LABELS)

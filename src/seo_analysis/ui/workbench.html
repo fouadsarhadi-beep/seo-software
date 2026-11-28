@@ -380,12 +380,13 @@ p{overflow-wrap:anywhere}
 </div></div>
 {% if items %}
 <div class="table"><table>
-<tr><th>Finding</th><th>Page</th><th>Decision</th><th>Standing</th><th>Note</th><th>Updated (UTC)</th></tr>
+<tr><th>Finding</th><th>Page</th><th>Decision</th><th>Standing</th><th>Why first</th><th>Note</th><th>Updated (UTC)</th></tr>
 {% for item in items %}
 <tr><td>{{ finding_labels.get(item.rule, item.rule) }}</td>
 <td>{{ item.page_key }}</td>
 <td>{{ item.status }}{% if item.state == 'needs re-review' %} <span class="badge">re-review</span>{% elif item.state == 'no longer reported' %} <span class="badge">not reported</span>{% endif %}</td>
-<td>{{ item.state }}</td><td>{{ item.note or '—' }}</td>
+<td>{{ item.state }}</td><td><small>{{ item.rationale }}</small></td>
+<td>{{ item.note or '—' }}</td>
 <td>{{ item.updated_at[:19]|replace('T',' ') }}</td></tr>
 {% endfor %}
 </table></div>

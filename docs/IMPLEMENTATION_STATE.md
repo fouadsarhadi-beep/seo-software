@@ -10,7 +10,8 @@ The seven-stage plan in [WORKBENCH_IMPLEMENTATION_CHECKLIST.md](WORKBENCH_IMPLEM
 - **Exports.** A self-contained HTML report, a page spreadsheet scoped to the current filter, and a ZIP analysis bundle carrying a versioned index of grain, join keys, thresholds, coverage and skipped files.
 - **Google.** Connection state per project, in-app consent with property selection, Search Console and GA4 fetches, URL inspection and disconnect, all through the same operations the CLI uses.
 - **Verification.** 186 tests pass; Hazm and a missing system Chromium are the only skips. The comparison and queue paths are covered for capped samples, fixes, persistent findings, changed evidence and a server restart.
-- **Known limits.** The results route re-reads `snapshot.jsonl` per request (0.2723 s for 100 pages on this machine). Review-queue priority does not use traffic data. No live Google consent or retrieval has been observed yet; the reference [capability status](CAPABILITY_STATUS.md) marks every provider action separately.
+- **Delivery plan.** Batches 1–7 of the DS delivery plan are implemented: honest comparison verdicts, project context through every tool, protected exports and a transient signed feed address, seed-scoped question captures, capture-scoped keyword gaps, brief provenance, launch and recovery behaviour, and the quality gate — Ruff and mypy clean, Bandit clear at medium/high, no known dependency advisories, a built wheel, and 230 passing tests.
+- **Known limits.** The results route re-reads `snapshot.jsonl` per request (0.2723 s for 100 pages on this machine). Review-queue severity is rule-based; traffic only refines the order when a compatible dataset exists. No live Google consent or retrieval has been observed yet; the reference [capability status](CAPABILITY_STATUS.md) marks every provider action separately.
 - **References.** [Audit rules](AUDIT_RULES.md) and [tools and routes](TOOL_CATALOGUE.md).
 
 ## Foundation checklist

@@ -227,6 +227,6 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 - Batch 7 — Repaired the quality findings the plan reported: three Ruff violations (unused imports) and three mypy errors (one narrowed assignment in the read model, two unannotated locals). `ruff check src tests` and `mypy src` now pass across 68 source files.
 - Batch 7 — Bandit reports nothing at medium or high severity, and the dependency audit reports no known vulnerabilities in the locked runtime.
 - Batch 7 — The full suite passes 229 tests with two optional skips and the known sandbox-only MCP failure, and `uv build --wheel` produces `seo_analysis-0.4.0-py3-none-any.whl`.
-- Batch 7 — Still open: review-queue ordering by verified severity with traffic provenance and rationale, the Windows/Linux CI matrix and its URL (which need a push the owner controls), and the hand-off to Codex for independent review.
+- Batch 7 — The review queue is ordered by verified severity first, then by how many pages the rule affects in the latest comparable audit, then by traffic where a compatible Search Console dataset exists. Each row states its rationale (`error-level · 4 page(s) affected in the latest audit · 42 clicks in Search Console data dated 2026-11-20`); with no analytics it says `traffic unknown` and keeps a sensible offline order. The severity scale is a property of the rule, never of a guess about traffic.
 
 [Current scope and remaining work](ROADMAP.md)

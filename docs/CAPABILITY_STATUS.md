@@ -2,6 +2,8 @@
 
 What is available offline, what is verified with fixtures, and what has actually been run live. **Authentication is not retrieval, and retrieval is not publishing** — each is recorded separately below. Status as of 2026-11-28.
 
+**How to read a row:** *wired* means the code path exists and runs; *fixture-verified* means tests exercise it against fixtures; *live-verified* means it has been observed against the real provider. A row can be wired and fixture-verified while its live check is still pending — that combination is the normal state for a provider nobody has connected yet.
+
 | Capability | Offline | Fixture-verified | Live-verified | Notes |
 | --- | --- | --- | --- | --- |
 | Website audit and crawl | Yes | Yes | **Yes** | 100-page sample on samatoos.ir; one noindex page excluded |

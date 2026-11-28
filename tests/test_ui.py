@@ -17,6 +17,7 @@ from seo_analysis.storage.history import History
 from seo_analysis.storage.removal import remove_saved_data
 from seo_analysis.research import sources
 from seo_analysis.web.fetch import Fetcher
+from seo_analysis.ui.audit_read import load_audit
 from seo_analysis.ui.server import create_app
 from seo_analysis.web.crawl import CrawlConfig
 
@@ -1020,6 +1021,54 @@ def test_ui_project_context_survives_each_tool(tmp_path):
         rejected = client.post("/tools/research", headers=headers,
                                data={"token": token, "project": "Beta", "host": "mine.test", "dataset": foreign})
         assert rejected.status_code == 400
+
+
+def test_ui_review_queue_orders_by_verified_severity_and_explains_why(tmp_path):
+    origin = "http://127.0.0.1:8972"
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    history = History(ws)
+    history.add_project("Acme")
+    rid = uuid4().hex
+    pages = [{"evidence_id": "page-000001", "url": "https://example.org/a", "final_url": "https://example.org/a",
+              "first_status": 500, "final_status": 500, "chain": [], "effective_indexability": "not_indexable_status",
+              "indexability_reason": "HTTP status 500", "title": "", "words": 0, "depth": 0,
+              "content_hash": "h1", "observed_at": "2026-11-20T00:00:00+00:00", "markup": {}},
+             {"evidence_id": "page-000002", "url": "https://example.org/b", "final_url": "https://example.org/b",
+              "first_status": 200, "final_status": 200, "chain": [], "effective_indexability": "indexable",
+              "indexability_reason": "", "title": "B", "words": 5, "depth": 0, "content_hash": "h2",
+              "observed_at": "2026-11-20T00:00:00+00:00", "markup": {}}]
+    findings = [{"category": "error", "rule": "crawl.server_error", "detail": "https://example.org/a (500)",
+                 "evidence_ids": ["page-000001"], "urls": ["https://example.org/a"]},
+                {"category": "review", "rule": "seo.missing-meta", "detail": "https://example.org/b",
+                 "evidence_ids": ["page-000002"], "urls": ["https://example.org/b"]}]
+    _saved_run(ws, {"run_id": rid, "tool_id": "seo.audit", "status": "succeeded", "project": "Acme",
+                    "saved_target": None, "started_at": "2026-11-20T00:00:00Z",
+                    "finished_at": "2026-11-20T00:00:30Z", "parameters": {"source": "https://example.org/"},
+                    "counts": {"observed": 2, "findings": 2}, "warnings": [],
+                    "artifacts": ["findings.json", "snapshot.jsonl"]},
+               {"snapshot.jsonl": "\n".join(json.dumps(page) for page in pages) + "\n",
+                "findings.json": json.dumps({"schema_version": 1, "findings": findings})})
+    data = History(ws).show(rid)
+    audit = load_audit(Path(data["directory"]), data["manifest"])
+    for rule, url in (("crawl.server_error", "https://example.org/a"), ("seo.missing-meta", "https://example.org/b")):
+        page = next(item for item in audit.pages if item.url == url)
+        History(ws).save_finding_review("Acme", rule, page.url, status="reviewed", note="decided",
+                                        fingerprint=page.fingerprint, evidence_id=page.evidence_id, run_id=rid)
+    _saved_run(ws, {"run_id": uuid4().hex, "tool_id": "research.import", "status": "succeeded",
+                    "project": "Acme", "saved_target": None, "started_at": "2026-11-21T00:00:00Z",
+                    "finished_at": "2026-11-21T00:00:05Z",
+                    "parameters": {"kind": "gsc", "observed": "2026-11-20"}, "counts": {"rows": 1},
+                    "warnings": [], "artifacts": ["dataset.json"]},
+               {"dataset.json": json.dumps({"schema_version": 1,
+                                            "source": {"kind": "gsc", "observed": "2026-11-20"},
+                                            "rows": [{"row": 1, "url": "https://example.org/b", "clicks": 42}]})})
+    with TestClient(create_app(ws, 8972), base_url=origin) as client:
+        page = client.get("/review-queue", params={"project": "Acme"}).text
+        dom = BeautifulSoup(page, "html.parser")
+        rows = [row.get_text(" ", strip=True) for row in dom.select("table tr") if row.find("td")]
+        assert "error-level" in rows[0] and "server_error" in rows[0].lower().replace(" ", "_")
+        assert "42 clicks in Search Console data dated 2026-11-20" in rows[1]
+        assert "traffic unknown" in rows[0]
 
 
 def test_ui_review_queue_ignores_unrelated_runs_and_other_targets(tmp_path):

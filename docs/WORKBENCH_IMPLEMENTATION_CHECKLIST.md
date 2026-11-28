@@ -109,3 +109,5 @@ Run the existing CI suite at release checkpoints using the locked environment in
 - [ ] **Release 2, after stage 7.** Import search and traffic data, trace a metric to its source, compare two audits, save a decision, select a competitor opportunity and turn a question branch into a brief. Record unresolved owner checks beside their stage.
 
 - [ ] **Product sign-off.** Follow both walkthroughs using the README and visible UI alone on the owner's Windows machine. Reconcile one real site's counts with its export and record one actionable SEO decision with evidence. Record each failed task against its step, correct it and repeat that task. Summarize supported workflows, measured limits, known issues and pending provider checks in the implementation state document. Call the local release ready when the offline journeys pass and the owner can complete them unaided. Claim each live integration separately as its check passes.
+
+> The six owner items above are tracked with their individual checkpoints in the [manual audit log](MANUAL_AUDIT_LOG.md). This checklist counts each one once.
