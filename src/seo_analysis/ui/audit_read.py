@@ -33,7 +33,8 @@ class PageRow:
     @property
     def fingerprint(self) -> str:
         """Stable per-page evidence identity used to notice that a reviewed page changed."""
-        seed = "|".join((self.url, self.status_text, self.indexability_text, self.title, self.content_hash))
+        seed = "|".join((self.url, self.final_url, self.status_text, self.indexability_text,
+                         self.title, self.content_hash))
         return sha256(seed.encode("utf-8")).hexdigest()[:16]
 
     @property

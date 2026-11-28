@@ -131,31 +131,89 @@ def _finding_urls(directory, row):
     return [by_id[identifier] for identifier in identifiers if by_id.get(identifier)]
 
 
+def _observed_pages(directory):
+    path = Path(directory) / "snapshot.jsonl"
+    if not path.is_file():
+        return {}
+    return {url_key(page["url"]): page for page in load_snapshot(path) if page.get("url")}
+
+
+# Rules that read captured markup or extracted text. Where that evidence is absent the rule
+# could not run, so its silence says nothing about the page.
+MARKUP_RULES = ("seo.missing-title", "seo.missing-meta", "seo.missing-h1", "seo.multiple-h1",
+                "seo.canonical", "seo.redirect", "content.overlap", "content.extraction")
+TEXT_RULES = ("content.overlap", "content.extraction")
+
+
+def _rule_could_run(rule, urls, snapshot):
+    """Whether this rule had usable evidence for every page the finding depends on."""
+    for url in urls:
+        page = snapshot.get(url)
+        if page is None:
+            return False
+        if rule in MARKUP_RULES and "markup" not in page:
+            return False
+        if rule in TEXT_RULES and page.get("extraction_state") == "truncated":
+            return False
+    return True
+
+
+def _unassessed_reason(urls, snapshot):
+    if any(url not in snapshot for url in urls):
+        return "the page was not observed in that crawl"
+    return "the evidence that rule needs was unavailable in that crawl"
+
+
+def _side_report(directory):
+    """Findings keyed by rule plus affected page identities, so a changed detail is still the same issue."""
+    path = Path(directory) / "findings.json"
+    if path.is_symlink() or not path.is_file():
+        return None
+    rows = {}
+    for row in json.loads(path.read_text(encoding="utf-8"))["findings"]:
+        urls = _finding_urls(directory, row)
+        if not urls:
+            continue
+        identity = (row["rule"], tuple(sorted(url_key(url) for url in urls)))
+        rows[identity] = row | {"urls": urls}
+    return rows
+
+
 def compare_findings(directories):
-    """Classify findings as new, persistent or resolved using URL identity plus detail."""
-    reports = []
-    for directory in directories:
-        path = Path(directory) / "findings.json"
-        if path.is_symlink() or not path.is_file():
-            return None
-        rows = {}
-        for row in json.loads(path.read_text(encoding="utf-8"))["findings"]:
-            urls = _finding_urls(directory, row)
-            if not urls:
-                continue
-            key = (row["rule"], tuple(sorted(url_key(url) for url in urls)), row["detail"])
-            rows[key] = row | {"urls": urls}
-        reports.append(rows)
-    before, after = reports
+    """Classify findings as new, persistent, changed, resolved or unassessed.
+
+    Identity is the rule plus its affected pages, so a changed redirect destination or pair
+    detail stays the same issue. A finding is only called resolved when the later crawl could
+    actually run that rule on every page it depends on; otherwise it is unassessed, and an
+    unassessed earlier page can never prove that a problem was newly introduced.
+    """
+    sides = [_side_report(directory) for directory in directories]
+    if any(side is None for side in sides):
+        return None
+    before, after = sides
+    snapshots = [_observed_pages(directory) for directory in directories]
     changes = []
-    for key in sorted(before.keys() | after.keys()):
-        if key in before and key in after:
-            state = "persistent"
-        elif key in before:
-            state = "resolved"
+    for identity in sorted(before.keys() | after.keys()):
+        first, second = before.get(identity), after.get(identity)
+        reason = ""
+        if first and second:
+            if first["detail"] == second["detail"]:
+                state, finding = "persistent", second
+            else:
+                state, finding = "changed", second | {"previous_detail": first["detail"]}
+        elif first:
+            finding = first
+            if _rule_could_run(identity[0], identity[1], snapshots[1]):
+                state = "resolved"
+            else:
+                state, reason = "unassessed", _unassessed_reason(identity[1], snapshots[1])
         else:
-            state = "new"
-        changes.append({"state": state, "finding": before[key] if key in before else after[key]})
+            finding = second
+            if _rule_could_run(identity[0], identity[1], snapshots[0]):
+                state = "new"
+            else:
+                state, reason = "unassessed", _unassessed_reason(identity[1], snapshots[0])
+        changes.append({"state": state, "finding": finding, "reason": reason})
     return changes
 
 

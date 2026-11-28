@@ -245,6 +245,15 @@ class History:
                                  ORDER BY updated_at DESC, query""", (project,))
             return [dict(row) for row in rows]
 
+    def latest_audit(self, project, target=None):
+        """The newest finished audit for this project and target, ignoring unrelated runs."""
+        with self.transaction() as db:
+            row = db.execute("""SELECT manifest FROM runs WHERE project=? AND tool=? AND finished IS NOT NULL
+                                AND (? IS NULL OR target IS ?)
+                                ORDER BY started DESC, id LIMIT 1""",
+                             (project, "seo.audit", target, target)).fetchone()
+            return json.loads(row["manifest"]) if row else None
+
     def remove_brief_item(self, project, query):
         with self.transaction() as db:
             db.execute("DELETE FROM brief_items WHERE project=? AND query=?", (project, query))

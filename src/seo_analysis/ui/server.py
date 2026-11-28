@@ -554,26 +554,36 @@ def create_app(workspace, port=8765):
             selected = projects[0]
         name = selected["name"] if selected else None
         reviews = history.finding_reviews(name) if name else []
-        latest = None
-        if name:
-            for run in history.list_runs(name, limit=20, archived=False):
-                if run["tool"] != tools.AUDIT.id:
-                    continue
+        audits = {}
+
+        def audit_for(target):
+            """Latest comparable audit for this project and target, ignoring imports and other targets."""
+            if target not in audits:
+                manifest = history.latest_audit(name, target) if name else None
                 try:
-                    data = history.show(run["id"])
-                    latest = (run["id"], load_audit(Path(data["directory"]), data["manifest"]))
+                    data = history.show(manifest["run_id"]) if manifest else None
+                    audits[target] = (load_audit(Path(data["directory"]), data["manifest"])
+                                      if data else None)
                 except (ValueError, OSError):
-                    latest = None
-                break
-        current = {}
-        if latest:
-            for page in latest[1].pages:
-                for rule in page.rules:
-                    current[(rule, page.url)] = page.fingerprint
+                    audits[target] = None
+            return audits[target]
+
         items = []
         for row in reviews:
-            fingerprint = current.get((row["rule"], row["page_key"]))
-            if not latest:
+            target = None
+            if row.get("run_id"):
+                try:
+                    target = history.show(row["run_id"])["manifest"].get("saved_target")
+                except (ValueError, OSError):
+                    target = None
+            audit = audit_for(target)
+            fingerprint = None
+            if audit:
+                for page in audit.pages:
+                    if row["rule"] in page.rules and page.url == row["page_key"]:
+                        fingerprint = page.fingerprint
+                        break
+            if audit is None:
                 state = "no current audit"
             elif fingerprint is None:
                 state = "no longer reported"
@@ -582,8 +592,9 @@ def create_app(workspace, port=8765):
             else:
                 state = "current"
             items.append(row | {"state": state})
+        latest_id = next((audit.manifest["run_id"] for audit in audits.values() if audit), None)
         return render("review_queue", selected=selected, projects=projects, items=items,
-                      latest=latest[0] if latest else None, finding_labels=FINDING_LABELS)
+                      latest=latest_id, finding_labels=FINDING_LABELS)
 
     @app.get("/brief")
     def brief(project: str = ""):

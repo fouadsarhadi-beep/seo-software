@@ -781,6 +781,51 @@ def test_ui_question_outline_compares_two_captures_and_offers_the_brief(tmp_path
         assert 'action="/brief/add"' in page
 
 
+def _target_audit(ws, project, target, rid, started, title):
+    pages = [{"evidence_id": "page-000001", "url": "https://example.org/a", "final_url": "https://example.org/a",
+              "first_status": 200, "final_status": 200, "chain": [], "effective_indexability": "indexable",
+              "indexability_reason": "", "title": title, "words": 5, "depth": 0, "content_hash": "h-" + title,
+              "observed_at": started, "markup": {}}]
+    findings = [{"category": "review", "rule": "seo.missing-title", "detail": "https://example.org/a",
+                 "evidence_ids": ["page-000001"], "urls": ["https://example.org/a"]}]
+    _saved_run(ws, {"run_id": rid, "tool_id": "seo.audit", "status": "succeeded", "project": project,
+                    "saved_target": target, "started_at": started, "finished_at": started,
+                    "parameters": {"source": "https://example.org/", "kind": "website"},
+                    "counts": {"observed": 1, "findings": 1}, "warnings": [],
+                    "artifacts": ["findings.json", "snapshot.jsonl"]},
+               {"snapshot.jsonl": "\n".join(json.dumps(page) for page in pages) + "\n",
+                "findings.json": json.dumps({"schema_version": 1, "findings": findings})})
+
+
+def test_ui_review_queue_ignores_unrelated_runs_and_other_targets(tmp_path):
+    origin = "http://127.0.0.1:8972"
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    history = History(ws)
+    history.add_project("Acme")
+    history.add_target("Acme", "Blog", "website", "https://example.org/")
+    history.add_target("Acme", "Docs", "website", "https://example.org/docs")
+    blog = uuid4().hex
+    _target_audit(ws, "Acme", "Blog", blog, "2026-11-20T00:00:00Z", "Same")
+    with TestClient(create_app(ws, 8972), base_url=origin) as client:
+        page = BeautifulSoup(client.get(f"/runs/{blog}", params={"tab": "findings",
+                                                                 "rule": "seo.missing-title"}).text, "html.parser")
+        token = page.select_one('input[name="token"]')["value"]
+        client.post(f"/runs/{blog}/review-finding", headers={"Origin": origin},
+                    data={"token": token, "rule": "seo.missing-title", "url": "https://example.org/a",
+                          "status": "reviewed", "note": "Checked"})
+    for index in range(25):
+        _saved_run(ws, {"run_id": uuid4().hex, "tool_id": "research.import", "status": "succeeded",
+                        "project": "Acme", "saved_target": None,
+                        "started_at": f"2026-11-21T00:{index:02d}:00Z",
+                        "finished_at": f"2026-11-21T00:{index:02d}:05Z", "parameters": {"kind": "serp"},
+                        "counts": {"rows": 1}, "warnings": [], "artifacts": ["dataset.json"]},
+                   {"dataset.json": json.dumps({"schema_version": 1, "source": {"kind": "serp"}, "rows": []})})
+    _target_audit(ws, "Acme", "Docs", uuid4().hex, "2026-11-25T00:00:00Z", "Different")
+    with TestClient(create_app(ws, 8972), base_url=origin) as client:
+        queue = client.get("/review-queue", params={"project": "Acme"}).text
+        assert "Checked" in queue and "current" in queue
+
+
 def test_ui_review_queue_keeps_a_decision_and_reopens_it_when_the_page_changes(tmp_path):
     origin = "http://127.0.0.1:8972"
     ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")

@@ -50,8 +50,8 @@
 {% if 'finding_changes.csv' in run.artifacts %}<a href="/runs/{{rid}}/files/finding_changes.csv">Finding changes CSV</a>{% endif %}
 </div>
 <h2>{{'Finding changes' if findings else 'Page observations'}}</h2>
-{% if findings and not unavailable %}<p>New means the finding appears only in the later run, persistent means both runs report it, resolved means the later run no longer does. Coverage and available evidence still govern what each run could report.</p>
-{% if rows %}<p>{% for state in ('new', 'persistent', 'resolved') %}{% set count = rows|selectattr('state', 'equalto', state)|list|length %}{% if count %}<span class="badge">{{count}} {{state}}</span> {% endif %}{% endfor %}</p>{% endif %}
+{% if findings and not unavailable %}<p>New means the finding appears only in the later run, persistent means both runs report it, resolved means the later run could check it and no longer reports it, changed means the same pages now carry different evidence, and unassessed means one run never had the evidence that rule needs. Coverage and available evidence still govern what each run could report.</p>
+{% if rows %}<p>{% for state in ('new', 'changed', 'persistent', 'resolved', 'unassessed') %}{% set count = rows|selectattr('state', 'equalto', state)|list|length %}{% if count %}<span class="badge">{{count}} {{state}}</span> {% endif %}{% endfor %}</p>{% endif %}
 {% endif %}
 {% if unavailable %}<p>Finding changes require findings reports from both runs.</p>
 {% elif rows %}
@@ -61,7 +61,7 @@
 <tr><th>Change</th><th>Finding</th><th>Page evidence</th></tr>
 {% for row in rows %}
 {% set item = row.finding %}
-<tr><td>{{row.state|capitalize}}</td><td><strong>{{finding_labels.get(item.rule, item.rule)}}</strong><br>{{item.detail}}</td>
+<tr><td>{{row.state|capitalize}}{% if row.reason %}<br><small>{{row.reason}}</small>{% endif %}</td><td><strong>{{finding_labels.get(item.rule, item.rule)}}</strong><br>{{item.detail}}{% if item.previous_detail %}<br><small>was: {{item.previous_detail}}</small>{% endif %}</td>
 <td>{% for url in item.urls %}{% set idx = loop.index0 %}{% for position in sides.get(row.state, [0]) %}{% if sources[position] and item.evidence_ids[idx] is defined %}<a href="/runs/{{sources[position].manifest.run_id}}/evidence/{{item.evidence_ids[idx]}}">{{'Before' if position == 0 else 'After'}}</a> {% endif %}{% endfor %}{{url}}<br>{% endfor %}</td></tr>
 {% endfor %}
 {% else %}
