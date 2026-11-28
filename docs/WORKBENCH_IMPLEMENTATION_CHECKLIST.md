@@ -1,6 +1,6 @@
 # Workbench implementation checklist
 
-**Status on 2026-11-28:** stages 1–6 are implemented with automated coverage; live Google checks remain pending owner credentials. Stage 7 has 7.1 done; 7.2–7.5 remain (a dedicated keyword-gap view and question relationships). Stage 7 expands its research follow-up. The first release target is stages 1–4: launch, crawl, investigate, share. The second is stages 5–7: explain performance, track decisions, explore opportunities.
+**Status on 2026-11-28:** stages 1–6 are implemented with automated coverage; live Google checks remain pending owner credentials. Stage 7 has 7.1 and the shared/owned-only/competitor-only gap split done; the sample-compatibility warning, an add-to-brief action and question relationships (7.3–7.5) remain. Stage 7 expands its research follow-up. The first release target is stages 1–4: launch, crawl, investigate, share. The second is stages 5–7: explain performance, track decisions, explore opportunities.
 
 ## How to pick up the work
 

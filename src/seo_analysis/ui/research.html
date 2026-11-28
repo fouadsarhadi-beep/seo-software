@@ -111,7 +111,7 @@
 </details>
 <div class="links">{% for key, label in sections.items() %}<a href="?category={{key}}"{% if key == section %} aria-current="page"{% endif %}>{{label}}</a>{% endfor %}</div>
 <h2>{{'Observations for ' ~ q if section == 'observations' else sections.get(section, 'Observations')}}</h2>
-{% if section == 'competitors' %}<p>Gap queries were observed for the competitor within the selected samples.</p>{% endif %}
+{% if section == 'competitors' %}<p>Each column is limited to the selected samples. <strong>Owned sample only</strong> means the competitor was not seen for that query in these captures — not that it never ranks for it. Compare samples captured with the same provider, locale and device.</p>{% endif %}
 {% if rows %}
 <div class="table"><table>
 {% if section == 'keywords' %}
@@ -121,9 +121,10 @@
 <tr><th>Observed URL</th><th>Rank or position</th><th>Source context</th><th>Evidence</th></tr>
 {% for row in rows %}<tr><td>{{row.url or '—'}}</td><td>{{'—' if row.rank is none else row.rank}}</td><td>{{source_context(report.sources[row.evidence.run_id])}}</td><td>{{evidence(row.evidence)}}</td></tr>{% endfor %}
 {% elif section == 'competitors' %}
-<tr><th>Host</th><th>Observed queries</th><th>Shared with owned site</th><th>Gap queries</th></tr>
-{% for row in rows %}<tr><td>{{row.host}}</td><td>{{row.observed_queries}}</td><td>{{row.shared_with_owned}}</td><td>
-{{row.only_in_competitor_sample|length}}{% if row.only_in_competitor_sample %}<details><summary>View query examples</summary><ul>{% for query in row.only_in_competitor_sample[:8] %}<li>{{keyword(query)}}</li>{% endfor %}</ul></details>{% endif %}</td></tr>{% endfor %}
+<tr><th>Competitor host</th><th>Queries in sample</th><th>Shared with owned</th><th>Owned sample only</th><th>Competitor sample only</th></tr>
+{% for row in rows %}<tr><td>{{row.host}}</td><td>{{row.observed_queries}}</td><td>{{row.shared_with_owned}}</td>
+<td>{{row.get('only_in_owned_sample', [])|length}}{% if row.get('only_in_owned_sample') %}<details><summary>View examples</summary><ul>{% for query in row.only_in_owned_sample[:8] %}<li>{{keyword(query)}}</li>{% endfor %}</ul></details>{% endif %}</td>
+<td>{{row.only_in_competitor_sample|length}}{% if row.only_in_competitor_sample %}<details><summary>View examples</summary><ul>{% for query in row.only_in_competitor_sample[:8] %}<li>{{keyword(query)}}</li>{% endfor %}</ul></details>{% endif %}</td></tr>{% endfor %}
 {% elif section == 'serp_overlap' %}
 <tr><th>Queries</th><th>Shared URLs</th><th>Capture context</th></tr>
 {% for row in rows %}<tr><td>{{keyword(row.queries[0])}}<br>{{keyword(row.queries[1])}}</td><td><details><summary>{{row.shared_urls|length}}</summary><ul>{% for url in row.shared_urls %}<li>{{url}}</li>{% endfor %}</ul></details></td><td>{{row.context[0]}} · {{row.context[1]}} · {{row.context[2] or 'Locale unknown'}} · {{row.context[3] or 'Device unknown'}}</td></tr>{% endfor %}

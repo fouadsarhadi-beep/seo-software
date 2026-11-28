@@ -52,6 +52,26 @@ def _observed_pages(workspace, run_id, owned_host, *, owned):
     return indexed, {"run_id": run_id, "host": host, "status": manifest["status"]}
 
 
+def competitor_gaps(domains, host):
+    """Split queries per observed host into shared, owned-only and competitor-only.
+
+    Every set is limited to the selected samples: a query absent here was not seen in
+    these captures, which is not evidence that a site never ranks for it.
+    """
+    owned = domains.get(host, set())
+    return [
+        {
+            "host": candidate,
+            "observed_queries": len(queries),
+            "shared_with_owned": len(queries & owned),
+            "only_in_owned_sample": sorted(owned - queries),
+            "only_in_competitor_sample": sorted(queries - owned),
+        }
+        for candidate, queries in sorted(domains.items())
+        if candidate != host
+    ]
+
+
 def build_research(ctx, request):
     host = request.owned_host.strip().casefold().rstrip(".")
     if not host or any(c in host for c in "/@: "):
@@ -138,16 +158,7 @@ def build_research(ctx, request):
                     jaccard=len(shared) / len(queries[a] | queries[b]),
                 )
             )
-    competitors = [
-        {
-            "host": d,
-            "observed_queries": len(q),
-            "shared_with_owned": len(q & domains.get(host, set())),
-            "only_in_competitor_sample": sorted(q - domains.get(host, set())),
-        }
-        for d, q in sorted(domains.items())
-        if d != host
-    ]
+    competitors = competitor_gaps(domains, host)
     rank_history = []
     for (provider, locale, device, query, domain), captures in sorted(ranks.items()):
         previous = None
