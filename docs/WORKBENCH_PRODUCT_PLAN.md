@@ -42,3 +42,18 @@ The first useful session should let someone choose a site, run an audit, underst
 1. Expose the existing comparison workflow from the project overview. Select a baseline and surface new, persistent and resolved findings. Show coverage differences and mark pages outside either sample as unassessed.
 2. Add a project review queue linked to evidence. Let the user mark a finding for review, record a decision and revisit it after the next crawl. Use impact data when available and show why an item appears high on the list.
 3. Final owner walkthrough: launch from Windows, audit a real site, filter pages, review an issue, export both formats, import analytics and compare a second run. Record each outcome and unresolved issue. Prioritize further tools using the tasks the owner repeats in practice.
+
+## Design references and the features they inform
+
+- **Stage 3, Ahrefs Page Explorer.** Give common questions one-click presets. In the example audit, selecting “2 redirecting” should open Pages with Redirects active, show the two matching rows and let the user inspect each destination. Implement presets using the same query as the table and its export. [Ahrefs Page Explorer](https://ahrefs.com/academy/how-to-use-ahrefs/site-audit/page-explorer)
+- **Stage 3, Semrush Site Audit.** Opening a rule should answer three questions in order: What did we observe? Why might it matter? What should I check next? For a noindex finding, show the directive and ask whether exclusion is intentional before suggesting a change. [Semrush Issues report](https://www.semrush.com/kb/541-site-audit-issues-report)
+- **Stage 6, Ahrefs crawl comparison.** Let a user open an affected URL from the change summary and inspect the two dated observations side by side. Test disappearance from a capped sample separately from a verified fix. [Ahrefs crawl comparison](https://help.ahrefs.com/en/articles/5192078-how-to-compare-changes-between-two-crawls-in-site-audit)
+- **Research follow-up, Semrush Keyword Gap.** After Stage 5, compare the owned site's keyword export with a competitor sample for a compatible locale and period. Offer Shared and Seen only in competitor sample views, with the source row behind each term. A sample can support a content lead without establishing that a site never ranks. [Semrush Keyword Gap](https://www.semrush.com/kb/28-keyword-gap)
+
+### Research follow-up: question trees
+
+Use AlsoAsked's branching question view as the reference. Start with an imported dataset containing seed, parent question, child question, source, language, country and observation date. An ordinary keyword list can support a flat view until relationship data is supplied. [AlsoAsked FAQ](https://alsoasked.com/faqs)
+
+1. Under Keyword & competitor research, add Explore questions. Select a seed and expand branches. Provide a keyboard-accessible outline alongside the visual tree, support Persian right-to-left text and link each relationship to its source.
+2. Let the user select a branch and send its questions to an editorial brief. Export parent-child rows with their provenance so another analyst can reconstruct the tree.
+3. Verify with a small Persian fixture covering a shared child, repeated edges, a cycle and a seed with no recorded questions. Expansion must terminate and preserve distinct observed parents. Evaluate a live provider after the offline workflow is useful.
