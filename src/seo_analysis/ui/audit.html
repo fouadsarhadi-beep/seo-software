@@ -69,8 +69,17 @@
 </section>
 <h2>Affected pages</h2>
 {% if affected %}
-<ul class="ruled">{% for page in affected %}<li><a href="/runs/{{rid}}/evidence/{{page.evidence_id}}?back={{ ('/runs/' ~ rid ~ '?tab=findings&rule=' ~ (selection.rule|urlencode))|urlencode }}">{{ page.path }}</a> · {{ page.status_text }} · {{ page.indexability_text }}</li>{% endfor %}</ul>
-<p><a href="?tab=pages&rule={{selection.rule|urlencode}}">Open these pages in the page table</a></p>
+<ul class="ruled">{% for page in affected[:20] %}{% set review = page_reviews.get(page.url) %}
+<li><a href="/runs/{{rid}}/evidence/{{page.evidence_id}}?back={{ ('/runs/' ~ rid ~ '?tab=findings&rule=' ~ (selection.rule|urlencode))|urlencode }}">{{ page.path }}</a> · {{ page.status_text }} · {{ page.indexability_text }}{% if review %} <span class="badge">{{ review.status }}</span>{% endif %}
+<form class="line" method="post" action="/runs/{{rid}}/review-finding">
+{{ csrf() }}<input type="hidden" name="rule" value="{{ selection.rule }}"><input type="hidden" name="url" value="{{ page.url }}">
+<label>Decision <select name="status"><option value="open"{% if review and review.status == 'open' %} selected{% endif %}>Open</option><option value="reviewed"{% if review and review.status == 'reviewed' %} selected{% endif %}>Reviewed</option><option value="ignored"{% if review and review.status == 'ignored' %} selected{% endif %}>Ignored</option></select></label>
+<label>Note <input name="note" value="{{ review.note if review else '' }}" placeholder="Why, or what to do next"></label>
+<button class="secondary">Save decision</button>
+</form>
+</li>{% endfor %}</ul>
+{% if affected|length > 20 %}<p>Showing the first 20 of {{ affected|length }} affected pages.</p>{% endif %}
+<p><a href="?tab=pages&rule={{selection.rule|urlencode}}">Open these pages in the page table</a> · <a href="/review-queue{% if run.project %}?project={{run.project|urlencode}}{% endif %}">Review queue</a></p>
 {% else %}<p>No page evidence is linked to this rule in this run.</p>{% endif %}
 {% else %}
 <h2>Findings</h2>

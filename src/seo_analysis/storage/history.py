@@ -1,5 +1,6 @@
 """SQLite index over authoritative, per-run manifests and observation files."""
 from contextlib import contextmanager
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 import sqlite3
@@ -40,6 +41,14 @@ MIGRATIONS = [
                FOREIGN KEY(project, target) REFERENCES targets(project, name))""",
     ),
     ("CREATE TABLE pending_removals (path TEXT PRIMARY KEY)",),
+    (
+        """CREATE TABLE finding_reviews (
+               project TEXT NOT NULL, rule TEXT NOT NULL, page_key TEXT NOT NULL,
+               status TEXT NOT NULL CHECK(status IN ('open','reviewed','ignored')),
+               note TEXT NOT NULL DEFAULT '', fingerprint TEXT NOT NULL,
+               evidence_id TEXT, run_id TEXT, updated_at TEXT NOT NULL,
+               PRIMARY KEY (project, rule, page_key))""",
+    ),
 ]
 
 
@@ -182,6 +191,35 @@ class History:
     def remove_google_connection(self, project, service):
         with self.transaction() as db:
             db.execute("DELETE FROM google_connections WHERE project=? AND service=?", (project or "", service))
+
+    def save_finding_review(self, project, rule, page_key, *, status, note, fingerprint, evidence_id="", run_id=""):
+        """Record one decision per project, rule and page. A repeated save updates the same row."""
+        if status not in ("open", "reviewed", "ignored"):
+            raise ValueError("Unknown review status.")
+        updated = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        with self.transaction() as db:
+            db.execute("""INSERT INTO finding_reviews
+                          (project, rule, page_key, status, note, fingerprint, evidence_id, run_id, updated_at)
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                          ON CONFLICT(project, rule, page_key) DO UPDATE SET status=excluded.status,
+                          note=excluded.note, fingerprint=excluded.fingerprint,
+                          evidence_id=excluded.evidence_id, run_id=excluded.run_id, updated_at=excluded.updated_at""",
+                       (project, rule, page_key, status, note, fingerprint, evidence_id, run_id, updated))
+            row = db.execute("""SELECT * FROM finding_reviews WHERE project=? AND rule=? AND page_key=?""",
+                             (project, rule, page_key)).fetchone()
+            return dict(row)
+
+    def finding_reviews(self, project=None):
+        with self.transaction() as db:
+            rows = db.execute("""SELECT * FROM finding_reviews WHERE (? IS NULL OR project=?)
+                                 ORDER BY updated_at DESC, rule, page_key""", (project, project))
+            return [dict(row) for row in rows]
+
+    def finding_review(self, project, rule, page_key):
+        with self.transaction() as db:
+            row = db.execute("""SELECT * FROM finding_reviews WHERE project=? AND rule=? AND page_key=?""",
+                             (project, rule, page_key)).fetchone()
+            return dict(row) if row else None
 
     def index(self, directory, *, recover=False):
         with self.transaction() as db:

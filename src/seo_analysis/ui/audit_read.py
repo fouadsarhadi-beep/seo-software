@@ -1,5 +1,6 @@
 """Read model over one saved audit run: observed pages, findings and the page query."""
 from dataclasses import dataclass, field
+from hashlib import sha256
 import json
 from math import ceil
 from pathlib import Path
@@ -25,8 +26,15 @@ class PageRow:
     title: str
     words: int | None
     evidence_id: str
+    content_hash: str
     depth: int | None
     rules: list[str] = field(default_factory=list)
+
+    @property
+    def fingerprint(self) -> str:
+        """Stable per-page evidence identity used to notice that a reviewed page changed."""
+        seed = "|".join((self.url, self.status_text, self.indexability_text, self.title, self.content_hash))
+        return sha256(seed.encode("utf-8")).hexdigest()[:16]
 
     @property
     def path(self) -> str:
@@ -143,6 +151,7 @@ def load_audit(directory, manifest: dict) -> Audit:
                 title=str(record.get("title") or ""),
                 words=_number(record.get("words")),
                 evidence_id=str(record.get("evidence_id") or ""),
+                content_hash=str(record.get("content_hash") or ""),
                 depth=_number(record.get("depth")),
             )
             pages.append(page)

@@ -496,6 +496,63 @@ def create_app(workspace, port=8765):
         return render("compare", snapshots=snapshots, before=before, after=after,
                       selected=selected, projects=projects)
 
+    @app.get("/review-queue")
+    def review_queue(project: str = ""):
+        projects = history.projects()
+        selected = next((item for item in projects if item["name"] == project), None)
+        if selected is None and projects:
+            selected = projects[0]
+        name = selected["name"] if selected else None
+        reviews = history.finding_reviews(name) if name else []
+        latest = None
+        if name:
+            for run in history.list_runs(name, limit=20, archived=False):
+                if run["tool"] != tools.AUDIT.id:
+                    continue
+                try:
+                    data = history.show(run["id"])
+                    latest = (run["id"], load_audit(Path(data["directory"]), data["manifest"]))
+                except (ValueError, OSError):
+                    latest = None
+                break
+        current = {}
+        if latest:
+            for page in latest[1].pages:
+                for rule in page.rules:
+                    current[(rule, page.url)] = page.fingerprint
+        items = []
+        for row in reviews:
+            fingerprint = current.get((row["rule"], row["page_key"]))
+            if not latest:
+                state = "no current audit"
+            elif fingerprint is None:
+                state = "no longer reported"
+            elif fingerprint != row["fingerprint"]:
+                state = "needs re-review"
+            else:
+                state = "current"
+            items.append(row | {"state": state})
+        return render("review_queue", selected=selected, projects=projects, items=items,
+                      latest=latest[0] if latest else None, finding_labels=FINDING_LABELS)
+
+    @app.post("/runs/{rid}/review-finding")
+    async def review_finding(rid: str, request: Request):
+        fields = await form(request)
+        data = detail(rid)
+        run = data["manifest"]
+        project = run.get("project")
+        if not project:
+            raise HTTPException(400, "Reviews attach to a project. Run this audit inside one first.")
+        rule = fields.get("rule", "")
+        audit = load_audit(Path(data["directory"]), run)
+        page = next((item for item in audit.pages if item.url == fields.get("url", "")), None)
+        if page is None or not rule:
+            raise HTTPException(400, "Choose a page and a finding from this run.")
+        history.save_finding_review(project, rule, page.url, status=fields.get("status", "reviewed"),
+                                    note=fields.get("note", "").strip()[:500], fingerprint=page.fingerprint,
+                                    evidence_id=page.evidence_id, run_id=rid)
+        return RedirectResponse(f"/runs/{rid}?" + urlencode({"tab": "findings", "rule": rule, "saved": "1"}), 303)
+
     @app.post("/compare")
     async def run_comparison(request: Request):
         fields = await form(request)
@@ -959,6 +1016,10 @@ def create_app(workspace, port=8765):
         page_query.filters = {**page_query.filters, "tab": "pages"}
         categories = sorted({row["category"] for row in rules if row["category"]})
         selection = next((row for row in rules if row["rule"] == rule), None)
+        page_reviews = {}
+        if selection and run.get("project"):
+            page_reviews = {row["page_key"]: row for row in history.finding_reviews(run["project"])
+                            if row["rule"] == selection["rule"]}
         affected = []
         if selection:
             unique = {}
@@ -982,7 +1043,7 @@ def create_app(workspace, port=8765):
                       check_labels=CHECK_LABELS, limit=run["parameters"].get("limit"),
                       page_limited=context["page_limited"], examples=context["examples"],
                       completion=context["completion"], has_pages=bool(audit.pages),
-                      export_href=export_href)
+                      export_href=export_href, page_reviews=page_reviews)
 
     @app.get("/runs/{rid}")
     def result(rid: str, page: int = 1, evidence_page: int = 1, q: str = "", category: str = "",

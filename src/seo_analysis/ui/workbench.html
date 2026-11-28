@@ -120,6 +120,7 @@ p{overflow-wrap:anywhere}
 <a href="/tools/site-qa"{% if area == 'qa' %} aria-current="page"{% endif %}>Site QA</a>
 <span class="nav-label">Workspace</span>
 <a href="/history"{% if view == 'history' %} aria-current="page"{% endif %}>History</a>
+<a href="/review-queue"{% if view == 'review_queue' %} aria-current="page"{% endif %}>Review queue</a>
 <a href="/history/data">Manage saved data</a>
 </nav>
 <p class="rail-foot">Local only. Pages are fetched, measured and stored on this computer.</p>
@@ -368,6 +369,25 @@ p{overflow-wrap:anywhere}
 {% else %}<p>Run an audit for this project first; its report is where measurements join observed pages.</p>{% endif %}
 <p><a class="button ghost" href="/audit/new{% if selected %}?project={{selected.name|urlencode}}{% endif %}">Start an audit</a>
 <a class="button ghost" href="/history">All saved runs</a></p>
+{% elif view=="review_queue" %}
+<div class="page-head"><div>
+<p class="crumbs">Workspace</p>
+<h1>Review queue{% if selected %} · {{ selected.name }}{% endif %}</h1>
+<p class="lede">Decisions recorded from an audit's findings. When a page's evidence no longer matches the decision, the item is marked for re-review and the note is kept.</p>
+</div></div>
+{% if items %}
+<div class="table"><table>
+<tr><th>Finding</th><th>Page</th><th>Decision</th><th>Standing</th><th>Note</th><th>Updated (UTC)</th></tr>
+{% for item in items %}
+<tr><td>{{ finding_labels.get(item.rule, item.rule) }}</td>
+<td>{{ item.page_key }}</td>
+<td>{{ item.status }}{% if item.state == 'needs re-review' %} <span class="badge">re-review</span>{% elif item.state == 'no longer reported' %} <span class="badge">not reported</span>{% endif %}</td>
+<td>{{ item.state }}</td><td>{{ item.note or '—' }}</td>
+<td>{{ item.updated_at[:19]|replace('T',' ') }}</td></tr>
+{% endfor %}
+</table></div>
+{% else %}<p>No decisions recorded yet. Open a saved audit, choose a finding, and record a decision on an affected page.</p>{% endif %}
+<p><a class="button ghost" href="/history">Saved audits</a>{% if latest %}<a class="button ghost" href="/runs/{{latest}}">Latest audit in this project</a>{% endif %}</p>
 {% elif view=="history" %}
 <h1>{{'Archived runs' if archived else 'Run history'}}</h1>
 <div class="links"><a href="/compare">Compare saved audits</a><a href="{{'/history' if archived else '/history?archived=true'}}">{{'Back to run history' if archived else 'View archived runs'}}</a><a href="/history/data">Manage saved data</a></div>

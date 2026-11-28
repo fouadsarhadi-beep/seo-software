@@ -14,6 +14,7 @@ from seo_analysis.connectors import google as google_connector
 from seo_analysis.core import tools
 from seo_analysis.core.workspace import Workspace
 from seo_analysis.storage.history import History
+from seo_analysis.storage.removal import remove_saved_data
 from seo_analysis.research import sources
 from seo_analysis.web.fetch import Fetcher
 from seo_analysis.ui.server import create_app
@@ -256,7 +257,8 @@ def test_ui_page_table_paginates_filters_and_opens_exact_counts(tmp_path):
         detail = BeautifulSoup(client.get(base, params={"tab": "findings", "rule": "seo.missing-meta"}).text,
                                "html.parser")
         assert detail.find("h3", string="What was observed") and detail.find("h3", string="Why it matters")
-        assert len(detail.select('a[href*="/evidence/"]')) == 32
+        assert len(detail.select('a[href*="/evidence/"]')) == 20
+        assert "Showing the first 20 of 32 affected pages." in detail.get_text(" ", strip=True)
         # The spreadsheet covers every matching page, not just the 30 on screen.
         csv_text = client.get(base + "/pages.csv", params={"rule": "seo.missing-meta"}).text
         assert csv_text.splitlines()[0].lstrip("\ufeff").startswith("# SEO Analysis page export")
@@ -343,7 +345,8 @@ def test_ui_overview_and_task_navigation_guide_a_first_session(tmp_path):
         assert tasks == {"Overview": "/", "Website audit": "/audit/new",
                          "Keyword and competitor research": "/tools/research",
                          "Search and traffic": "/tools/search-traffic", "Site QA": "/tools/site-qa",
-                         "History": "/history", "Manage saved data": "/history/data"}
+                         "History": "/history", "Review queue": "/review-queue",
+                         "Manage saved data": "/history/data"}
         assert home.select_one('nav.tasks a[aria-current="page"]').get_text(strip=True) == "Overview"
 
         start = BeautifulSoup(client.get("/audit/new").text, "html.parser")
@@ -622,3 +625,58 @@ def test_ui_search_traffic_scopes_the_connection_to_the_selected_project(tmp_pat
         beta = client.get("/tools/search-traffic", params={"project": "Beta"}).text
         assert "alpha.test" in alpha and "beta.test" not in alpha
         assert "beta.test" in beta and "alpha.test" not in beta
+
+
+def _audit_pages(ws, project, rid, *, started, title):
+    pages = [{"evidence_id": "page-000001", "url": "https://example.org/a", "final_url": "https://example.org/a",
+              "first_status": 200, "final_status": 200, "chain": [], "effective_indexability": "indexable",
+              "indexability_reason": "", "title": title, "words": 10, "depth": 0, "content_hash": "hash-" + title,
+              "observed_at": "2026-11-20T00:00:00+00:00"}]
+    findings = [{"category": "review", "rule": "seo.missing-title", "detail": "https://example.org/a",
+                 "evidence_ids": ["page-000001"]}]
+    _saved_run(ws, {"run_id": rid, "tool_id": "seo.audit", "status": "succeeded", "project": project,
+                    "saved_target": None, "started_at": started, "finished_at": started,
+                    "parameters": {"source": "https://example.org/"}, "counts": {"observed": 1, "findings": 1},
+                    "warnings": [], "artifacts": ["findings.json", "snapshot.jsonl"]},
+               {"snapshot.jsonl": "\n".join(json.dumps(page) for page in pages) + "\n",
+                "findings.json": json.dumps({"schema_version": 1, "findings": findings})})
+    return rid
+
+
+def test_ui_review_queue_keeps_a_decision_and_reopens_it_when_the_page_changes(tmp_path):
+    origin = "http://127.0.0.1:8972"
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    History(ws).add_project("Acme")
+    first = _audit_pages(ws, "Acme", uuid4().hex, started="2026-11-20T00:00:00Z", title="Same")
+    with TestClient(create_app(ws, 8972), base_url=origin) as client:
+        headers = {"Origin": origin}
+        page = BeautifulSoup(client.get(f"/runs/{first}", params={"tab": "findings", "rule": "seo.missing-title"}).text,
+                             "html.parser")
+        form = page.select_one(f'form[action="/runs/{first}/review-finding"]')
+        assert form is not None
+        token = form.select_one('input[name="token"]')["value"]
+        saved = client.post(form["action"], headers=headers,
+                            data={"token": token, "rule": "seo.missing-title", "url": "https://example.org/a",
+                                  "status": "reviewed", "note": "Rewrote the title"})
+        assert saved.status_code == 200
+        reviews = History(ws).finding_reviews("Acme")
+        assert len(reviews) == 1
+        assert reviews[0]["status"] == "reviewed" and reviews[0]["note"] == "Rewrote the title"
+        queue = client.get("/review-queue", params={"project": "Acme"}).text
+        assert "Missing title" in queue and "Rewrote the title" in queue and "current" in queue
+        # A second save updates the same decision instead of adding another row.
+        client.post(form["action"], headers=headers,
+                    data={"token": token, "rule": "seo.missing-title", "url": "https://example.org/a",
+                          "status": "ignored", "note": "Accepted"})
+        reviews = History(ws).finding_reviews("Acme")
+        assert len(reviews) == 1 and reviews[0]["status"] == "ignored" and reviews[0]["note"] == "Accepted"
+        # A later audit changes the page: the decision reopens and the note survives.
+        _audit_pages(ws, "Acme", uuid4().hex, started="2026-11-25T00:00:00Z", title="Different")
+        queue = client.get("/review-queue", params={"project": "Acme"}).text
+        assert "needs re-review" in queue and "Accepted" in queue
+    # The decision lives in SQLite, so a fresh server still shows it.
+    with TestClient(create_app(ws, 8972), base_url=origin) as client:
+        again = client.get("/review-queue", params={"project": "Acme"}).text
+        assert "Accepted" in again and "needs re-review" in again
+    remove_saved_data(History(ws), "workspace")
+    assert History(ws).finding_reviews("Acme") == []
