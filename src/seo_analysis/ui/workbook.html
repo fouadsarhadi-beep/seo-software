@@ -15,6 +15,9 @@
 {% endfor %}
 </select>
 {% endfor %}
+{% if notes %}<div class="notice"><p><strong>Check the measurement scope before joining.</strong></p>
+<ul>{% for item in notes %}<li>{{item.name}} · {{item.note}}</li>{% endfor %}</ul>
+<p>Rows are still joined, but a measurement outside the audit's date or site describes a different picture.</p></div>{% endif %}
 <p><button>Preview matches</button></p>
 </form>
 </section>

@@ -542,3 +542,26 @@ def test_ui_search_traffic_fetches_only_with_a_working_credential(tmp_path, monk
                             data={"token": token, "project": "Acme"})
         assert "Disconnected Search Console for this project." in reply.text
         assert History(ws).google_connection("Acme", "gsc") is None
+
+
+def test_ui_report_picker_warns_when_a_measurement_is_out_of_scope(tmp_path):
+    ws = Workspace(tmp_path / "config", tmp_path / "data", tmp_path / "exports")
+    History(ws).add_project("Acme")
+    audit = uuid4().hex
+    _saved_run(ws, {"run_id": audit, "tool_id": "seo.audit", "status": "succeeded", "project": "Acme",
+                    "saved_target": None, "started_at": "2026-11-20T00:00:00Z",
+                    "finished_at": "2026-11-20T00:01:00Z", "parameters": {"source": "https://example.org/"},
+                    "counts": {"observed": 3}, "warnings": [], "artifacts": ["snapshot.jsonl"]},
+               {"snapshot.jsonl": ""})
+    pull = uuid4().hex
+    _saved_run(ws, {"run_id": pull, "tool_id": "google.search-analytics", "status": "succeeded", "project": "Acme",
+                    "saved_target": None, "started_at": "2026-10-15T00:00:00Z",
+                    "finished_at": "2026-10-15T00:00:09Z",
+                    "parameters": {"start": "2026-10-01", "end": "2026-10-15"}, "counts": {"rows": 4},
+                    "warnings": [], "artifacts": ["dataset.json"]},
+               {"dataset.json": json.dumps({"schema_version": 1, "source": {"kind": "gsc"}, "rows": []})})
+    with TestClient(create_app(ws, 8972), base_url="http://127.0.0.1:8972") as client:
+        page = client.get(f"/runs/{audit}/report").text
+        assert "Check the measurement scope before joining." in page
+        assert "measured before the audit, which ran on 2026-11-20" in page
+        assert f'value="{pull}"' in page

@@ -134,6 +134,29 @@ def _row_limit(value, default: int = 25000) -> int:
         return default
 
 
+def alignment_note(item: dict, crawl: dict) -> str:
+    """Point out a measurement whose period or origin does not line up with this audit."""
+    notes = []
+    audit_date = str(crawl.get("started_at") or "")[:10]
+    start = str(item.get("period_start") or "")
+    end = str(item.get("observed") or "")
+    if audit_date:
+        if end and end < audit_date:
+            notes.append(f"measured before the audit, which ran on {audit_date}")
+        elif start and start > audit_date:
+            notes.append(f"measured after the audit, which ran on {audit_date}")
+    origin = str(item.get("origin") or "")
+    parameters = crawl.get("parameters") or {}
+    site = str(parameters.get("source") or parameters.get("sitemap") or "")
+    if origin and site:
+        try:
+            if HttpOrigin.from_url(origin).host != HttpOrigin.from_url(site).host:
+                notes.append(f"pulled for {origin}, while this audit covers {site}")
+        except ValueError:
+            pass
+    return "; ".join(notes)
+
+
 def create_app(workspace, port=8765):
     host = f"127.0.0.1:{port}"
     origin = "http://" + host
@@ -606,7 +629,8 @@ def create_app(workspace, port=8765):
                 name = f"{REPORT_PROVIDERS[kind]} API · {source}"
                 if params.get("origin"):
                     name += " · " + params["origin"]
-                yield item | dict(name=name, observed=params.get("end", ""), period_start=params.get("start", ""))
+                yield item | dict(name=name, observed=params.get("end", ""), period_start=params.get("start", ""),
+                                  origin=params.get("origin", ""))
             elif tool == tools.PUBLIC_FEED.id:
                 yield item | dict(name=params["url"], provider="Public RSS/Atom", observed=run["finished_at"][:10])
             elif tool == tools.BRAVE_SEARCH.id:
@@ -616,11 +640,13 @@ def create_app(workspace, port=8765):
     def report_form(rid, selected, error=""):
         data = detail(rid)
         artifact_path(data, "snapshot.jsonl")
+        crawl = data["manifest"]
         datasets = {kind: [] for kind in REPORT_PROVIDERS}
         for item in saved_datasets(datasets, CONNECTED_REPORT_TOOLS):
-            datasets[item["kind"]].append(item)
-        return render("report_form", rid=rid, crawl=data["manifest"], datasets=datasets, selected=selected,
-                      providers=REPORT_PROVIDERS, error=error)
+            datasets[item["kind"]].append(item | {"note": alignment_note(item, crawl)})
+        notes = [item for items in datasets.values() for item in items if item.get("note")]
+        return render("report_form", rid=rid, crawl=crawl, datasets=datasets, selected=selected,
+                      providers=REPORT_PROVIDERS, error=error, notes=notes)
 
     @app.get("/runs/{rid}/report")
     def report_options(rid: str, gsc: str = "", ga4: str = ""):
