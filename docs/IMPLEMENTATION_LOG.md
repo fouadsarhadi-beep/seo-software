@@ -75,6 +75,8 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 
 - Stage J, Steps 1–2 — Profiled a 300-page audit fixture and replayed ten saved real pages on 2026-11-22. Consolidated default HTML exclusions into one traversal. The fixture's median audit time moved from 2.10 seconds to 1.77 seconds and real-page extraction results matched exactly.
 - Stage J, Step 4 — Built the 0.4.0 Python wheel and extended the cross-platform CI smoke test to run static site QA outside the checkout on 2026-11-22.
+- Stage J, Step 4 follow-up — Added a single-file Windows workbench launcher, a writable workspace copy option and a Windows executable build workflow on 2026-11-28.
+- Stage J, Step 4 follow-up — Added a double-click Windows script that reuses the project's Python environment and limited executable builds to version tags and manual runs on 2026-11-28.
 
 - Stage H, Step 3 follow-up — Added the local Lighthouse runner on 2026-11-22. Lighthouse 13.6 and Chromium 156 produced six lab measurements from a local fixture. The HTTP fixture verified that external requests and paths outside the build are refused.
 
@@ -87,5 +89,7 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 - Stage I, Step 4 follow-up — Added reusable project audit workflows on 2026-11-24. Workflows store a target and crawl options. Runs record the workflow name and settings used. Added a Windows checkpoint to the manual audit log.
 - Stage I, Step 4 follow-up — Added a noninteractive CLI for saved audit workflows on 2026-11-24. The CLI and workbench share execution and a per-workflow lock. Documented Windows Task Scheduler setup and added a manual checkpoint.
 - Stage H, Step 3 follow-up — Added Chromium captures and explicit saved baselines to the workbench on 2026-11-24. The results show the screenshot, local navigation timings, baseline link and changed-pixel mask. Added Windows verification to the manual audit log.
+
+- Stages A–C review follow-up — Improved cross-origin redirect guidance and sitemap parsing, added Python 3.13 and CI quality checks, updated FileLock, separated integration CLI commands, and added stratified calibration sampling on 2026-11-28.
 
 [Current scope and remaining work](ROADMAP.md)

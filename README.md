@@ -4,17 +4,40 @@ A local SEO workbench. Enter a website URL to crawl its pages and flag issues su
 
 You can also compare saved audits, turn Search Console and GA4 exports into an Excel report, or check a local site build before publishing. A basic audit needs access to the site, with no API keys or accounts.
 
-## Quick start
+## Open the workbench on Windows
 
-Open a terminal in the downloaded repository folder with Python 3.12 installed.
+If you've already installed the project, double-click **Start SEO Workbench.cmd** in the project folder. It checks for `.venv` in the project folder and then in its parent. For a first-time installation, follow the Windows setup under [Run from Python](#run-from-python).
 
-On Windows, use CMD or PowerShell.
+The launcher opens the workbench in your default browser. Use **Open Workbench** to reopen the tab and **Exit** to stop the app. It starts with your usual workspace in `%LOCALAPPDATA%\SEOAnalysisSoftware`. If Windows prevents writes, the launcher offers to copy your projects, history and saved files to a writable workspace. It reopens the copy on later launches. You may need to reconnect external accounts after switching to a copy. To open a custom workspace, pass `--config-file "C:\path\to\config.toml"` to the launcher.
+
+### Optional standalone Windows app
+
+If you need a copy with Python included, download **SEO-Workbench-Windows-x64** from a successful build. Extract the ZIP and double-click **SEO-Workbench.exe**. Optional browser captures use Playwright's Chromium when installed and can use Microsoft Edge on Windows. External providers require their own credentials and setup. [Windows desktop builds](https://github.com/fouadsarhadi-beep/seo-software/actions/workflows/windows-desktop.yml)
+
+### Build the executable on Windows
+
+From the repository folder with uv installed, run these commands.
+
+```powershell
+uv sync --locked --python 3.12 --all-extras --group desktop-build
+uv run --no-sync pyinstaller --noconfirm packaging/SEO-Workbench.spec
+uv run --no-sync python packaging/smoke_desktop.py dist/SEO-Workbench.exe
+```
+
+The executable is in `dist\SEO-Workbench.exe`. GitHub Actions runs the same build for version tags or on demand and checks that the executable can open the workbench from a folder with spaces and Persian characters.
+
+## Run from Python
+
+Open a terminal in the downloaded repository folder with Python 3.12 or 3.13 installed. The examples use 3.12. Use 3.13 in those commands if that is your installed version.
+
+On Windows, install the project once in CMD or PowerShell.
 
 ```bat
 py -3.12 -m venv .venv
 .venv\Scripts\python -m pip install -e .
-.venv\Scripts\seo-analysis serve
 ```
+
+Double-click **Start SEO Workbench.cmd** to open the installed project.
 
 On macOS or Linux, use these commands.
 
@@ -24,9 +47,13 @@ python3.12 -m venv .venv
 .venv/bin/seo-analysis serve
 ```
 
-Open [http://127.0.0.1:8765](http://127.0.0.1:8765), enter your website URL, and click **Run audit**. Under **Crawl options**, enable **Follow internal links if no sitemap is available** if your site has no sitemap. When the audit finishes, check the crawl coverage, open a finding to see its evidence, and download the report. On later visits, run only the `serve` command to reopen the app. Press Ctrl+C in the terminal to stop it.
+When using `seo-analysis serve` from a terminal, open [http://127.0.0.1:8765](http://127.0.0.1:8765). Press Ctrl+C to stop that server.
+
+Enter your website URL and click **Run audit**. Under **Crawl options**, enable **Follow internal links if no sitemap is available** if your site has no sitemap. When the audit finishes, check the crawl coverage, open a finding to see its evidence, and download the report.
 
 For a reproducible development environment with uv, run `uv sync --locked` then `uv run --locked pytest`.
+
+The quality job checks Ruff error rules, mypy, Bandit medium and high findings, and advisories in the locked runtime dependencies. Install its tools locally with `uv sync --locked --group quality`.
 
 To install a built wheel, download the `seo-analysis-wheel` artifact from a successful Foundation checks run and extract it. In the virtual environment, replace the editable install above with `.venv\Scripts\python -m pip install path\to\seo_analysis-0.4.0-py3-none-any.whl`. The Python wheel contains the CLI, workbench templates and Persian stopwords.
 
@@ -44,6 +71,8 @@ For a website, the crawler checks robots declarations and conventional sitemap p
 
 `audit --help` lists page, depth, request, duration, retry, response-size, pacing and per-path query-variant controls. Scope is one exact origin. The transport connects to validated numeric addresses and retains the origin hostname for HTTPS verification. Robots, sitemap requests, redirects and retries share the request budget.
 
+If discovery reports a redirect to another origin, check the destination and start a new audit there if it is the intended site. Use the final HTTPS or `www` address where applicable.
+
 The result includes a run ID and directory. Read `issues.txt` for findings, or use `findings.json` / `findings.csv` and look up each evidence ID under `observations/`. `requests.json` records attempted destinations and HTTP responses when received. `run.json` contains the tool version, inputs, outcome, timestamps, coverage, warnings and file references. A response cap or request limit can produce a partial result. Exit codes are 0 for success, 3 for partial, 130 for cancellation and 2 for a failed or empty audit or invalid input.
 
 ## Replay and review
@@ -56,6 +85,16 @@ seo-analysis calibrate --in-dir "<analysis directory>"
 ```
 
 Each execution receives its own run directory. Use the analysis directory printed by `analyze` for review and calibration. Decisions are saved alongside the selected pair set. The review and calibration runs retain copies of their outputs. Existing Search Console CSVs can enrich an offline replay. The `crawl --sitemap` command runs acquisition on its own.
+
+To estimate how many useful pairs the thresholds miss, review a sample from both flagged and unflagged pairs in the saved crawl.
+
+```sh
+seo-analysis analyze --in-dir "<crawl directory>" --sample-per-stratum 25 --sample-seed 2026
+seo-analysis review --in-dir "<analysis directory>" --sample
+seo-analysis calibrate --in-dir "<analysis directory>" --sample
+```
+
+The sample inherits the crawl's coverage. Calibration reports weighted estimates after all selected pairs have decisions. Small samples remain provisional. Calibrating flagged pairs alone reports precision within the reviewed set and leaves recall unavailable.
 
 ## Local workbench and snapshot checks
 

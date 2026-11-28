@@ -2,6 +2,13 @@
 
 Run these checks after the development batch is ready on your Windows test copy. Start with the saved Samatoos runs. For any mismatch, record the test date, commit, run ID, affected URL or source row, and what you saw.
 
+## Windows desktop checkpoint — Stage J, Step 4
+
+- [ ] Double-click `Start SEO Workbench.cmd` from the project folder with the existing `.venv` in the parent folder. Confirm the workbench opens and shows the usual projects and history.
+- [ ] Double-click `SEO-Workbench.exe` to open the workbench. Close the browser tab, reopen it with **Open Workbench**, and confirm **Exit** stops the local server.
+- [ ] Open the app under the Windows account that owns your Samatoos workspace. Check projects, history and a saved report download. Start a small audit and confirm that it appears in History.
+- [ ] If Windows blocks writes to the workspace, accept the copy prompt and verify the same projects and history are available. Exit and reopen to check that the copied workspace is reused. Leave the original workspace in place.
+
 ## Workbench checkpoint — Checks, comparisons and review (steps 1–3)
 
 - [ ] **Technical checks (C3, D2–D4).** Open the saved 100-page audit from **History** and run **All checks**. Open the source link, original page evidence and CSV. Filter **Internal links** for `unknown` and confirm unobserved targets differ from recorded HTTP errors. Search for a known URL in the source audit. If you have an older snapshot without markup, check that the affected checks show partial coverage.
@@ -48,3 +55,8 @@ Use authorized properties and the documented [Google connection and CLI commands
 - [ ] **Edit safely.** Change the workflow name or page cap, rerun it, and verify that an older run still displays the name and settings it used. Check that the project’s other targets and audit history are still available after the workspace upgrade.
 - [ ] **Local access is per run.** If you have a trusted local or private staging site, opt in on one workflow run. On a later run, confirm the option starts unchecked.
 - [ ] **Scheduler handoff.** Copy the workflow ID from `seo-analysis workflow list`. Run it from the CLI and verify the workflow name, target, page cap and run ID in History. Then configure a one-time run in Windows Task Scheduler using the [scheduler instructions](../README.md#run-a-saved-workflow-from-a-scheduler). Check that the result appears in the same workspace. While the workflow is running, try launching it again and confirm the second attempt does not start another crawl.
+
+## Review follow-up — 2026-11-28
+
+- [ ] **Windows installation and redirects.** Try a clean install with Python 3.13. If a known alternate URL for your site redirects to its HTTPS or `www` address, check that the workbench names the destination origin. Start a new audit at the intended URL and record its coverage against your sitemap. The earlier Windows run covered a 100-page Samatoos sample.
+- [ ] **Calibrate a saved audit.** Create a stratified sample using the [CLI instructions](../README.md#replay-and-review). Review both flagged and unflagged pairs. Confirm the report lists the population, sampled and reviewed counts. After all decisions are saved, check that the report includes weighted estimates for that snapshot.
