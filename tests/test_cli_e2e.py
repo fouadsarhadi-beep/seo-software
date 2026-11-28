@@ -119,6 +119,17 @@ def test_review_flow_through_the_cli(crawled):
     cli.cmd_calibrate(cal)
     assert "PROVISIONAL" in (out / "calibration.txt").read_text(encoding="utf-8")
 
+    analyze.run_analyze(out, sample_per_stratum=2, log=lambda *_: None)
+    sample = json.loads((out / "calibration-sample.json").read_text(encoding="utf-8"))
+    assert {pair["stratum"] for pair in sample["pairs"]} == {"flagged", "unflagged"}
+    args = cli.build_parser().parse_args(["review", "--in-dir", str(out), "--sample", "--decisions", str(out / "sample.jsonl")])
+    args.workspace = cal.workspace
+    cli.cmd_review(args, input_fn=lambda _: "i")
+    cal = cli.build_parser().parse_args(["calibrate", "--in-dir", str(out), "--sample", "--decisions", str(out / "sample.jsonl")])
+    cal.workspace = args.workspace
+    assert cli.cmd_calibrate(cal) == 0
+    assert "weighted estimates" in (out / "calibration.txt").read_text(encoding="utf-8")
+
 
 def test_non_interactive_cli_end_to_end(site, tmp_path, capsys):
     b = build(site)

@@ -24,7 +24,9 @@ class RobotsPolicy:
     @classmethod
     def parse(cls, text: str):
         groups: dict[str, list] = {}
-        sitemaps, current, in_rules = [], [], False
+        sitemaps: list[str] = []
+        current: list[str] = []
+        in_rules = False
         for raw in text.splitlines():
             line = raw.split("#", 1)[0].strip()
             if ":" not in line:

@@ -90,7 +90,10 @@ def summarize(records, info, pairs_count, thin_words=300) -> str:
 
 
 def run_analyze(in_dir, out_dir=None, gsc_pages=None, gsc_queries=None, settings=None, stopwords_file=None,
-                variants_file=None, normalizer="basic", stem=False, include_noindex=False, log=print) -> dict:
+                variants_file=None, normalizer="basic", stem=False, include_noindex=False, log=print, *,
+                sample_per_stratum=0, sample_seed=0) -> dict:
+    if not 0 <= sample_per_stratum <= 1000:
+        raise ValueError("Choose 0–1000 calibration pairs per stratum.")
     in_dir = Path(in_dir)
     out = Path(out_dir or in_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -127,6 +130,17 @@ def run_analyze(in_dir, out_dir=None, gsc_pages=None, gsc_queries=None, settings
     revisions = {r["url"]: sha256(json.dumps([r.get(k) for k in ("text", "title", "h1", "effective_indexability")], ensure_ascii=False).encode()).hexdigest() for r in records}
     title_of = {i["url"]: i["title"] for i in items}
 
+    def pair_record(p, ga, gb, count, top, comparable, triggers, evidence):
+        return {"content_revisions": {p.url_a: revisions[p.url_a], p.url_b: revisions[p.url_b]},
+                           "source_snapshot": str(in_dir.resolve()), "url_a": p.url_a, "url_b": p.url_b, "title_a": title_of[p.url_a], "title_b": title_of[p.url_b],
+                           "title_sim": p.title_sim, "dup": p.dup, "containment": p.containment, "topic": p.topic,
+                           "same_h1": p.same_h1, "shared_terms": p.shared_terms, "shared_phrases": p.shared_phrases,
+                           "triggers": triggers, "evidence": evidence, "page_type_a": p.page_type_a,
+                           "page_type_b": p.page_type_b, "words_a": p.words_a, "words_b": p.words_b, "short_page": p.short_page,
+                           "gsc": ({"clicks_a": ga.get("clicks"), "clicks_b": gb.get("clicks"),
+                                    "impr_a": ga.get("impressions"), "impr_b": gb.get("impressions"),
+                                    "shared_count": count if comparable else None, "shared_top": top} if (pages or qpairs) else None)}
+
     rows, pairs_json = [], []
     for p in results:
         ga, gb = pages.get(url_key(p.url_a), {}), pages.get(url_key(p.url_b), {})
@@ -140,18 +154,24 @@ def run_analyze(in_dir, out_dir=None, gsc_pages=None, gsc_queries=None, settings
                      p.words_a, p.words_b, "short page: scores can be noisy" if p.short_page else "",
                      ga.get("clicks", ""), gb.get("clicks", ""), ga.get("impressions", ""), gb.get("impressions", ""),
                      count if comparable else "", "; ".join(f"{q} ({gsc.display_metric(a)}/{gsc.display_metric(b)})" for q, a, b in top)])
-        pairs_json.append({"content_revisions": {p.url_a: revisions[p.url_a], p.url_b: revisions[p.url_b]},
-                           "source_snapshot": str(in_dir.resolve()), "url_a": p.url_a, "url_b": p.url_b, "title_a": title_of[p.url_a], "title_b": title_of[p.url_b],
-                           "title_sim": p.title_sim, "dup": p.dup, "containment": p.containment, "topic": p.topic,
-                           "same_h1": p.same_h1, "shared_terms": p.shared_terms, "shared_phrases": p.shared_phrases,
-                           "triggers": triggers, "evidence": evidence, "page_type_a": p.page_type_a,
-                           "page_type_b": p.page_type_b, "words_a": p.words_a, "words_b": p.words_b, "short_page": p.short_page,
-                           "gsc": ({"clicks_a": ga.get("clicks"), "clicks_b": gb.get("clicks"),
-                                    "impr_a": ga.get("impressions"), "impr_b": gb.get("impressions"),
-                                    "shared_count": count if comparable else None, "shared_top": top} if (pages or qpairs) else None)})
+        pairs_json.append(pair_record(p, ga, gb, count, top, comparable, triggers, evidence))
     rows_order = sorted(range(len(rows)), key=lambda i: -rows[i][8])
     write_csv(out / "similar_pairs.csv", PAIR_HEADER, [rows[i] for i in rows_order])
     write_json(out / "pairs.json", [pairs_json[i] for i in rows_order])
+    artifacts = ["similar_pairs.csv", "pairs.json", "canonical_report.csv", "issues.txt"]
+    if sample_per_stratum:
+        population, sample = similarity.calibration_sample(corpus, results, sample_per_stratum, sample_seed)
+        pairs = []
+        for stratum, pair in sample:
+            comparable = url_key(pair.url_a) in qpairs and url_key(pair.url_b) in qpairs
+            count, top = gsc.shared_queries(qpairs, pair.url_a, pair.url_b) if comparable else (0, [])
+            triggers = pair.triggers + (["shared GSC queries"] if count >= 3 else [])
+            row = pair_record(pair, pages.get(url_key(pair.url_a), {}), pages.get(url_key(pair.url_b), {}),
+                              count, top, comparable, triggers, pair.evidence + (1 if count >= 3 else 0))
+            pairs.append(row | {"stratum": stratum})
+        write_json(out / "calibration-sample.json", {"schema_version": 1, "seed": sample_seed,
+                                                    "population": population, "pairs": pairs})
+        artifacts.append("calibration-sample.json")
     canon_rows = [[r["url"], r["final_status"], r["effective_indexability"], info[r["url"]]["candidates"],
                    info[r["url"]]["relationship"], info[r["url"]]["target_status"], info[r["url"]]["issues"],
                    info[r["url"]]["pointing_here"]] for r in records
@@ -170,7 +190,7 @@ def run_analyze(in_dir, out_dir=None, gsc_pages=None, gsc_queries=None, settings
                     "normalizer": normalizer if hz else fa_text.NORMALIZER_VERSION, "stem": stem,
                     "stopwords_version": fa_text.STOPWORDS_VERSION, "variants": len(variants),
                     "gsc_pages": bool(pages), "gsc_query_page": bool(qpairs), "include_noindex": include_noindex},
-                   counts, ["similar_pairs.csv", "pairs.json", "canonical_report.csv", "issues.txt"], [coverage] if coverage else [],
+                   counts, artifacts, [coverage] if coverage else [],
                    ["Thresholds are starting values, provisional until you calibrate them with your own decisions.",
                     "Similarity is not proof of cannibalization.",
                     "Search Console data: a missing query row does not prove a page never appeared for it."])

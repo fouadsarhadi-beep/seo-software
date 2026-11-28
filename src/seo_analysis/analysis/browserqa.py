@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 from mimetypes import guess_type
 from pathlib import Path
+import sys
 from urllib.parse import quote, unquote, urlsplit
 
 from seo_analysis.analysis.siteqa import compare_screenshots
@@ -122,8 +123,12 @@ def browser_qa(ctx, request):
 
     try:
         with sync_playwright() as playwright:
+            channel = None
+            if sys.platform == "win32" and getattr(sys, "frozen", False) and not request.chromium:
+                channel = "chromium" if Path(playwright.chromium.executable_path).is_file() else "msedge"
             browser = playwright.chromium.launch(
                 executable_path=request.chromium or None,
+                channel=channel,
                 args=["--host-resolver-rules=MAP * ~NOTFOUND", "--force-webrtc-ip-handling-policy=disable_non_proxied_udp"],
                 timeout=20_000,
             )
@@ -170,6 +175,8 @@ def browser_qa(ctx, request):
             browser.close()
     except Error as exc:
         detail = str(exc)
+        if "Executable doesn't exist" in detail and sys.platform == "win32" and getattr(sys, "frozen", False):
+            raise RuntimeError("Install Microsoft Edge to capture local builds from SEO Workbench.") from None
         if "Executable doesn't exist" in detail:
             raise RuntimeError("Install Chromium with playwright install chromium or supply --chromium.") from None
         raise RuntimeError("Chromium could not capture the selected local build.") from None

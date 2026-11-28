@@ -64,6 +64,15 @@ class FetchResult:
     def redirect_count(self) -> int:
         return max(0, len(self.chain) - 1) if self.chain else 0
 
+    @property
+    def external_redirect_origin(self) -> HttpOrigin | None:
+        if self.redirect_note.startswith("blocked_external:"):
+            try:
+                return HttpOrigin.from_url(self.final_url)
+            except ValueError:
+                pass
+        return None
+
 
 def _getlist(resp, name: str) -> list:
     try:
@@ -94,7 +103,7 @@ class Fetcher:
         self.backoff_base, self.sleep = backoff_base, sleep
         self.cancel = cancel
         self._last = 0.0
-        self.attempts = []
+        self.attempts: list[dict] = []
 
     # -- scope and pacing
     def in_scope(self, url: str) -> bool:
@@ -212,7 +221,10 @@ class Fetcher:
                     res.final_status = resp.status_code
                     return res
                 res.final_status, res.final_url = resp.status_code, nxt
-                if self.in_scope(nxt) and url_key(nxt) in seen:
+                if not self.in_scope(nxt):
+                    res.redirect_note = f"blocked_external:{nxt}"
+                    return res
+                if url_key(nxt) in seen:
                     res.redirect_note = "loop"
                     return res
                 current = nxt

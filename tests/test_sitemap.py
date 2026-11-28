@@ -35,9 +35,10 @@ def test_gzip_supported_and_bomb_refused():
         sitemap.parse_sitemap(bomb, cap=100_000)
 
 
-def test_dtd_entities_refused():
+@pytest.mark.parametrize("encoding", ["utf-8", "utf-16"])
+def test_dtd_entities_refused(encoding):
     with pytest.raises(ValueError):
-        sitemap.parse_sitemap(b'<!DOCTYPE x [<!ENTITY a "b">]><urlset></urlset>')
+        sitemap.parse_sitemap('<!DOCTYPE x [<!ENTITY a "b">]><urlset></urlset>'.encode(encoding))
 
 
 def test_collect_nested_recursive_duplicates_and_skip(site):

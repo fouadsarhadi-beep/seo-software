@@ -2,6 +2,7 @@
 Nothing is changed on the website. Decisions are saved one by one, so you can stop and resume."""
 from __future__ import annotations
 
+from collections import Counter
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -121,31 +122,51 @@ def review_loop(pairs, decisions_path, min_evidence: int = 1, limit: int = 0, in
     return saved
 
 
-def calibrate(pairs, decisions_path, output_fn=print) -> str:
-    """Compare the thresholds with YOUR decisions. 'actionable' = anything except ignore."""
-    dec = load_decisions(decisions_path)
-    rows = []
-    for p in pairs:
-        d = dec.get(pair_key(p["url_a"], p["url_b"]))
-        if d and d.get("content_revisions") == p.get("content_revisions"):
-            rows.append((p, d["decision"] != "ignore"))
-    lines = [f"Calibration from {len(rows)} decisions you made "
-             f"({sum(1 for _, a in rows if a)} actionable, {sum(1 for _, a in rows if not a)} ignored)."]
-    if len(rows) < 20 or sum(1 for _, a in rows if not a) < 5 or sum(1 for _, a in rows if a) < 5:
-        lines.append("PROVISIONAL: with fewer than 20 decisions, or fewer than 5 of each kind, these numbers are anecdotes, "
-                     "not statistics. Keep reviewing before changing any threshold.")
-    total_act = sum(1 for _, a in rows if a)
-    for key, label in (("dup", "near-duplicate"), ("containment", "containment"), ("topic", "topic overlap"),
-                       ("title_sim", "title similarity")):
-        lines.append(f"\n{label}: share of flagged pairs you judged actionable, by threshold")
-        lines.append("  threshold  flagged  actionable  precision  recall")
-        for t in (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9):
-            flagged = [a for p, a in rows if p[key] >= t]
-            tp = sum(flagged)
-            prec = tp / len(flagged) if flagged else float("nan")
-            rec = tp / total_act if total_act else float("nan")
-            lines.append(f"  {t:>8.0%}  {len(flagged):>7}  {tp:>10}  {prec:>9.0%}  {rec:>6.0%}")
-    lines.append("\nThese metrics apply only to reviewed candidates. Unflagged pairs were not sampled. Choose thresholds by what you can tolerate: higher = fewer pairs to review but more missed duplicates.")
+def calibrate(pairs, decisions_path, output_fn=print, *, population=None) -> str:
+    decisions = load_decisions(decisions_path)
+    reviewed = []
+    for pair in pairs:
+        decision = decisions.get(pair_key(pair["url_a"], pair["url_b"]))
+        if decision is not None and not needs_review(pair, decision):
+            reviewed.append((pair, decision["decision"] != "ignore"))
+    actionable = sum(label for _, label in reviewed)
+    lines = [f"Calibration from {len(reviewed)} decisions you made "
+             f"({actionable} actionable, {len(reviewed) - actionable} ignored)."]
+    if len(reviewed) < 20 or min(actionable, len(reviewed) - actionable) < 5:
+        lines.append("PROVISIONAL: fewer than 20 decisions or fewer than five of either label. Treat these estimates as exploratory.")
+
+    sampled = Counter(pair.get("stratum") for pair in pairs)
+    complete = (population is not None and bool(pairs) and len(reviewed) == len(pairs)
+                and all(sampled[key] for key, size in population.items() if size))
+    if population is None:
+        lines.append("Flagged-pair review only. Precision describes reviewed pairs. Recall is unavailable.")
+    else:
+        judged = Counter(pair["stratum"] for pair, _ in reviewed)
+        for stratum, size in population.items():
+            lines.append(f"{stratum.capitalize()} pairs in snapshot: {size}; sampled: {sampled[stratum]}; reviewed: {judged[stratum]}.")
+        if complete:
+            lines.append("Precision and recall below are weighted estimates for eligible pairs in this snapshot.")
+        else:
+            lines.append("Review the full sample before estimating population precision or recall.")
+
+    def weight(pair):
+        if population is not None and complete:
+            return population[pair["stratum"]] / sampled[pair["stratum"]]
+        return 1.0
+
+    total_actionable = sum(weight(pair) for pair, label in reviewed if label)
+    for key, label in (("dup", "near-duplicate"), ("containment", "containment"),
+                       ("topic", "topic overlap"), ("title_sim", "title similarity")):
+        lines.extend((f"\n{label}", "  threshold  sample matches  precision  recall"))
+        for threshold in (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9):
+            selected = [(pair, label) for pair, label in reviewed if pair[key] >= threshold]
+            positives = sum(weight(pair) for pair, label in selected if label)
+            selected_weight = sum(weight(pair) for pair, _ in selected)
+            precision = (f"{positives / selected_weight:.3f}" if selected_weight and (complete or population is None)
+                         else "—")
+            recall = f"{positives / total_actionable:.3f}" if complete and total_actionable else "—"
+            lines.append(f"  {threshold:>8.2f}  {len(selected):>14}  {precision:>9}  {recall:>6}")
+    lines.append("Threshold rows evaluate individual signals. Coverage inherits the limits of the source snapshot.")
     text = "\n".join(lines)
     output_fn(text)
     return text

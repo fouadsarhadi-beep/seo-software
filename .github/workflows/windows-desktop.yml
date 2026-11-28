@@ -1,0 +1,34 @@
+name: Windows desktop
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: '0.13.9'
+      - name: Bundle the executable
+        run: |
+          uv sync --locked --python 3.12 --all-extras --group desktop-build
+          uv run --no-sync pyinstaller --noconfirm packaging/SEO-Workbench.spec
+      - name: Open the packaged workbench
+        run: python packaging/smoke_desktop.py dist/SEO-Workbench.exe
+      - uses: actions/upload-artifact@v5
+        with:
+          name: SEO-Workbench-Windows-x64
+          path: dist/SEO-Workbench.exe
+          if-no-files-found: error

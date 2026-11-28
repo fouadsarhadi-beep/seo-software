@@ -1,6 +1,6 @@
 """Run one registered operation and preserve its inputs, coverage and artifact references."""
 from collections.abc import Callable
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, is_dataclass
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -63,7 +63,7 @@ class ToolRunner:
 
     def run(self, spec: ToolSpec, request, *, project=None, saved_target=None, log=print, prompt=None, cancel=None, workflow=None):
         expected, operation = OPERATIONS[spec]
-        if not isinstance(request, expected):
+        if not isinstance(request, expected) or not is_dataclass(request) or isinstance(request, type):
             raise TypeError(f"{spec.id} requires {expected.__name__}")
         history = History(self.workspace)
         selection = history.selection(project, saved_target)

@@ -1,4 +1,3 @@
-import pytest
 
 from seo_analysis.core.network import HttpOrigin
 

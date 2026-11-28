@@ -20,6 +20,8 @@ class HttpOrigin:
             if parts.scheme not in {"http", "https"} or not parts.hostname or parts.username is not None:
                 raise ValueError
             prepared = Request("GET", url).prepare()
+            if not isinstance(prepared.url, str):
+                raise ValueError
             host = urlsplit(prepared.url).hostname
             port = parts.port
             if not host or port == 0:
@@ -33,3 +35,8 @@ class HttpOrigin:
             return self == HttpOrigin.from_url(url)
         except ValueError:
             return False
+
+    def __str__(self) -> str:
+        host = f"[{self.host}]" if ":" in self.host else self.host
+        port = "" if self.port == (443 if self.scheme == "https" else 80) else f":{self.port}"
+        return f"{self.scheme}://{host}{port}"

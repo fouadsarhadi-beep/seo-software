@@ -9,16 +9,17 @@ from pathlib import Path
 
 
 def find_candidates(token_lists, min_split: int = 2, min_len: int = 4):
-    uni, bi = Counter(), Counter()
+    uni: Counter[str] = Counter()
+    bi: Counter[tuple[str, str]] = Counter()
     for toks in token_lists:
         uni.update(toks)
         bi.update(zip(toks, toks[1:]))
-    out = []
+    out: list[dict[str, str | int]] = []
     for (a, b), c in bi.items():
         joined = a + b
         if c >= min_split and len(joined) >= min_len and len(b) >= 2 and joined in uni:
             out.append({"joined": joined, "split": f"{a} {b}", "joined_count": uni[joined], "split_count": c})
-    out.sort(key=lambda x: -(x["joined_count"] + x["split_count"]))
+    out.sort(key=lambda x: -(int(x["joined_count"]) + int(x["split_count"])))
     return out
 
 

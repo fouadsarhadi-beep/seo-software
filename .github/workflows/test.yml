@@ -5,17 +5,18 @@ jobs:
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest]
+        python: ['3.12', '3.13']
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python }}
       - uses: astral-sh/setup-uv@v7
         with:
           version: '0.13.9'
-      - run: uv sync --locked --extra google
-      - run: uv run --locked --extra google pytest -q
+      - run: uv sync --locked --python '${{ matrix.python }}' --extra google --extra browser
+      - run: uv run --locked --extra google --extra browser pytest -q -rs
       - run: uv build --wheel
       - name: Smoke-test installed wheel outside the checkout
         shell: python
@@ -44,9 +45,27 @@ jobs:
               assert run["status"] == "succeeded" and run["counts"]["pages"] == 1
               assert (pathlib.Path(run["out_dir"]) / "site-qa.json").is_file()
       - name: Upload verified wheel
-        if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@v4
+        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
+        uses: actions/upload-artifact@v5
         with:
           name: seo-analysis-wheel
           path: dist/*.whl
           if-no-files-found: error
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: '0.13.9'
+      - run: uv sync --locked --group quality
+      - run: uv run --locked --group quality ruff check src tests
+      - run: uv run --locked --group quality mypy src/seo_analysis
+      - run: uv run --locked --group quality bandit -q -ll -r src
+      - name: Audit locked runtime dependencies
+        run: |
+          uv export --locked --no-dev --all-extras --no-emit-project --output-file /tmp/seo-requirements.txt
+          uv run --locked --group quality pip-audit --disable-pip --require-hashes -r /tmp/seo-requirements.txt

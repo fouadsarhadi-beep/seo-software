@@ -39,6 +39,8 @@ class AnalysisInput:
     normalizer: str = "basic"
     stem: bool = False
     include_noindex: bool = False
+    sample_per_stratum: int = 0
+    sample_seed: int = 0
 
 
 @dataclass
@@ -54,12 +56,14 @@ class ReviewInput:
     decisions: str | None = None
     min_evidence: int = 1
     limit: int = 0
+    sample: bool = False
 
 
 @dataclass
 class CalibrationInput:
     in_dir: str
     decisions: str | None = None
+    sample: bool = False
 
 
 def crawl(ctx, cfg):
@@ -74,6 +78,7 @@ def analyze_snapshot(ctx, request):
     result = analyze.run_analyze(
         request.in_dir, ctx.directory, request.gsc_pages, request.gsc_queries, request.settings,
         request.stopwords, request.variants, request.normalizer, request.stem, request.include_noindex, log=ctx.log,
+        sample_per_stratum=request.sample_per_stratum, sample_seed=request.sample_seed,
     )
     manifest = Path(request.in_dir) / "crawl_manifest.json"
     if manifest.is_file():
@@ -105,10 +110,12 @@ def spelling_variants(ctx, request):
 
 def review_pairs(ctx, request):
     source = Path(request.in_dir)
-    pairs = json.loads((source / "pairs.json").read_text(encoding="utf-8"))
+    filename = "calibration-sample.json" if request.sample else "pairs.json"
+    data = json.loads((source / filename).read_text(encoding="utf-8"))
+    pairs = data["pairs"] if request.sample else data
     path = Path(request.decisions or source / "decisions.jsonl")
     with FileLock(str(path) + ".lock", timeout=0):
-        new = review.review_loop(pairs, path, request.min_evidence, request.limit, ctx.ask, ctx.log)
+        new = review.review_loop(pairs, path, 0 if request.sample else request.min_evidence, request.limit, ctx.ask, ctx.log)
         decisions = review.load_decisions(path)
         if path.exists():
             write_text(ctx.directory / "decisions.jsonl", path.read_text(encoding="utf-8"))
@@ -120,9 +127,11 @@ def review_pairs(ctx, request):
 def calibrate(ctx, request):
     source = Path(request.in_dir)
     path = Path(request.decisions or source / "decisions.jsonl")
-    pairs = json.loads((source / "pairs.json").read_text(encoding="utf-8"))
+    filename = "calibration-sample.json" if request.sample else "pairs.json"
+    data = json.loads((source / filename).read_text(encoding="utf-8"))
+    pairs = data["pairs"] if request.sample else data
     with FileLock(str(path) + ".lock", timeout=0):
-        text = review.calibrate(pairs, path, ctx.log)
+        text = review.calibrate(pairs, path, ctx.log, population=data["population"] if request.sample else None)
     write_text(ctx.directory / "calibration.txt", text)
     return {"counts": {"candidate_pairs": len(pairs)}}
 

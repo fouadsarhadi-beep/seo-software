@@ -5,6 +5,7 @@ from pathlib import Path
 from seo_analysis.analysis import canon
 from seo_analysis.analysis.analyze import load_snapshot, run_analyze
 from seo_analysis.core.artifacts import write_json, write_text
+from seo_analysis.core.network import HttpOrigin
 from seo_analysis.reporting.report import write_csv
 from seo_analysis.web.crawl import run_crawl
 
@@ -30,7 +31,15 @@ def report_findings(directory):
         state = page["fetch_state"]
         if not state.startswith("ok"):
             category = "error" if state in ("server_error", "client_error", "fetch_error") else "warning"
-            add(category, "crawl." + state, f"{url} ({page['final_status'] or state})", eid)
+            detail = f"{url} ({page['final_status'] or state})"
+            if state == "redirect_blocked_external":
+                try:
+                    destination = HttpOrigin.from_url(page["final_url"])
+                except ValueError:
+                    pass
+                else:
+                    detail += f" redirects outside the selected origin to {destination}."
+            add(category, "crawl." + state, detail, eid)
             continue
         if page["extraction_state"] in ("fallback", "empty", "truncated"):
             message = extraction_messages[page["extraction_state"]]

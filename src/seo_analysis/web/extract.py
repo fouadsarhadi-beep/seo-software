@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass, field
 from urllib.parse import urljoin
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, PageElement, Tag
 
 from seo_analysis.analysis.fa_text import tokenize
 
@@ -20,6 +20,11 @@ ROBOTS_NAMES = re.compile(r"^(robots|googlebot|googlebot-news|bingbot|msnbot|slu
 
 def _clean(s: str) -> str:
     return re.sub(r"\s+", " ", s or "").strip()
+
+
+def _attribute(tag: PageElement | None, name: str) -> str:
+    value = tag.get(name) if isinstance(tag, Tag) else None
+    return value if isinstance(value, str) else ""
 
 
 @dataclass
@@ -49,23 +54,24 @@ def extract_page(html: str, base_url: str, content_selector: str = "", exclude_s
     pd.h1_list = [_clean(h.get_text(" ")) for h in soup.find_all("h1")]
     pd.h2_count = len(soup.find_all("h2"))
     tag = soup.find("meta", attrs={"name": re.compile(r"^description$", re.I)})
-    pd.meta_description = _clean(tag.get("content", "")) if tag else ""
+    pd.meta_description = _clean(_attribute(tag, "content"))
     for m in soup.find_all("meta"):
-        name = m.get("name") or ""
+        name = _attribute(m, "name")
         if ROBOTS_NAMES.match(name) and m.get("content") is not None:
-            pd.robots_meta.append((name.lower(), _clean(m["content"])))
+            pd.robots_meta.append((name.lower(), _clean(_attribute(m, "content"))))
     base_tag = soup.find("base", href=True)
-    base = urljoin(base_url, base_tag["href"]) if base_tag else base_url
+    base = urljoin(base_url, _attribute(base_tag, "href"))
     pd.markup = capture_markup(soup, base)
     if collect_links:
         pd.links = pd.markup["links"]
     for link in soup.find_all("link"):
-        rel = link.get("rel") or []
-        rel = rel.split() if isinstance(rel, str) else rel
-        if "canonical" in [r.lower() for r in rel] and link.get("href", "").strip():
-            pd.canonicals.append(urljoin(base, link["href"].strip()))
+        rel = link.get("rel")
+        tokens = rel.split() if isinstance(rel, str) else rel or []
+        href = _attribute(link, "href").strip()
+        if href and any(token.lower() == "canonical" for token in tokens):
+            pd.canonicals.append(urljoin(base, href))
     html_tag = soup.find("html")
-    pd.lang = (html_tag.get("lang") or "") if html_tag else ""
+    pd.lang = _attribute(html_tag, "lang")
 
     js_notice = any(JS_NOTICE.search(tag.get_text(" ", strip=True)) for tag in soup("noscript"))
     selectors = list(dict.fromkeys(filter(None, [content_selector, *DEFAULT_CONTENT_SELECTORS])))
@@ -86,7 +92,7 @@ def extract_page(html: str, base_url: str, content_selector: str = "", exclude_s
             if tag.parent is not None:
                 tag.decompose()
 
-    attempts = []
+    attempts: list[dict] = []
     pd.extraction = {"attempts": attempts, "javascript_notice": js_notice}
     pd.state = "empty"
     for selector in selectors + ["body"]:

@@ -54,8 +54,6 @@ class FakeService:
         self.calls.append((siteUrl, body))
         start, lim = body["startRow"], body["rowLimit"]
         chunk = self.rows[start:start + lim]
-        outer = self
-
         class Req:
             def execute(self_inner):
                 return {"rows": chunk}
