@@ -119,3 +119,4 @@ Use authorized properties and the documented [Google connection and CLI commands
 
 - [ ] **The picker explains itself.** Open **Keyword and competitor research**. Each saved dataset should say what it can answer, and the page should explain that two comparable samples support a gap comparison while an absent query is not proof of no ranking.
 - [ ] **A gap uses comparable samples only.** Import two search-result exports from the same provider, locale and device but different dates or sites. The competitor section should report shared and competitor-only queries within those samples, with the capture context visible.
+- [ ] **Every advertised task leads somewhere.** Work through the navigation and confirm each entry reaches a working screen or explains its prerequisite; nothing should be a dead link. Run a local HTML build through **Site QA** and follow one observation to its evidence.

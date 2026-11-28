@@ -2,6 +2,8 @@
 
 The local audit, evidence, project and history workflows are in use. The Windows test on Samatoos observed 100 URLs and confirmed Persian article extraction. PR #4 added run archiving and clearer results and downloads. Technical checks, comparisons, local reporting, research and build QA already have CLI entry points. The next milestone brings the most useful of those workflows into the browser workbench.
 
+**Status update.** That workbench milestone has since been delivered through the seven-stage plan in [WORKBENCH_PRODUCT_PLAN.md](WORKBENCH_PRODUCT_PLAN.md) and its [implementation checklist](WORKBENCH_IMPLEMENTATION_CHECKLIST.md): stages 1–6 are implemented and verified with fixtures, and stage 7 has its source picker. Remaining work is the keyword-gap view and question relationships, plus owner acceptance. Provider capabilities and their live status are tracked in [CAPABILITY_STATUS.md](CAPABILITY_STATUS.md).
+
 ## Next milestone — Audit, compare and review in the workbench
 
 | Order | From the original plan | Change | Ready when |

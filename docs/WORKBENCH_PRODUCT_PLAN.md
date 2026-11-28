@@ -2,7 +2,7 @@
 
 [Step-by-step implementation checklist](WORKBENCH_IMPLEMENTATION_CHECKLIST.md)
 
-Proposed 2026-11-28. All steps below are pending. Deliver one stage at a time and record the result in the implementation log. Add each stage's owner checks to the manual audit log when its build is ready.
+Proposed 2026-11-28. **Status:** stages 1–6 are delivered and covered by tests; stage 7 has its source picker, with the keyword-gap view and question relationships still open. Delivery and verification detail lives in the [implementation checklist](WORKBENCH_IMPLEMENTATION_CHECKLIST.md), the [implementation log](IMPLEMENTATION_LOG.md) and the [capability status](CAPABILITY_STATUS.md). Deliver one stage at a time and record the result in the implementation log. Add each stage's owner checks to the manual audit log when its build is ready.
 
 The first useful session should let someone choose a site, run an audit, understand its coverage, inspect an affected page and save a report. Returning users should be able to see what changed. Build this journey on the existing run history, evidence, imports and analysis routines. Keep older run links working.
 

@@ -2,6 +2,17 @@
 
 [Dated implementation log](IMPLEMENTATION_LOG.md)
 
+## Workbench product work
+
+The seven-stage plan in [WORKBENCH_IMPLEMENTATION_CHECKLIST.md](WORKBENCH_IMPLEMENTATION_CHECKLIST.md) sits on top of the foundation described below. Stages 1–6 are implemented; stage 7 has its source picker and is otherwise open.
+
+- **Screens.** Project overview and task navigation; a four-view audit explorer (Overview, Findings, Pages, Exports); Search and traffic with connection state and fetch; a project review queue; comparison of two runs.
+- **Exports.** A self-contained HTML report, a page spreadsheet scoped to the current filter, and a ZIP analysis bundle carrying a versioned index of grain, join keys, thresholds, coverage and skipped files.
+- **Google.** Connection state per project, in-app consent with property selection, Search Console and GA4 fetches, URL inspection and disconnect, all through the same operations the CLI uses.
+- **Verification.** 186 tests pass; Hazm and a missing system Chromium are the only skips. The comparison and queue paths are covered for capped samples, fixes, persistent findings, changed evidence and a server restart.
+- **Known limits.** The results route re-reads `snapshot.jsonl` per request (0.2723 s for 100 pages on this machine). Review-queue priority does not use traffic data. No live Google consent or retrieval has been observed yet; the reference [capability status](CAPABILITY_STATUS.md) marks every provider action separately.
+- **References.** [Audit rules](AUDIT_RULES.md) and [tools and routes](TOOL_CATALOGUE.md).
+
 ## Foundation checklist
 
 - [x] Stage A. Installable Python package, workspace configuration, diagnostics and built-in tool catalogue.

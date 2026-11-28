@@ -24,7 +24,8 @@
 <span><strong>{{ counts.get('errors', 0) }}</strong>fetch errors</span>
 <span><strong>{{ counts.get('redirecting', 0) }}</strong>redirecting</span>
 </div>
-<p><a href="?tab=pages">Browse every observed page</a></p>
+<p><a href="?tab=pages">Browse every observed page</a> · <a href="?tab=exports">run one of {{ check_labels|length }} saved-snapshot checks</a></p>
+<p><small>Snapshot checks read this run's saved data and make no requests to the site.</small></p>
 </div>
 <div class="card"><h2>Filter the page table</h2>
 <p>Each counter opens the page table with the filter that reproduces it.</p>

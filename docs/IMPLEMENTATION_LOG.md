@@ -152,4 +152,8 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 
 - Workbench Stage 7, Step 1 — Added a source picker that says what each saved dataset can answer on 2026-11-28: search-result samples support keyword overlap and competitor gaps, keyword lists carry no observed rankings, Search Console data describes the owned site's performance, backlinks are sample-limited and community sources are articles rather than rankings. The picker also states that a query absent from a sample is not proof that a site never ranks for it, and how to select two comparable samples for a gap comparison. Keyword-gap rendering already exists inside the research report's competitor section; a dedicated gap view and the question-relationship work (7.2–7.5) remain.
 
+## Workbench documentation and inventories
+
+- Workbench acceptance, docs — Added the reference set the plan asks for on 2026-11-28: [AUDIT_RULES.md](AUDIT_RULES.md) catalogues every crawl rule and saved-snapshot check with its evidence and coverage limits, including the three distinct link cases; [TOOL_CATALOGUE.md](TOOL_CATALOGUE.md) lists each task's entry screen, shared operation, prerequisite, example input and output, and separates the CLI-only utilities; [CAPABILITY_STATUS.md](CAPABILITY_STATUS.md) records offline, fixture-verified and live-verified status per provider action, keeping authentication, retrieval and publishing apart. Refreshed the roadmap, product plan, implementation state and README so they describe the delivered workbench instead of the pre-workbench plan. The audit overview now surfaces how many saved-snapshot checks are available and links to them.
+
 [Current scope and remaining work](ROADMAP.md)
