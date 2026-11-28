@@ -72,7 +72,8 @@ REPORT_PROVIDERS = {"gsc": "Search Console", "ga4": "Google Analytics 4"}
 CONNECTED_REPORT_TOOLS = {tools.SEARCH_ANALYTICS.id: "gsc", tools.GA4_LANDING_PAGES.id: "ga4"}
 RESEARCH_SOURCE_TOOLS = {tools.PUBLIC_FEED.id: "community", tools.BRAVE_SEARCH.id: "serp"}
 RESEARCH_DATASETS = {"serp": "Search results (SERP)", "keywords": "Keywords", "gsc": "Search Console",
-                     "backlinks": "Backlinks", "community": "Community"}
+                     "backlinks": "Backlinks", "community": "Community",
+                     "questions": "Question relationships"}
 # What each source can answer, shown beside it so an operator picks the right sample.
 RESEARCH_CAPABILITIES = {
     "serp": "Keyword overlap and competitor gaps: which pages ranked for a query in this sample.",
@@ -80,6 +81,7 @@ RESEARCH_CAPABILITIES = {
     "gsc": "Your own search performance: clicks and impressions per query and page.",
     "backlinks": "Referring hosts and target pages, limited to the sample.",
     "community": "Articles and topics from feeds; not search rankings.",
+    "questions": "Seed, parent and child questions: relationships for the question explorer.",
 }
 RESEARCH_SECTIONS = {"keywords": "Keywords", "competitors": "Competitor gaps", "serp_overlap": "SERP overlap",
                      "rank_history": "Rank samples", "keyword_clusters": "Keyword clusters",

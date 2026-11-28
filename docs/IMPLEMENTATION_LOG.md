@@ -160,4 +160,6 @@ Dates use Tehran time and reflect when the work was recorded in Git. Step number
 
 - Workbench Stage 7, Step 2 follow-up — Warned when the selected search samples are not comparable on 2026-11-28. The research report detects two or more SERP sources whose provider, locale or device differ and states that rank history and gaps stay within each capture, so a difference between them is not a ranking change. The last open part of 7.2 is an add-to-brief action from a gap row; that needs a product decision about what a brief is before it is built.
 
+- Workbench Stage 7, Step 3 — Added a question-relationship import on 2026-11-28. A file needs `parent` and `child` columns (aliases accepted, `seed` optional); each row is validated separately, incomplete rows are counted as skipped, and an identical parent-child edge appearing twice collapses into one relationship while a child under two different parents stays as two. Original spelling is preserved, and the saved source keeps provider, locale and observation date. A file missing the relationship columns is rejected with the missing names. The preview is the saved dataset view, which lists the kept relationships and reports both the skipped and collapsed counts; a pre-commit preview is not built.
+
 [Current scope and remaining work](ROADMAP.md)

@@ -49,6 +49,9 @@ ALIASES = {
     "conversions": ("conversions", "key events"),
     "title": ("title", "question", "post title", "topic"),
     "published": ("published", "publication date", "pubdate"),
+    "seed": ("seed", "seed question", "seed_question", "topic seed"),
+    "parent": ("parent", "parent question", "parent_question", "parent topic"),
+    "child": ("child", "child question", "child_question", "sub question", "related question"),
 }
 REQUIRED = {
     "keywords": ("query",),
@@ -57,6 +60,7 @@ REQUIRED = {
     "ga4": ("url", "sessions"),
     "community": ("title", "url"),
     "backlinks": ("source_url", "url"),
+    "questions": ("parent", "child"),
 }
 METRICS = {"rank", "volume", "clicks", "impressions", "sessions", "conversions"}
 
@@ -150,6 +154,7 @@ def import_export(ctx, request):
     if len(raw) > 20_000_000:
         raise ValueError("Select an export of 20 MB or less.")
     rows, skipped, capped, mapping = [], 0, False, {}
+    edges, duplicates = set(), 0
     for number, source in enumerate(records(path, raw, request.kind), 1):
         if number > 50000:
             capped = True
@@ -182,6 +187,14 @@ def import_export(ctx, request):
         if request.kind == "gsc" and not (row.get("url") or row.get("query")):
             skipped += 1
             continue
+        if request.kind == "questions":
+            # One row per relationship: the same parent-child edge twice is the same edge,
+            # while a child under two different parents is two relationships and is kept.
+            edge = (row.get("parent", ""), row.get("child", ""))
+            if edge in edges:
+                duplicates += 1
+                continue
+            edges.add(edge)
         rows.append(row)
     if not rows:
         raise ValueError("No usable rows in the selected export.")
@@ -204,9 +217,9 @@ def import_export(ctx, request):
     write_csv(ctx.directory / "normalized.csv", columns, ([r[c] for c in columns] for r in rows))
     warnings = (["Read the first 50,000 rows."] if capped else []) + (
         [f"Skipped {skipped} incomplete rows."] if skipped else []
-    )
+    ) + ([f"Collapsed {duplicates} duplicate relationship rows."] if duplicates else [])
     return dict(
         status="partial" if warnings else "succeeded",
-        counts={"rows": len(rows), "skipped": skipped},
+        counts={"rows": len(rows), "skipped": skipped, "duplicates": duplicates},
         warnings=warnings,
     )
